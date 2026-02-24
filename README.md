@@ -1,179 +1,75 @@
 # kube-slint
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+`kube-slint` is a pure Go framework and observability stack for tracking Operational SLIs (Service Level Indicators) in Kubernetes Operators.
 
-## Getting Started
+> **IMPORTANT:** This repository has transitioned from a standalone operator to a library/observability framework. The `operator runtime` (e.g., `cmd/main.go`, `controller-runtime` manager loops) has been removed. 
 
-### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+## How to Use
 
-#### Development tools (project-local)
+The repository is now divided into two primary concepts:
 
-This project uses a project-local toolchain to ensure consistency
-between local development and CI.
+1. **Deploying the Observability Stack (Kustomize)**
+2. **Instrumenting your Operator (Go Library)**
 
-- **golangci-lint v2.1.0**
-    - Provided in `./bin/golangci-lint`
-    - Used by GitHub Actions and recommended for local linting
+### 1. Deploying the Observability Stack (Kustomize)
 
-### Linting
+The Kustomize manifests here provide the Prometheus tags, recording rules, and dashboards needed for monitoring `kube-slint` metrics.
 
-This project uses `golangci-lint` with a v2 configuration
-(`.golangci.yml` uses `version: "2"`).
+**Remote Resource Installation (Recommended)**  
+You can embed the observability stack directly into your project's Kustomize overlays. Add the following to your `kustomization.yaml`:
 
-To run lint locally (recommended):
+```yaml
+resources:
+  # Replace <PINNED_REF> with a specific tag or commit SHA for reproducible builds
+  - github.com/HeaInSeo/kube-slint//config/default?ref=<PINNED_REF>
+```
 
+To test the generated output without downloading:
 ```sh
-make lint
+kustomize build github.com/HeaInSeo/kube-slint//config/default?ref=main | kubectl apply -f -
 ```
 
-**NOTE:** The same version and configuration are used in CI,
-ensuring consistent results between local development and GitHub Actions.
-
-### Local Development (Quick Start)
-For rapid iteration, we provide a Developer Entrypoint Script. This script performs safety checks (cluster existence, context validation), installs CRDs, and guides you through the running loop.
-
-1. Setup your local environment:
-
-```bash
-# Checks prerequisites, installs CRDs, and waits for them to be established
-./hack/dev-start.sh
-# or
-# ./hack/dev-start-kubectl.sh
-```
-2. Run the controller locally:
-
-By default, the metrics endpoint is disabled for security reasons.  
-For local development, it is recommended to explicitly enable the metrics endpoint when running the controller.    
-
-Run the controller with the following command:
-
-```bash
-make run ARGS="--metrics-bind-address=:8080 --metrics-secure=false"
-```
-With this configuration:
-- Health and readiness probes are exposed on port 8081.  
-- Prometheus metrics are exposed on http://localhost:8080/metrics  
-
-After starting the controller, you can verify metrics availability by accessing the metrics endpoint directly from your local machine.  
-
-3. Test your changes: Open a new terminal and apply sample CRs:
-
-```bash
-kubectl apply -n default -f config/samples/batch_v1_joboperator.yaml
-
-```
-- Check metrics and logs as guided by the dev-start.sh/dev-start-kubectl.sh output.
-
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
-
+**Local Installation**  
+Alternatively, if you have cloned the repository locally:
 ```sh
-make docker-build docker-push IMG=<some-registry>/kube-slint:tag
+kustomize build config/default | kubectl apply -f -
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+### 2. Instrumenting your Operator (Go Library)
 
-**Install the CRDs into the cluster:**
+Use the `pkg/slo` library in your own Operator code to calculate Churn Rate, Convergence Time, and other SLO metrics. 
 
+> **Note:** `kube-slint` (the Go code) is responsible for *calculating and reporting* SLI JSON output. The Kustomize stack is entirely responsible for *deploying* the observability targets. They serve different purposes.
+
+Ensure your Go modules reference the correct version of this project:
 ```sh
-make install
+go get github.com/HeaInSeo/kube-slint@latest
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+---
 
+## Local Development & Testing
+
+Since this project no longer acts as a running service, standard Go testing tools apply.
+
+### Makefile Targets
+We provide standard Makefile targets for development and testing:
+- **`make build`**: Compiles the library code (`go build ./...`).
+- **`make test`**: Runs unit tests (`go test ./...`).
+- **`make fmt`**: Formats the codebase.
+- **`make vet`**: Vets the codebase.
+- **`make lint`**: Runs `golangci-lint` (recommended before submitting PRs).
+
+> Many legacy deployment commands (`run`, `docker-build`, `deploy`, `install`, etc.) have been stubbed as no-ops with friendly guidance to prevent confusion for returning developers.
+
+### Running End-To-End (E2E) Tests
+If you want to validate changes against a live cluster:
 ```sh
-make deploy IMG=<some-registry>/kube-slint:tag
+make test-e2e
 ```
+*(Requires `kind` installed locally to spin up a transient test cluster)*
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/kube-slint:tag
-```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kube-slint/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+---
 
 ## License
 
@@ -190,4 +86,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
