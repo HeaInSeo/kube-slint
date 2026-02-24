@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-slint-observability-placeholder
+  labels:
+    app.kubernetes.io/name: kube-slint-observability
+  annotations:
+    kube-slint.io/todo: "Replace placeholder with real observability stack manifests"
+data:
+  README: |
+    This is a placeholder ConfigMap to keep kustomize buildable.
+    Replace resources in config/observability with your real stack
+    (Prometheus, Alertmanager, ServiceMonitors, etc.).

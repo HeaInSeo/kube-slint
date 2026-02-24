@@ -1,0 +1,13 @@
+apiVersion: batch.my.domain/v1
+kind: JobOperator
+metadata:
+  labels:
+    app.kubernetes.io/name: my-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: joboperator-sample
+spec:
+  # NOTE: JobOperatorSpec currently defines these fields (image is effectively required).
+  # This sample keeps minimal valid values so `kubectl apply` and e2e smoke tests work.
+  image: nginx:1.25
+  replicas: 1
+  port: 8080

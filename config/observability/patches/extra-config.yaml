@@ -1,0 +1,8 @@
+# TODO: Add your ConfigMap patch here.
+# Example:
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: <target-name>
+# data:
+#   key: value
