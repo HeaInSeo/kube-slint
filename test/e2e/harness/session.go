@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/slo/engine"
-	"github.com/yeongki/my-operator/pkg/slo/fetch"
-	"github.com/yeongki/my-operator/pkg/slo/fetch/curlpod"
-	"github.com/yeongki/my-operator/pkg/slo/fetch/promtext"
-	"github.com/yeongki/my-operator/pkg/slo/spec"
-	"github.com/yeongki/my-operator/pkg/slo/summary"
-	"github.com/yeongki/my-operator/pkg/slo/tags"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/engine"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch/curlpod"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch/promtext"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/tags"
 )
 
 // SessionConfig contains session inputs and defaults.

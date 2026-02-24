@@ -10,20 +10,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/yeongki/my-operator/pkg/devutil"
-	"github.com/yeongki/my-operator/pkg/kubeutil"
+	"github.com/HeaInSeo/kube-slint/pkg/devutil"
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
 
-	"github.com/yeongki/my-operator/pkg/slo/fetch/curlpod"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch/curlpod"
 
-	"github.com/yeongki/my-operator/test/e2e/harness"
-	e2eenv "github.com/yeongki/my-operator/test/e2e/internal/env"
-	"github.com/yeongki/my-operator/test/e2e/manifests"
+	"github.com/HeaInSeo/kube-slint/test/e2e/harness"
+	e2eenv "github.com/HeaInSeo/kube-slint/test/e2e/internal/env"
+	"github.com/HeaInSeo/kube-slint/test/e2e/manifests"
 )
 
 // TODO 이거 따로 빼야 함.
-const namespace = "my-operator-system"
-const serviceAccountName = "my-operator-controller-manager"
-const metricsServiceName = "my-operator-controller-manager-metrics-service"
+const namespace = "kube-slint-system"
+const serviceAccountName = "kube-slint-controller-manager"
+const metricsServiceName = "kube-slint-controller-manager-metrics-service"
 
 var _ = Describe("Manager", Ordered, func() {
 	var (
@@ -94,8 +94,8 @@ var _ = Describe("Manager", Ordered, func() {
 		By("ensuring metrics reader RBAC for controller-manager SA (idempotent)")
 		Expect(kubeutil.ApplyClusterRoleBinding(
 			ctx, logger, runner,
-			"my-operator-e2e-metrics-reader",
-			"my-operator-metrics-reader",
+			"kube-slint-e2e-metrics-reader",
+			"kube-slint-metrics-reader",
 			namespace,
 			serviceAccountName,
 		)).To(Succeed())

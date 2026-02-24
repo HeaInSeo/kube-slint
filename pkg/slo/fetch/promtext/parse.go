@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yeongki/my-operator/pkg/slo/common/promkey"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 )
 
 // ParseTextToMap parses Prometheus exposition format (text) into a flat map.

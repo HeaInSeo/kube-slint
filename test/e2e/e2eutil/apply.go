@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/yeongki/my-operator/pkg/devutil"
+	"github.com/HeaInSeo/kube-slint/pkg/devutil"
 )
 
 // TODO 일단 생각하기.

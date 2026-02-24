@@ -11,10 +11,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/yeongki/my-operator/pkg/devutil"
-	"github.com/yeongki/my-operator/pkg/kubeutil"
-	"github.com/yeongki/my-operator/pkg/slo"
-	"github.com/yeongki/my-operator/test/e2e/e2eutil"
+	"github.com/HeaInSeo/kube-slint/pkg/devutil"
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/test/e2e/e2eutil"
 )
 
 var (
@@ -30,7 +30,7 @@ var (
 
 	// projectImage is the name of the image which will be built and loaded with the code source changes to be tested.
 	// projectImage는 테스트할 코드 소스 변경 사항으로 빌드되고 로드될 이미지의 이름입니다.
-	projectImage = "example.com/my-operator:v0.0.1"
+	projectImage = "example.com/kube-slint:v0.0.1"
 
 	// logger is the suite logger. It is always safe (nil -> no-op).
 	// logger는 스위트 로거입니다. 항상 안전합니다 (nil -> no-op).
@@ -46,7 +46,7 @@ var (
 
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	logger.Logf("Starting my-operator integration test suite")
+	logger.Logf("Starting kube-slint integration test suite")
 	RunSpecs(t, "e2e suite")
 }
 

@@ -3,7 +3,7 @@ package engine
 import (
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/slo/spec"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 )
 
 // RunMode는 측정의 실행 컨텍스트를 정의함.

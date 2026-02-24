@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/slo"
-	"github.com/yeongki/my-operator/pkg/slo/fetch"
-	"github.com/yeongki/my-operator/pkg/slo/spec"
-	"github.com/yeongki/my-operator/pkg/slo/summary"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
 // Logger keeps pkg/slo independent from klog/logr.

@@ -9,7 +9,7 @@
 - `pkg/slo/fetch`: 메트릭 스냅샷 Fetcher 인터페이스 및 Prometheus text 파서
 - `pkg/slo/summary`: 실행 결과 요약 스키마와 JSON writer
 - `pkg/slo/engine`: v1 엔진 및 실행 요청 타입
-- `presets/`: controller-runtime 및 my-operator SLI 프리셋
+- `presets/`: controller-runtime 및 kube-slint SLI 프리셋
 - `test/e2e/harness`: 테스트 시점에 엔진을 호출하는 glue 코드
 
 ## 현재 사용되지 않는 레거시 코드 (삭제하지 않음)

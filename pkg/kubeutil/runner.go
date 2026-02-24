@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 // CmdRunner abstracts command execution (stdout-only on success).

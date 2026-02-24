@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yeongki/my-operator/pkg/slo/fetch"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
 )
 
 func TestNewSession(t *testing.T) {

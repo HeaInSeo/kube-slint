@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/yeongki/my-operator/pkg/kubeutil"
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 // LoadImageToKindClusterWithName loads a local docker image into a kind cluster.

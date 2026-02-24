@@ -1,6 +1,6 @@
 package controller_runtime
 
-// import "github.com/yeongki/my-operator/pkg/slo/spec"
+// import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 
 // func RegisterV1(reg *spec.Registry) {
 // 	reg.MustRegister(ReconcileTotalDeltaSuccess())

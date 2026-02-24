@@ -5,7 +5,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 // 사용 예시

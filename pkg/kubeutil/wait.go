@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 // TODO(refactor): Extract the common polling loop logic into a generic 'Poll' function.

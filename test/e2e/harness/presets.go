@@ -8,7 +8,7 @@ package harness
 //
 // TODO(specs): Keep BaselineV3Specs as a Go fallback, but make config-driven specs the primary path.
 
-import "github.com/yeongki/my-operator/pkg/slo/spec"
+import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 
 // DefaultV3Specs is kept for backward compatibility.
 // It returns the baseline preset set.

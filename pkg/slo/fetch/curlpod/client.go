@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/kubeutil"
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 // PodLabelSelector is the label used for curl pods.

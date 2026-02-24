@@ -1,8 +1,8 @@
 package my_operator
 
 // import (
-// 	"github.com/yeongki/my-operator/pkg/slo/spec"
-// 	"github.com/yeongki/my-operator/presets/controller_runtime"
+// 	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
+// 	"github.com/HeaInSeo/kube-slint/presets/controller_runtime"
 // )
 
 // func RegisterV1(reg *spec.Registry) {
@@ -20,12 +20,12 @@ package my_operator
 // func WorkqueueAddsDeltaMyOperator() spec.SLISpec {
 // 	return spec.SLISpec{
 // 		ID:          "my_operator.workqueue_adds_delta",
-// 		Title:       "Workqueue adds delta (my-operator)",
+// 		Title:       "Workqueue adds delta (kube-slint)",
 // 		Unit:        "count",
 // 		Kind:        "delta_counter",
-// 		Description: "Override queue name for my-operator controller.",
+// 		Description: "Override queue name for kube-slint controller.",
 // 		Inputs: []spec.MetricRef{
-// 			spec.PromKey(`workqueue_adds_total{name="my-operator-controller"}`),
+// 			spec.PromKey(`workqueue_adds_total{name="kube-slint-controller"}`),
 // 		},
 // 		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
 // 	}
@@ -34,11 +34,11 @@ package my_operator
 // func WorkqueueRetriesDeltaMyOperator() spec.SLISpec {
 // 	return spec.SLISpec{
 // 		ID:    "my_operator.workqueue_retries_delta",
-// 		Title: "Workqueue retries delta (my-operator)",
+// 		Title: "Workqueue retries delta (kube-slint)",
 // 		Unit:  "count",
 // 		Kind:  "delta_counter",
 // 		Inputs: []spec.MetricRef{
-// 			spec.PromKey(`workqueue_retries_total{name="my-operator-controller"}`),
+// 			spec.PromKey(`workqueue_retries_total{name="kube-slint-controller"}`),
 // 		},
 // 		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
 // 	}

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yeongki/my-operator/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 type tokenRequest struct {

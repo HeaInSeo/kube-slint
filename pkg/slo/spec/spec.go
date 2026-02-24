@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yeongki/my-operator/pkg/slo/common/promkey"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 )
 
 // MetricRef identifies a metric input to an SLI.
