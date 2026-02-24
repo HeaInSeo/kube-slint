@@ -16,17 +16,27 @@ The repository is now divided into two primary concepts:
 The Kustomize manifests here provide the Prometheus tags, recording rules, and dashboards needed for monitoring `kube-slint` metrics.
 
 **Remote Resource Installation (Recommended)**  
-You can embed the observability stack directly into your project's Kustomize overlays. Add the following to your `kustomization.yaml`:
+You can embed the observability stack directly into your project's Kustomize overlays. 
+
+> **CRITICAL:** Do NOT use branches like `?ref=main`. You must pin the remote resource to a specific tag or commit SHA to ensure reproducible, immutable builds.
+
+Create a `kustomization.yaml` in your consumer repository. Because the base stack intentionally does **not** hardcode a namespace (Strategy A: Zero-Assumption Base), you must declare which namespace the stack should be deployed to using the `namespace` field in your overlay:
 
 ```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# (Required) Inject the destination namespace into the remote stack
+namespace: your-target-namespace
+
 resources:
-  # Replace <PINNED_REF> with a specific tag or commit SHA for reproducible builds
-  - github.com/HeaInSeo/kube-slint//config/default?ref=<PINNED_REF>
+  # Pin to a specific tag or commit SHA
+  - github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>
 ```
 
-To test the generated output without downloading:
+To test the generated output without downloading, you can run a targeted build with a real SHA:
 ```sh
-kustomize build github.com/HeaInSeo/kube-slint//config/default?ref=main | kubectl apply -f -
+kustomize build github.com/HeaInSeo/kube-slint//config/default?ref=ca156d34b0efde18bb54fcf1e9d07727e5e4dce3 | kubectl apply -f -
 ```
 
 **Local Installation**  
