@@ -12,7 +12,7 @@ Additionally, we needed to ensure the Kustomize entrypoints (specifically `confi
   - Removed `setup-envtest` dependency from local tests since `pkg/` tests do not require a live API server (resolving 401 GCS issues).
 - **Kustomize Entrypoint Tuning:**
   - Validated that `config/default` behaves as a safe overarching entrypoint for the observability stack.
-  - Demonstrated usage of remote resource references (`github.com/HeaInSeo/kube-slint//config/default?ref=main`).
+  - Demonstrated usage of remote resource references (`github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>`).
 - **README Updates:**
   - Explicitly stated the "operator runtime removed" transition.
   - Separated instructions into two sections: Deploying the Observability Stack (via Kustomize) vs. Instrumenting your Operator (via Go modules).
@@ -23,7 +23,7 @@ I ran the following commands to ensure stability:
 - `make build` -> Success (compiles `pkg/` contents).
 - `make test` -> Success (runs unit tests without ENVTEST failures).
 - `make fmt` and `make vet` -> Success.
-- `./bin/kustomize build config/default` -> Success (outputs correct `namespace.yaml` and Prometheus placeholders).
+- `./bin/kustomize build config/default` -> Success (outputs correct configuration alongside Prometheus placeholders, requiring consumer overlay for exact injection).
 
 ## Compatibility
 Existing targets widely used by downstream systems or returning developers (`make run`, `make docker-build`) will now safely exit 0 while printing a deprecation notice, preventing sudden pipeline explosion errors. 

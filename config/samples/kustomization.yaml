@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- metrics_service.yaml
+- prometheus/
+- network-policy/
+
+# Optional Patches
+# patches:
+# - path: manager_metrics_patch.yaml
+# - path: cert_metrics_manager_patch.yaml

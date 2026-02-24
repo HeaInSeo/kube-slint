@@ -3,6 +3,7 @@ kind: Kustomization
 
 
 resources:
+- placeholders/README-configmap.yaml
 # Remote resource (pin ref for reproducibility):
 # - github.com/<ORG>/<OBS_REPO>//kustomize/overlays/default?ref=<PINNED_REF>
 #   # <PINNED_REF> should be a tag or commit SHA (commit SHA recommended).
