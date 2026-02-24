@@ -1,0 +1,25 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories (legacy)
+vendor/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
