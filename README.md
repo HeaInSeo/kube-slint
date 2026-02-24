@@ -56,6 +56,8 @@ Ensure your Go modules reference the correct version of this project:
 go get github.com/HeaInSeo/kube-slint@latest
 ```
 
+> **Note on ServiceMonitors & NetworkPolicies:** Base manifests (like `monitor.yaml` or `metrics_service.yaml`) contain labels specific to individual operators. We have moved the `kube-slint` specific legacy components into `config/samples/`. You MUST copy/adapt these samples to match your target operator's metrics service and labels.
+
 ---
 
 ## Local Development & Testing
