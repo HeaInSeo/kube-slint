@@ -1,22 +1,17 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Observability stack resources live in this repo.
-# TODO: Replace the placeholder resources below with your real stack manifests.
-
 namespace: kube-slint-observability
 
 resources:
 - namespace.yaml
-- placeholders/README-configmap.yaml
+# Remote resource (pin ref for reproducibility):
+# - github.com/<ORG>/<OBS_REPO>//kustomize/overlays/default?ref=<PINNED_REF>
+#   # <PINNED_REF> should be a tag or commit SHA (commit SHA recommended).
 
-# Patches are optional. Uncomment and tailor as needed.
+# Optional patches (uncomment as needed):
 # patches:
-# - path: patches/override-values.yaml
+# - path: patches/override.yaml
 #   target:
 #     kind: Deployment
-#     name: <target-name>
-# - path: patches/extra-config.yaml
-#   target:
-#     kind: ConfigMap
 #     name: <target-name>
