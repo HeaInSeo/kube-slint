@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -44,6 +45,11 @@ type SessionConfig struct {
 	// Internal metadata
 	ConfigSourceType string
 	ConfigSourcePath string
+
+	StrictnessMode string // BestEffort | StrictCollection | StrictEvaluation
+	GateOnLevel    string // none | warn | fail
+	CleanupEnabled bool
+	CleanupMode    string // always | on-success | on-failure | manual
 }
 
 type sessionImpl struct {
@@ -126,7 +132,17 @@ func NewSession(cfg SessionConfig) *Session {
 		if discoveredCfg.Write.ArtifactsDir != "" && cfg.ArtifactsDir == "" {
 			cfg.ArtifactsDir = discoveredCfg.Write.ArtifactsDir
 		}
-		// TODO(future): apply Strictness, Gating, and Cleanup configs when implemented in Stage 2.
+		if discoveredCfg.Strictness.Mode != "" {
+			cfg.StrictnessMode = discoveredCfg.Strictness.Mode
+		}
+		if discoveredCfg.Gating.GateOnLevel != "" {
+			cfg.GateOnLevel = discoveredCfg.Gating.GateOnLevel
+		}
+		// If explicitly set
+		cfg.CleanupEnabled = discoveredCfg.Cleanup.Enabled
+		if discoveredCfg.Cleanup.Mode != "" {
+			cfg.CleanupMode = discoveredCfg.Cleanup.Mode
+		}
 	}
 
 	autoTags := tags.AutoTags(tags.AutoTagsInput{
@@ -227,6 +243,43 @@ func (s *Session) AddWarning(message string) {
 	s.impl.Warnings = append(s.impl.Warnings, message)
 }
 
+// Cleanup removes temporary resources created by the session.
+// It uses run-id and namespace as safety guards to prevent broad deletion.
+// Cleanup은 세션에서 생성된 임시 리소스를 제거합니다.
+// 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용합니다.
+func (s *Session) Cleanup(ctx context.Context) {
+	if s == nil || s.impl == nil {
+		return
+	}
+
+	mode := s.impl.Config.CleanupMode
+	if mode == "manual" || (!s.impl.Config.CleanupEnabled && mode == "") {
+		return
+	}
+
+	ns := s.impl.Config.Namespace
+	runID := s.impl.RunID
+
+	if ns == "" || runID == "" {
+		fmt.Printf("kube-slint [cleanup]: skip cleanup - missing namespace or run-id (ns=%q, runID=%q)\n", ns, runID)
+		return
+	}
+
+	// Always restrict by namespace and run-id
+	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", runID)
+
+	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("kube-slint [cleanup]: failed for run-id %s: %v (output: %s)\n", runID, err, string(out))
+	} else {
+		outStr := strings.TrimSpace(string(out))
+		if outStr != "" {
+			fmt.Printf("kube-slint [cleanup]: success for run-id %s: %s\n", runID, outStr)
+		}
+	}
+}
+
 // Start begins measurement.
 // Start는 측정을 시작함.
 func (s *Session) Start() {
@@ -313,6 +366,11 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		outPath = path
 	}
 
+	rel := &summary.Reliability{
+		ConfigSourceType: s.impl.Config.ConfigSourceType,
+		ConfigSourcePath: s.impl.Config.ConfigSourcePath,
+	}
+
 	sum, err := engine.ExecuteStandard(ctx, eng, engine.ExecuteRequestStandard{
 		Method: m,
 		Config: engine.RunConfig{
@@ -322,24 +380,10 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 			Format:     "v4.4",
 			Tags:       s.impl.Tags,
 		},
-		Specs:   s.impl.specs,
-		OutPath: outPath, // Note: The initial write does NOT include Reliability. Next step will fix this.
+		Specs:       s.impl.specs,
+		OutPath:     outPath,
+		Reliability: rel,
 	})
-
-	// Inject Reliability info post-execution.
-	// In Step 2, this struct will be passed all the way down.
-	// 실행 사후에 신뢰도 정보 주입. Step 2에서 이 구조체가 하위로 끝까지 전달될 예정입니다.
-	if sum != nil {
-		if sum.Reliability == nil {
-			sum.Reliability = &summary.Reliability{}
-		}
-		sum.Reliability.ConfigSourceType = s.impl.Config.ConfigSourceType
-		sum.Reliability.ConfigSourcePath = s.impl.Config.ConfigSourcePath
-		// Best-effort overwrite config file
-		if outPath != "" {
-			_ = s.impl.writer.Write(outPath, *sum)
-		}
-	}
 
 	return sum, err
 }
@@ -353,10 +397,14 @@ type curlPodFetcher struct {
 }
 
 func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
+	client := curlpod.New(nil, nil)
+	// Add required safety labels
+	client.LabelSelector = fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", impl.RunID)
+
 	return &curlPodFetcher{
 		impl: impl,
 		pod: &curlpod.CurlPod{
-			// NOTE: CurlPod.Client는 nil이면 내부에서 New(nil,nil)로 default 생성됨.
+			Client:             client,
 			Namespace:          impl.Config.Namespace,
 			MetricsServiceName: impl.Config.MetricsServiceName,
 			ServiceAccountName: impl.Config.ServiceAccountName,

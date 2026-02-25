@@ -45,21 +45,33 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		return nil, fmt.Errorf("StartedAt/FinishedAt must be set")
 	}
 
+	rel := req.Reliability
+	if rel == nil {
+		rel = &summary.Reliability{}
+	}
+
 	// Fetch snapshots
 	start, err := e.fetcher.Fetch(ctx, cfg.StartedAt)
 	if err != nil {
+		rel.CollectionStatus = "Failed"
+		rel.BlockedReason = fmt.Sprintf("fetch(start) failed: %v", err)
 		// philosophy: "measurement failure is not test failure" → return a Summary with warnings
 		// 철학: "측정 실패는 테스트 실패가 아님" → 경고가 포함된 Summary 반환
-		s := e.emptySummary(cfg, []string{fmt.Sprintf("fetch(start) failed: %v", err)})
+		s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(start) failed: %v", err)})
 		_ = e.writer.Write(req.OutPath, *s)
 		return s, nil
 	}
 	end, err := e.fetcher.Fetch(ctx, cfg.FinishedAt)
 	if err != nil {
-		s := e.emptySummary(cfg, []string{fmt.Sprintf("fetch(end) failed: %v", err)})
+		rel.CollectionStatus = "Failed"
+		rel.BlockedReason = fmt.Sprintf("fetch(end) failed: %v", err)
+		s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(end) failed: %v", err)})
 		_ = e.writer.Write(req.OutPath, *s)
 		return s, nil
 	}
+
+	rel.CollectionStatus = "Complete"
+	rel.EvaluationStatus = "Complete" // default to complete, downgrade to partial if skipped
 
 	sum := summary.Summary{
 		SchemaVersion: "slo.v3",
@@ -76,31 +88,36 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 			Format:        cfg.Format,
 			EvidencePaths: cfg.EvidencePaths,
 		},
+		Reliability: rel,
 	}
 
+	missingSet := map[string]bool{}
+
 	for _, s := range req.Specs {
-		// specItem, ok := e.reg.Get(id)
-		// if !ok {
-		// 	sum.Warnings = append(sum.Warnings, fmt.Sprintf("unknown sli id: %s", id))
-		// 	sum.Results = append(sum.Results, summary.SLIResult{
-		// 		ID:     id,
-		// 		Status: "skip",
-		// 		Reason: "unknown sli id",
-		// 	})
-		// 	continue
-		// }
-		// r := evalSLI(specItem, start.Values, end.Values)
 		r := evalSLI(s, start.Values, end.Values)
+		for _, m := range r.InputsMissing {
+			missingSet[m] = true
+		}
+		if r.Status == summary.StatusSkip {
+			rel.SkippedSLIs = append(rel.SkippedSLIs, s.ID)
+		}
 		sum.Results = append(sum.Results, r)
+	}
+
+	for missing := range missingSet {
+		rel.MissingInputs = append(rel.MissingInputs, missing)
+	}
+	if len(rel.SkippedSLIs) > 0 {
+		rel.EvaluationStatus = "Partial"
 	}
 
 	if err := e.writer.Write(req.OutPath, sum); err != nil {
 		return nil, err
 	}
-	return &sum, nil
+	return &sum, err
 }
 
-func (e *Engine) emptySummary(cfg RunConfig, warnings []string) *summary.Summary {
+func (e *Engine) emptySummary(cfg RunConfig, rel *summary.Reliability, warnings []string) *summary.Summary {
 	return &summary.Summary{
 		SchemaVersion: "slo.v3",
 		GeneratedAt:   time.Now(),
@@ -113,8 +130,9 @@ func (e *Engine) emptySummary(cfg RunConfig, warnings []string) *summary.Summary
 			Format:        cfg.Format,
 			EvidencePaths: cfg.EvidencePaths,
 		},
-		Results:  []summary.SLIResult{},
-		Warnings: warnings,
+		Reliability: rel,
+		Results:     []summary.SLIResult{},
+		Warnings:    warnings,
 	}
 }
 
@@ -223,10 +241,11 @@ func compare(v float64, op spec.Op, target float64) bool {
 
 // ExecuteRequestStandard is the standardized request shape (formerly V4).
 type ExecuteRequestStandard struct {
-	Method  MeasurementMethod
-	Config  RunConfig
-	Specs   []spec.SLISpec
-	OutPath string
+	Method      MeasurementMethod
+	Config      RunConfig
+	Specs       []spec.SLISpec
+	OutPath     string
+	Reliability *summary.Reliability
 }
 
 // ExecuteStandard applies standard defaults and delegates to the engine.
@@ -240,8 +259,9 @@ func ExecuteStandard(ctx context.Context, eng *Engine, req ExecuteRequestStandar
 		Trigger:  string(mode.Trigger),
 	}
 	return eng.Execute(ctx, ExecuteRequest{
-		Config:  req.Config,
-		Specs:   req.Specs,
-		OutPath: req.OutPath,
+		Config:      req.Config,
+		Specs:       req.Specs,
+		OutPath:     req.OutPath,
+		Reliability: req.Reliability,
 	})
 }
