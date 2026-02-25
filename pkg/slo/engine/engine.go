@@ -51,7 +51,14 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	}
 
 	// Fetch snapshots
+	realStart := time.Now()
+	startSkew := realStart.Sub(cfg.StartedAt).Milliseconds()
+	rel.StartSkewMs = &startSkew
+
 	start, err := e.fetcher.Fetch(ctx, cfg.StartedAt)
+	scrapeLatencyStart := time.Since(realStart).Milliseconds()
+	rel.ScrapeLatencyMs = &scrapeLatencyStart
+
 	if err != nil {
 		rel.CollectionStatus = "Failed"
 		rel.BlockedReason = fmt.Sprintf("fetch(start) failed: %v", err)
@@ -61,7 +68,19 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		_ = e.writer.Write(req.OutPath, *s)
 		return s, nil
 	}
+
+	realEnd := time.Now()
+	endSkew := realEnd.Sub(cfg.FinishedAt).Milliseconds()
+	rel.EndSkewMs = &endSkew
+
 	end, err := e.fetcher.Fetch(ctx, cfg.FinishedAt)
+	scrapeLatencyEnd := time.Since(realEnd).Milliseconds()
+	// ScrapeLatency is updated to reflect the slower of the two for simplicity,
+	// or sequentially adding if we want total scrape time. We'll store max latency.
+	if scrapeLatencyEnd > scrapeLatencyStart {
+		rel.ScrapeLatencyMs = &scrapeLatencyEnd
+	}
+
 	if err != nil {
 		rel.CollectionStatus = "Failed"
 		rel.BlockedReason = fmt.Sprintf("fetch(end) failed: %v", err)

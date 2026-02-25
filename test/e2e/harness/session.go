@@ -82,7 +82,8 @@ type sessionImpl struct {
 	fetcher fetch.MetricsFetcher
 	writer  summary.Writer
 
-	started time.Time
+	started   time.Time
+	hasFailed bool
 }
 
 type Session struct {
@@ -253,7 +254,26 @@ func (s *Session) Cleanup(ctx context.Context) {
 	}
 
 	mode := s.impl.Config.CleanupMode
-	if mode == "manual" || (!s.impl.Config.CleanupEnabled && mode == "") {
+	if mode == "manual" {
+		return
+	}
+
+	// Resolve implicitly enabled state if not explicitly disabled or set via manual mode
+	if mode == "" {
+		if s.impl.Config.CleanupEnabled {
+			mode = "always"
+		} else {
+			// fallback default when nothing is specified is manual/none for safety
+			return
+		}
+	}
+
+	if mode == "on-success" && s.impl.hasFailed {
+		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test failed\n", mode)
+		return
+	}
+	if mode == "on-failure" && !s.impl.hasFailed {
+		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test succeeded\n", mode)
 		return
 	}
 
@@ -386,19 +406,23 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	})
 
 	if err != nil {
+		s.impl.hasFailed = true
 		return sum, err
 	}
 
 	// 1. Strictness Check (파이프라인 신뢰도 검증)
 	if strictErr := CheckStrictness(s.impl.Config, sum); strictErr != nil {
+		s.impl.hasFailed = true
 		return sum, strictErr
 	}
 
 	// 2. Gating Check (정상 결과 승격 검증)
 	if gatingErr := CheckGating(s.impl.Config, sum); gatingErr != nil {
+		s.impl.hasFailed = true
 		return sum, gatingErr
 	}
 
+	s.impl.hasFailed = false
 	return sum, nil
 }
 
