@@ -23,7 +23,7 @@ I ran the following commands to ensure stability:
 - `make build` -> Success (compiles `pkg/` contents).
 - `make test` -> Success (runs unit tests without ENVTEST failures).
 - `make fmt` and `make vet` -> Success.
-- `./bin/kustomize build config/default` -> Success (outputs correct configuration alongside Prometheus placeholders, requiring consumer overlay for exact injection).
+- `./bin/kustomize build config/default` -> Success (outputs correct configuration alongside placeholder ConfigMap, requiring consumer overlay for exact injection).
 
 ## Compatibility
 Existing targets widely used by downstream systems or returning developers (`make run`, `make docker-build`) will now safely exit 0 while printing a deprecation notice, preventing sudden pipeline explosion errors. 

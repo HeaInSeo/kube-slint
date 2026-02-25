@@ -1,0 +1,827 @@
+# SLO/SLI 계측 방식 기술 문서 v4.4
+
+**Measurement Methods & Developer Configuration Spec v4.4**
+
+**(Engineering Rigor + Architecture Boundary Baseline)**
+
+- **문서 버전:** v4.4
+- **Summary Schema Version:** `schemaVersion="slo.v3"` (유지)
+- **권장 Config Format:** `config.format="v4.4"`
+- **상태:** Working Baseline (정본 / 구현 기준선)
+- **대상:** 오퍼레이터 개발자, 리뷰어, Codex/AI 작업자
+- **목적:** 오퍼레이터 개발 단계에서 사용하는 비침투형(non-invasive) SLI 계측 프레임워크의 **설계 계약**, **실행 규칙**, **신뢰도 정책**, **문서/UX 체계**를 정의한다.
+
+---
+
+## 변경 이력 (v4.3.2 → v4.4)
+
+v4.4는 v4.3.2의 아키텍처/문서 체계를 유지하면서, 신뢰성 계약(Engineering Rigor)을 강화한다.
+
+### v4.4 핵심 추가/보강
+
+1. **설정 탐색 규칙(Discovery Rules)** 정식 규범화
+2. **Strictness 전파 계약(Propagation Contract)** 확정
+3. **자원 정리(Cleanup & Lifecycle)** 및 orphan 보호 규칙 추가
+4. **신뢰도(Reliability) 모델** 강화 (분해 필드 우선, confidenceScore 선택)
+5. **결과 결정성(Result Determinism)** 원칙 명시
+6. **Strictness vs GatingPolicy 분리** (의미 충돌 방지)
+7. **문서 역할 분리(Consumer Quickstart / Integration Guide)** 유지 및 명시
+
+---
+
+# 1) 범위 및 용어
+
+## 1.1 범위 (Scope)
+
+이 문서는 다음을 정의한다.
+
+- e2e(Ginkgo/testing) 기반 SLI 계측의 계층 모델
+    
+    (**Trigger / Observe / Evaluate / Write / Config(Profile)**)
+    
+- 현재 구현 경로 및 확장 방향
+- 설정 탐색/주입 규칙 (Go 주입 / env / YAML / auto-discovery)
+- 계측 실패 엄격도(Strictness), 테스트 실패 전파(Propagation), 자원 정리(Cleanup)
+- 시차(Skew), 노이즈(Noise), 메트릭 의미론(Semantics) 처리 원칙
+- 문서 역할 분리 및 사용자 UX 기준선
+- 외부 표준(OpenSLO 등)과의 브리지 전략
+
+## 1.2 비범위 (Non-goals)
+
+이 문서는 아래를 목표로 하지 않는다.
+
+- 프로덕션 운영용 SLO 플랫폼 전체 (알림/에러버짓 관리/대시보드 체계)
+- 오퍼레이터 프로덕션 `Reconcile()` 경로에 계측 로직 직접 삽입
+- 외부 표준 포맷에 내부 설계를 종속시키는 것
+- 운영 환경 전체의 관측/통제 시스템 대체
+
+## 1.3 핵심 용어
+
+### Trigger (경계 생성)
+
+측정 구간의 시작/끝(Boundary)을 정의하는 방식
+
+- `NoTrigger` (계측자 경계): 테스트/세션이 `Start/End` 기록
+- `AnnotationTrigger` (시스템 경계): annotation 기반 시작, `EndPolicy` 기반 종료
+- `ConditionTrigger` (확장): status condition 기반 종료/경계
+
+### Observe (스냅샷 수집)
+
+경계 시점에 메트릭 스냅샷을 수집하는 단계
+
+- `Inside/CurlPod`
+- `Outside/Endpoint`
+- 기본 포맷: Prometheus/OpenMetrics 텍스트
+
+### Evaluate (엔진 평가)
+
+start/end 스냅샷과 SLI 정의(`SLISpec`)를 바탕으로 계산/판정 수행
+
+### Write (산출물 기록)
+
+summary 및 관련 신뢰도 상태를 기록하는 단계
+
+### Config/Profile (설정 레이어)
+
+오퍼레이터별 SLI 정의와 환경별 정책(strictness/skew/noise 등)을 주입하는 레이어
+
+### Canonicalize
+
+동일 의미 메트릭 키를 동일 문자열 표현으로 정규화 (라벨 순서/이스케이프 등)
+
+### Semantics / Noise Control
+
+Counter reset, volatile label, NaN/Inf, missing input 등 **값 해석/무시/보정 정책**
+
+### Strictness Mode
+
+수집/평가 실패를 WARN으로 허용할지, BLOCK으로 승격할지 정하는 **계측 파이프라인 신뢰도 정책**
+
+### GatingPolicy
+
+정상 계산 결과의 SLI 판정(`WARN/FAIL`)을 **테스트 실패로 승격할지** 정하는 별도 정책
+
+(Strictness와 분리)
+
+### Skew
+
+Boundary 시점과 실제 scrape 시점 간 시차
+
+### Reliability (신뢰도 상태)
+
+계측 결과를 얼마나 신뢰할 수 있는지에 대한 구조화된 상태 집합
+
+(필수 분해 필드 + 선택적 파생 점수)
+
+---
+
+# 2) 설계 원칙 (Normative Principles)
+
+## 2.1 불침투(Non-invasive) 원칙 — **MUST**
+
+- 프로덕션 오퍼레이터 코드(`Reconcile` 경로)에 계측 로직을 삽입하지 않는다.
+- 계측은 기본적으로 E2E 훅(시작/종료)에서 수행한다.
+- 계측 실패가 오퍼레이터의 비계측 동작을 바꾸면 안 된다.
+
+## 2.2 계층 경계(P4/P5) — **MUST**
+
+- `pkg/slo` (P5): 순수 라이브러리 계층 유지
+    - K8s/controller-runtime 의존성 유입 금지
+- `test/e2e`, `internal` (P4): K8s/환경 의존 로직 허용
+- P5는 테스트 프레임워크(ginkgo/testing.T)에 직접 의존하지 않는다.
+- 복잡도(gocognit 등) 해결은 우선 같은 파일의 private helper(P2) 분리로 처리한다.
+
+## 2.3 자원 무결성(Resource Integrity) — **MUST** (v4.4 강화)
+
+- 계측 도구는 클러스터에 좀비 리소스(zombie pods/jobs)를 남기지 않아야 한다.
+- 모든 `Observe` 작업은 성공/실패와 무관하게 정리(cleanup) 경로를 가져야 한다.
+- 정리 범위는 **run-id/session-id로 제한**되어야 하며, 전역 wildcard 삭제를 기본으로 사용하면 안 된다.
+
+## 2.4 결과 결정성(Result Determinism) — **MUST** (v4.4 강화)
+
+- 동일한 입력 메트릭 데이터와 동일한 설정에 대해 엔진은 항상 동일한 결과를 반환해야 한다.
+- 환경 요인(skew, scrape latency, missing data)은 계산 결과와 혼합하지 않고 **신뢰도 상태**로 분리하여 기록한다.
+
+## 2.5 Shift-left 목적성 — **MUST**
+
+이 프레임워크는 운영 SLA 계약 도구가 아니라, **개발 단계 설계 검증/회귀 탐지 도구**다.
+
+## 2.6 신뢰도 우선 — **MUST**
+
+“데이터 없는 통과”를 기본 성공으로 간주해서는 안 된다.
+
+계측 수집/평가 실패는 Strictness 모드에 따라 WARN/BLOCK로 처리되어야 하며, CI에서는 엄격 모드가 권장된다.
+
+## 2.7 문서 역할 분리 — **MUST**
+
+- 일반 사용자용 최소 경로: **Consumer Quickstart**
+- 통합/개발자용 상세 문서: **Developer Integration Guide**
+- 본 문서(기술 명세)는 구현/리뷰 기준선이지 일반 사용 설명서가 아니다.
+
+---
+
+# 3) 전체 아키텍처 흐름
+
+## 3.1 기준선 흐름
+
+1. **Trigger**: 세션이 `StartedAt/FinishedAt` 기록
+2. **Observe**: `/metrics` scrape → parse → canonicalize
+3. **Evaluate**: `SLISpec` 기반 계산/판정
+4. **Write**: summary + reliability 상태 기록
+5. **Propagation** (P4): Strictness/GatingPolicy에 따라 테스트 실패/통과 전파
+
+## 3.2 역할 분리 요약
+
+- **Kustomize**: 계측 보조 리소스 attach / bundle 소비 UX
+- **Harness(P4)**: 설정 탐색/주입, observe 실행, strictness 전파, cleanup
+- **pkg/slo(P5)**: evaluate, semantics/noise 처리, 결과 구조화
+- **Guide 문서**: 사용/해석/운영 절차 제공
+
+---
+
+# 4) 구성요소 명세
+
+## 4.1 Trigger 계층
+
+### 4.1.1 `NoTriggerBoundary` (현재 기본)
+
+- 세션 시작/종료 시각 기반 경계 생성
+- 가장 단순하고 재현성이 높은 기준선
+
+### 4.1.2 Trigger-based 경계 (확장)
+
+- `AnnotationTrigger`, `ConditionTrigger`
+- 종료 정의는 반드시 `EndPolicy`로 명시되어야 함
+
+### 4.1.3 `EndPolicy` (규범)
+
+예시:
+
+- `StatusCondition`
+- `MetricDelta`
+- `Timeout`
+
+**규칙**
+
+- EndPolicy 누락 상태에서 Trigger-based 측정을 허용하면 안 된다 (**MUST NOT**)
+- `Timeout` 종료는 정상 종료와 동일 의미로 처리하면 안 된다 (**MUST NOT**)
+
+---
+
+## 4.2 Observe 계층
+
+### 4.2.1 Observer 역할
+
+- metrics endpoint scrape
+- parse/canonicalize를 위한 원시 텍스트 확보
+- scrape timing 정보 기록 (reliability용)
+
+### 4.2.2 Inside/CurlPod
+
+- 클러스터 내부 접근 전용 경로
+- K8s 의존은 P4 계층에 위치
+- lifecycle cleanup 정책(7장) 준수 필요
+
+### 4.2.3 Outside/Endpoint
+
+- 로컬/외부 endpoint 실험용 경로
+- 네트워크 편차가 클 수 있으므로 profile 기반 skew/noise 기준 필요
+
+---
+
+## 4.3 Evaluate 계층
+
+### 4.3.1 Evaluator
+
+- 입력: `SLISpec[]`, `Snapshot(start/end)`, profile policy
+- 출력: 계산 결과 + 판정 + reliability 상태용 진단 정보(가능 범위)
+
+### 4.3.2 판정 레벨 (개발용 권장)
+
+- `INFO`
+- `WARN`
+- `FAIL`
+- `BLOCK` (측정/정책 신뢰도 실패 또는 구조 실패 포함 가능)
+
+> `BLOCK`는 “운영 장애”가 아니라 “측정/검증 신뢰도 실패”일 수 있다.
+> 
+
+---
+
+## 4.4 Write 계층
+
+### 4.4.1 Writer 정책
+
+- `ArtifactsDir == ""` → noop (계산 가능)
+- `ArtifactsDir != ""` → atomic write
+- 충돌 회피 규칙(`NextSummaryPath` 등) 유지
+
+### 4.4.2 Summary 스키마 정책
+
+- `schemaVersion="slo.v3"` 유지
+- 문서/설정 포맷 버전(v4.x)과 summary 스키마는 분리 관리 (**MUST**)
+
+### 4.4.3 하위호환 원칙
+
+- 신뢰도 관련 필드는 가능한 한 **추가 필드**로 도입
+- 기존 필드 의미 변경은 명시적 버전 정책 없이는 금지
+
+---
+
+## 4.5 Config/Profile 계층
+
+### 4.5.1 현재 기준선
+
+- `SessionConfig` 직접 주입 (Go 코드)
+- `Specs == nil` → baseline preset 사용
+
+### 4.5.2 v4.4 브리지 스프린트 우선 구현
+
+- env/YAML → `SessionConfig` 외부화 래퍼 (P4)
+- 기존 Go 주입과 공존 (하위호환 유지)
+
+### 4.5.3 목표 방향
+
+- 파일 기반 preset/profile 정식 스키마
+- `baseline + overlay(profile)` 합성
+- Strictness/Skew/Noise/Gating을 설정화
+
+---
+
+# 5) 공식 지원 시나리오
+
+## 5.1 시나리오 A: InsideSnapshot (기본)
+
+**NoTrigger + Observe(Inside/CurlPod) + Evaluate + Write + Propagation + Cleanup**
+
+- 가장 재현성 높은 기본 경로
+- CI/VM K8s 기본 권장
+
+## 5.2 시나리오 B: OutsideSnapshot (확장)
+
+**NoTrigger + Observe(Outside/Endpoint) + Evaluate + Write + Propagation**
+
+- 로컬 실험/디버깅에 유리
+- skew/noise 편차 해석 필요
+
+## 5.3 시나리오 C: Trigger-based + External Observe (확장 목표)
+
+**Annotation/Condition Trigger + Observe + Evaluate + Write + Propagation**
+
+- 시스템 경계 기반 측정
+- `EndPolicy` 명시 필수
+
+## 5.4 시나리오 D: Adapter-based Internal-like Observe (실험적)
+
+- opt-in만 허용
+- 불침투/P4-P5 경계 유지 필수
+
+---
+
+# 6) 설정 탐색 규칙 (Discovery Rules) — v4.4 추가
+
+## 6.1 목적
+
+Config 외부화 시, 하네스(P4)가 설정을 예측 가능하고 디버깅 가능하게 탐색하도록 한다.
+
+## 6.2 탐색 우선순위 (Normative)
+
+하네스는 다음 우선순위로 설정을 탐색한다.
+
+1. **명시적 주입 (Go 코드)**
+    - `SessionConfig` 구조체 직접 주입
+2. **환경 변수 경로**
+    - 예: `SLINT_CONFIG_PATH`
+3. **자동 탐색 (Discovery)**
+    - 현재 실행 디렉토리에서 시작하여 상위 디렉토리로 올라가며
+    - `.slint.yaml` 또는 `slint.config.yaml` 검색
+
+## 6.3 디버깅 가능성 보장 — **MUST**
+
+설정이 resolve되면 하네스는 최소한 다음을 로그/상태로 남겨야 한다.
+
+- `configSourceType` (`injected | env | discovered`)
+- `configSourcePath` (파일 경로인 경우)
+- `discoveryEnabled` 여부
+
+## 6.4 재현성 보호 규칙 (권장)
+
+- CI에서는 auto-discovery보다 **명시 경로** 사용을 권장
+- `SLINT_DISABLE_DISCOVERY=1` (또는 동등 옵션) 제공 권장
+- 잘못된 상위 디렉토리 설정 오인 탐색 방지를 위해 resolved source 로깅 필수
+
+---
+
+# 7) Strictness, GatingPolicy, 전파 계약 (Propagation Contract)
+
+> **중요:** v4.4에서는 `Strictness`와 `GatingPolicy`를 분리한다.
+> 
+
+## 7.1 Strictness (계측 파이프라인 신뢰도 정책)
+
+수집/평가/입력 누락 등의 **측정 파이프라인 실패**를 어떻게 처리할지 결정한다.
+
+예시 모드:
+
+- `BestEffort`
+- `StrictCollection`
+- `StrictEvaluation`
+- `RequiredSLIs` (조합형)
+
+### 의미 예시
+
+- `StrictCollection`: scrape 실패/start-end snapshot 실패 시 BLOCK
+- `StrictEvaluation`: 수집 성공 후 evaluate 내부 오류(계산 실패/입력 불충분) 시 BLOCK
+- `RequiredSLIs`: 지정 SLI 누락/skip 시 BLOCK
+
+## 7.2 GatingPolicy (SLI 판정 승격 정책)
+
+정상 계산된 SLI 결과(`WARN/FAIL`)를 테스트 실패로 승격할지 결정한다.
+
+예시:
+
+- `gateOnLevel: none | fail | warn`
+- `gateOnSLIs: [id1, id2, ...]`
+
+> `StrictEvaluation`과 `gateOnLevel=fail`은 다른 개념이다.
+> 
+> 
+> 전자는 **평가 파이프라인 실패**, 후자는 **정상 평가 결과의 정책적 승격**이다.
+> 
+
+## 7.3 전파 계약 (Normative)
+
+### P5 (`pkg/slo`) — **MUST**
+
+- `Status` (`INFO/WARN/FAIL/BLOCK`)와 `BlockedReason`(해당 시)을 명시적으로 반환할 수 있어야 한다.
+- 신뢰도 관련 상태(`collection/evaluation`, missing inputs 등)를 구조적으로 제공해야 한다.
+
+### P4 (Harness/Test Integration) — **MUST**
+
+- Strictness/GatingPolicy에 따라 결과를 테스트 프레임워크 실패 경로로 전파할 수 있어야 한다.
+- `BLOCK` 발생 시 CI에서 관찰 가능한 실패(예: Ginkgo Fail, testing.T Fatal, non-zero exit)로 이어져야 한다.
+- 전파 방식은 P4 구현 상세지만, 사용자 가이드에는 실제 동작 계약을 명시해야 한다.
+
+## 7.4 금지 규칙
+
+- `BLOCK`를 조용히 `WARN`으로 다운그레이드하고 기록하지 않는 것 (**MUST NOT**)
+- 파이프라인 실패와 임계치 초과를 같은 의미로 취급하는 것 (**MUST NOT**)
+
+---
+
+# 8) Boundary/Scrape Skew 및 시간 정책
+
+## 8.1 문제 정의
+
+Trigger 시점과 실제 scrape 시점은 다를 수 있으며, 이는 측정 창 왜곡을 유발한다.
+
+## 8.2 시간 기록 필드 (권장 → 구현 우선순위 높음)
+
+각 boundary(start/end)에 대해 가능하면 다음을 기록한다.
+
+- `boundaryAt`
+- `scrapeRequestAt`
+- `scrapeStartAt`
+- `scrapeEndAt`
+- (선택) `snapshotCapturedAt`
+
+## 8.3 Skew/Latency 파생값 (권장)
+
+- `startSkewMs = start.scrapeStartAt - start.boundaryAt`
+- `endSkewMs = end.scrapeStartAt - end.boundaryAt`
+- `startScrapeLatencyMs`
+- `endScrapeLatencyMs`
+
+> v4.4에서는 단일 `skewDuration`보다 **분해된 timing 필드**를 우선 권장한다.
+> 
+> 
+> `skewDuration`은 파생/요약 필드(선택)로만 취급한다.
+> 
+
+## 8.4 정책
+
+Profile은 다음 임계값을 가질 수 있어야 한다.
+
+- `maxStartSkewMs`
+- `maxEndSkewMs`
+- `maxScrapeLatencyMs`
+
+임계값 초과 시:
+
+- `BestEffort`: WARN
+- Strict 모드 + 설정 시: BLOCK 승격 가능
+
+## 8.5 사용자 책임 최소화 원칙 (v4.4 강화)
+
+Skew는 사용자가 추정해서 해석해야 하는 문제가 아니라, **도구가 계산/기록/정책 적용해야 하는 기술 영역**이다.
+
+---
+
+# 9) Canonicalize vs Metric Semantics & Noise Control
+
+## 9.1 역할 분리 — **MUST**
+
+- **Canonicalize:** 키 표현 정규화 (라벨 순서/이스케이프/표현 통일)
+- **Semantics/Noise:** 값 해석/보정/무시 정책
+
+두 단계를 혼합하면 구현 복잡도와 디버깅 난이도가 급증한다.
+
+## 9.2 Counter reset 처리 정책 (권장)
+
+Counter delta 계산에서 `end < start` 발생 시:
+
+- `treat_as_reset` (권장 기본)
+- `mark_invalid`
+- `clamp_zero` (신중)
+
+규칙:
+
+- reset를 silently ignore 하면 안 된다 (**MUST NOT**)
+- reset 처리 사실은 summary/log에 남겨야 한다 (**SHOULD**)
+
+## 9.3 Gauge/변동성 지표 정책
+
+- Gauge는 delta가 항상 의미 있는 것이 아님
+- `single`, `window`, `max` 등 계산 종류를 명시적으로 구분해야 함
+
+## 9.4 Masking / Ignore Rules (노이즈 제어 핵심)
+
+동적 라벨 예:
+
+- `pod`, `instance`, `endpoint`, `container`, `job`(환경별)
+
+적용 위치:
+
+- 공통 정책: `Profile`
+- SLI 특화 정책: `SLISpec` override
+
+## 9.5 사용자 노출 전략
+
+노이즈 제어는 핵심 설계 요소이나, 일반 사용자에게는 직접 조작 가능한 저수준 옵션으로 노출하지 않고 **Profile** 중심으로 제공하는 것을 원칙으로 한다.
+
+---
+
+# 10) 신뢰도 모델 (Reliability Model) — v4.4 강화
+
+## 10.1 목표
+
+사용자의 주관적 해석을 줄이고, 계측 결과의 신뢰도를 구조화된 데이터로 제공한다.
+
+## 10.2 필수(또는 사실상 필수) 분해 필드
+
+`sli-summary.json` 또는 동등 결과 구조에는 다음 상태가 포함되어야 한다 (하위호환적으로 추가 가능).
+
+- `collectionStatus`: `Complete | Partial | Failed`
+- `evaluationStatus`: `Complete | Partial | Failed`
+- `blockedReason` (BLOCK 시)
+- `missingInputs[]`
+- `skippedSLIs[]`
+- `configSource` (주입/env/discovery) 및 가능하면 `configSourcePath`
+- timing/skew 관련 필드 (최소 `startSkewMs`, `endSkewMs` 또는 equivalent)
+
+## 10.3 선택적 파생 필드: `confidenceScore`
+
+`confidenceScore`는 도입 가능하지만 다음 원칙을 따른다.
+
+### 원칙
+
+- 필수 분해 필드 없이 단일 점수만 제공하면 안 된다 (**MUST NOT**)
+- 점수 계산 규칙(가중치)은 문서화되어야 한다 (**SHOULD**)
+- 디버깅 가능성을 위해 점수 구성 요소를 역추적 가능하게 해야 한다 (**SHOULD**)
+
+> v4.4에서는 `confidenceScore`를 **선택/파생 필드**로 규정한다.
+> 
+
+## 10.4 Reliability와 결과 판정의 분리
+
+- SLI 계산 결과(`WARN/FAIL`)와
+- Reliability 상태(`Partial`, skew 과다 등)
+    
+    를 혼합 판정하지 않는다.
+    
+
+예:
+
+- 결과는 `FAIL`이 아니어도 Reliability가 `Failed`이면 CI 차단 가능 (Strictness 정책에 따라)
+
+---
+
+# 11) 자원 정리 및 생명주기 (Cleanup & Lifecycle) — v4.4 강화
+
+## 11.1 원칙
+
+모든 Observe 작업은 자원 생성 시 정리 경로를 가져야 하며, 실패 시에도 orphan를 남기지 않아야 한다.
+
+## 11.2 레이블링 규약 (권장)
+
+계측 관련 리소스에는 최소 다음 라벨을 부여한다.
+
+- `app.kubernetes.io/managed-by=kube-slint`
+- `slint-run-id=<run-id>`
+- (선택) `slint-session-id=<session-id>`
+
+## 11.3 Auto-Cleanup (즉시 정리)
+
+- scrape 완료 후 사용된 CurlPod 등 임시 리소스는 즉시 삭제 시도
+- 삭제 실패 시 경고를 남기고, 하네스 종료 cleanup 대상에 포함
+
+## 11.4 Orphan Protection (하네스 종료 시 방어 정리)
+
+하네스 종료(defer 등) 시, 현재 run/session에 속한 계측 리소스를 일괄 정리할 수 있어야 한다.
+
+### 필수 조건
+
+- selector는 반드시 run-id/session-id 범위로 제한 (**MUST**)
+- namespace 스코프를 명시 (**MUST**)
+- `managed-by=kube-slint`만으로 광범위 삭제 금지 (**MUST NOT**)
+
+## 11.5 Cleanup 모드 (권장)
+
+- `always`
+- `on-success`
+- `on-failure`
+- `manual`
+- `retainOnFailure` (디버깅용)
+
+## 11.6 defer 한계와 보완
+
+`defer` cleanup은 다음 상황에서 실행되지 않을 수 있다.
+
+- 프로세스 강제 종료
+- 노드 장애
+- SIGKILL
+
+따라서 장기적으로:
+
+- TTL 기반 orphan sweeper
+- 다음 실행 시 stale run-id 정리
+    
+    를 고려한다 (로드맵 항목)
+    
+
+---
+
+# 12) Kustomize Consumer UX / Bundle 정책
+
+## 12.1 역할 분리 — **MUST**
+
+- **Kustomize:** attach/배포/구성
+- **SLI Spec/Profile:** 평가 논리/정책
+
+## 12.2 Placeholder ConfigMap 정책 (명시 강화)
+
+placeholder ConfigMap은 `kustomize build` non-empty 보장을 위한 **UX workaround**이다.
+
+### 허용되는 설명
+
+- non-empty build 보장
+- remote consumer UX 안정화
+- 설명/앵커 리소스
+
+### 금지되는 설명
+
+- 실제 observability 동작 리소스처럼 서술 (**MUST NOT**)
+
+## 12.3 Bundle 역할 분리 (권장)
+
+- `consumer-ux bundle` (placeholder 포함 가능)
+- `runtime-minimal bundle` (실제 최소 동작 리소스)
+- `full/observability bundle` (확장 리소스 포함)
+
+문서/README/PR은 사용자가 어떤 bundle을 보고 있는지 명시해야 한다.
+
+## 12.4 Placeholder 탈출 조건 (Exit Criteria)
+
+다음 중 하나 충족 시 제거/대체 검토:
+
+1. runtime-minimal bundle이 모든 소비 경로에서 안정적으로 제공됨
+2. placeholder 없이도 non-empty build/consumer UX 보장 구조 확보
+3. bundle 분리로 빈 출력 문제가 구조적으로 제거됨
+
+---
+
+# 13) 문서 체계 및 역할 분리 (v4.4 정식화)
+
+## 13.1 문서 분류
+
+1. **기술 명세 문서 (본 문서)**
+    - 설계 계약, 경계, 정책, 금지사항, 로드맵
+2. **Developer Integration Guide**
+    - 통합/하네스/설정/실행/해석 상세
+3. **Consumer Quickstart**
+    - 최소 attach/run/check 경로
+4. **설정 스키마 문서 (향후)**
+    - 파일 스키마/프로파일/합성 규칙
+
+## 13.2 UX 원칙
+
+- 일반 사용자에게 5개 레이어 전체 이해를 요구하지 않는다.
+- Quickstart는 성공 루트 중심, Integration Guide는 구현/통합 세부 중심으로 분리한다.
+
+---
+
+# 14) Anti-patterns / Forbidden Changes (AI/Codex 포함)
+
+## 14.1 아키텍처 금지사항 — **MUST NOT**
+
+1. `pkg/slo`에 K8s/controller-runtime 의존성 유입
+2. canonicalize와 semantics/noise 처리 혼합
+3. `BLOCK`를 기록 없이 `WARN`으로 다운그레이드
+4. parser/민감 로직(`promkey`류)을 테스트/보호 전략 없이 구조 변경
+5. cleanup selector를 run-id/session-id 없이 광범위 적용
+6. discovery 결과를 로그/상태에 남기지 않음
+
+## 14.2 문서/UX 금지사항
+
+1. placeholder를 기능 리소스로 오인시키는 표현
+2. `BestEffort`를 CI 기본 권장처럼 서술
+3. Strictness와 GatingPolicy를 혼용
+4. OpenSLO 브리지를 보장된 목표처럼 서술
+
+## 14.3 Codex/AI 작업 금지사항
+
+- 문서 미검토 상태에서 코드 수정 시작
+- 분석/계획 없이 리팩터링 실행
+- 승인 범위 외 파일 수정
+- 신뢰도 상태를 “나중에”로 미루고 조용한 성공 경로 추가
+- lint 규칙 비활성화부터 시도
+
+---
+
+# 15) 테스트/검증 전략
+
+## 15.1 구조 검증
+
+- Kustomize build non-empty
+- bundle 역할 문서와 실제 출력 정합성
+- placeholder 설명 정합성
+
+## 15.2 계측 동작 검증
+
+- start/end scrape 성공 여부
+- summary write 성공
+- cleanup 동작 (임시 pod 삭제 / orphan 정리)
+
+## 15.3 신뢰도 검증
+
+- Strictness 모드별 동작 차이 (WARN vs BLOCK)
+- Propagation 계약 동작 (CI에서 실패 관찰 가능)
+- skew/timing 기록 존재 여부
+- discovery source 기록 여부
+
+## 15.4 의미 검증
+
+- 대표 SLI 결과 기대값 일치
+- counter reset 정책 동작
+- noise profile 적용 효과
+
+---
+
+# 16) 상호운용 전략 (OpenSLO / Sloth / Pyrra)
+
+## 16.1 기본 입장
+
+- 내부 Spec/Profile 모델이 정본(canonical)
+- 외부 도구/표준은 브리지 대상
+- full-fidelity 매핑은 비목표일 수 있음
+
+## 16.2 이유
+
+shift-left 평가에는 다음 컨텍스트가 중요하다:
+
+- 테스트 세션 경계
+- Strictness / GatingPolicy / Reliability 상태
+- harness integration / propagation contract
+- cleanup lifecycle
+
+## 16.3 로드맵
+
+1. 내부 Spec/Profile + Reliability/Propagation/Cleanup 안정화
+2. 파일 기반 스키마 확정
+3. OpenSLO subset 매핑 (가능/불가/손실 명시)
+4. 필요 시 Sloth/Pyrra 브리지 실험
+
+---
+
+# 17) 우선순위 및 로드맵 (v4.4)
+
+## P0 (브리지 스프린트: 즉시)
+
+1. **Config 외부화 래퍼 (P4)**
+    - env/YAML → `SessionConfig`
+    - discovery 규칙 + resolved source 로깅
+2. **Strictness 전파 계약 구현**
+    - `BLOCK` → 테스트 실패/CI 비정상 종료 경로 확정
+    - Strictness vs GatingPolicy 분리 구현
+3. **Reliability 상태 기록 강화**
+    - `collectionStatus`, `evaluationStatus`, `blockedReason`
+    - timing/skew 필드 (최소 start/end skew)
+4. **Cleanup lifecycle 구현**
+    - run-id 라벨링
+    - auto-cleanup + 하네스 종료 방어 정리
+5. **문서 역할 분리 반영**
+    - Consumer Quickstart / Integration Guide 최신화
+
+## P1
+
+1. 파일 기반 Spec/Profile 정식 스키마/로더
+2. Noise control (mask/ignore/counter reset) 프로파일 노출
+3. Trigger-based EndPolicy 검증 확대
+
+## P2
+
+1. VM K8s 운영 플레이북 고도화
+2. Reliability 파생 점수(`confidenceScore`) 문서화 및 선택 도입
+3. summary/report UX 개선
+
+## P3
+
+1. OpenSLO subset 매핑 문서화
+2. Sloth/Pyrra 브리지 실험
+3. OTel/OTLP observe plugin 탐색
+
+---
+
+# 18) 빠른 요약 (리뷰어/구현자용)
+
+1. **P4/P5 경계 유지**가 최우선이다.
+2. **Strictness(파이프라인 실패)** 와 **GatingPolicy(결과 승격)** 를 분리한다.
+3. **Skew/Noise는 사용자가 추정하는 문제가 아니라 도구가 기록/정책화해야 하는 문제**다.
+4. **Cleanup은 run-id 범위 제한이 필수**다.
+5. **Reliability는 분해 필드 우선**, `confidenceScore`는 후순위/선택이다.
+6. placeholder는 **UX workaround**이며 bundle 역할 분리로 관리한다.
+7. 문서는 **기술 명세 / Integration Guide / Quickstart**로 분리한다.
+
+---
+
+# 부록 A) 설정 탐색 규칙 예시 (개념)
+
+```
+# .slint.yaml (concept)
+format: v4.4
+strictness:
+  mode: StrictCollection
+gating:
+  gateOnLevel: fail
+write:
+  artifactsDir: ./artifacts
+cleanup:
+  enabled: true
+  mode: always
+reliability:
+  recordTiming: true
+profile:
+  name: vm-k8s
+```
+
+> 실제 스키마는 별도 설정 스키마 문서에서 고정한다. 본 문서에서는 탐색/우선순위/책임 분리를 우선 정의한다.
+> 
+
+---
+
+# 부록 B) Codex 작업 기준선 체크리스트 (요약)
+
+- 문서 먼저 읽기: `rule.md` + 본 문서 + Integration Guide
+- 분석 → 계획 → 승인 → 수정 순서 준수
+- P4/P5 경계/금지사항 확인
+- Strictness/Gating/Cleanup/Reliability를 “부가 기능”이 아닌 핵심 계약으로 취급
