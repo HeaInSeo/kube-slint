@@ -385,7 +385,21 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		Reliability: rel,
 	})
 
-	return sum, err
+	if err != nil {
+		return sum, err
+	}
+
+	// 1. Strictness Check (파이프라인 신뢰도 검증)
+	if strictErr := CheckStrictness(s.impl.Config, sum); strictErr != nil {
+		return sum, strictErr
+	}
+
+	// 2. Gating Check (정상 결과 승격 검증)
+	if gatingErr := CheckGating(s.impl.Config, sum); gatingErr != nil {
+		return sum, gatingErr
+	}
+
+	return sum, nil
 }
 
 // ---- (TEMP) Default Fetcher: curlpod + promtext ----
