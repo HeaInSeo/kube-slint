@@ -27,7 +27,7 @@ func TestCheckStrictness_SkewThresholds(t *testing.T) {
 			name: "BestEffort_ExceedThresholds",
 			cfg:  SessionConfig{StrictnessMode: "BestEffort", MaxStartSkewMs: 1000},
 			rel:  summary.Reliability{StartSkewMs: &val2000},
-			expectError: false, // In BestEffort, it should still be ignored and return nil
+			expectError: false, // BestEffort 모드에서는 무시되고 nil을 반환해야 함
 		},
 		{
 			name: "StrictCollection_UnderThresholds",
@@ -39,7 +39,7 @@ func TestCheckStrictness_SkewThresholds(t *testing.T) {
 			name: "StrictCollection_ExceedStartSkew",
 			cfg:  SessionConfig{StrictnessMode: "StrictCollection", MaxStartSkewMs: 1500},
 			rel:  summary.Reliability{StartSkewMs: &val2000, CollectionStatus: "Complete"},
-			expectError: true, // exceeds threshold
+			expectError: true, // 임계값 초과
 		},
 		{
 			name: "StrictCollection_ExceedEndSkew",

@@ -7,34 +7,25 @@ import (
 	"strings"
 )
 
-// Parse parses a Prometheus metric key token into name + labels.
-// token examples:
-//
-//	metric_name
-//	metric_name{a="b",c="d"}
-//
-// It supports Prometheus label value escapes: \" \\ \n \t \r
-// Parse는 Prometheus 메트릭 키 토큰을 이름 + 레이블로 파싱합니다.
+// Parse는 Prometheus 메트릭 키 토큰을 이름과 레이블로 파싱함.
 // 토큰 예시:
 //
 //	metric_name
 //	metric_name{a="b",c="d"}
 //
-// Prometheus 레이블 값 이스케이프를 지원합니다: \" \\ \n \t \r
+// Prometheus 레이블 값 이스케이프(\" \\ \n \t \r)를 지원함.
 func Parse(token string) (name string, labels map[string]string, err error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return "", nil, fmt.Errorf("empty token")
 	}
 
-	// No labels
 	// 레이블 없음
 	br := strings.IndexByte(token, '{')
 	if br < 0 {
 		return token, map[string]string{}, nil
 	}
 
-	// Must end with }
 	// } 로 끝나야 함
 	if !strings.HasSuffix(token, "}") {
 		return "", nil, fmt.Errorf("invalid token (missing '}'): %q", token)
@@ -49,10 +40,8 @@ func Parse(token string) (name string, labels map[string]string, err error) {
 	return name, labels, nil
 }
 
-// Format formats name + labels into canonical key string.
-// Labels are sorted by key, values are escaped.
-// Format은 이름 + 레이블을 정규 키 문자열로 포맷합니다.
-// 레이블은 키로 정렬되며, 값은 이스케이프됩니다.
+// Format은 이름과 레이블을 정규 키 문자열로 포맷함.
+// 레이블은 키로 정렬되며, 값은 이스케이프됨.
 func Format(name string, labels map[string]string) string {
 	if len(labels) == 0 {
 		return name
@@ -80,8 +69,7 @@ func Format(name string, labels map[string]string) string {
 	return b.String()
 }
 
-// Canonicalize converts a raw token into canonical key string.
-// Canonicalize는 원시 토큰을 정규 키 문자열로 변환합니다.
+// Canonicalize는 원시 토큰을 정규 키 문자열로 변환함.
 func Canonicalize(token string) (string, error) {
 	name, labels, err := Parse(token)
 	if err != nil {
@@ -94,7 +82,6 @@ func parseLabels(s string) (map[string]string, error) {
 	labels := map[string]string{}
 	i := 0
 	for {
-		// skip spaces/commas
 		// 공백/쉼표 건너뛰기
 		for i < len(s) && (s[i] == ' ' || s[i] == ',') {
 			i++
@@ -103,7 +90,6 @@ func parseLabels(s string) (map[string]string, error) {
 			break
 		}
 
-		// parse key
 		// 키 파싱
 		start := i
 		for i < len(s) && s[i] != '=' {
@@ -115,8 +101,7 @@ func parseLabels(s string) (map[string]string, error) {
 		key := strings.TrimSpace(s[start:i])
 		i++ // '='
 
-		// expect opening quote
-		// 여는 따옴표 기대
+		// 여는 따옴표 확인
 		for i < len(s) && s[i] == ' ' {
 			i++
 		}
@@ -125,18 +110,13 @@ func parseLabels(s string) (map[string]string, error) {
 		}
 		i++ // opening '"'
 
-		// parse quoted value with escapes until closing quote
-		// 닫는 따옴표까지 이스케이프가 포함된 인용 값 파싱
+		// 닫는 따옴표까지 이스케이프가 포함된 값을 파싱함
 		var raw bytes.Buffer
 		for {
 			if i >= len(s) {
 				return nil, fmt.Errorf("invalid labels (unterminated value for %q): %q", key, s)
 			}
 			ch := s[i]
-			if ch == '"' {
-				i++ // closing '"'
-				break
-			}
 			if ch == '"' {
 				i++ // 닫는 '"'
 				break
@@ -160,14 +140,12 @@ func parseLabels(s string) (map[string]string, error) {
 		}
 		labels[key] = val
 
-		// trailing spaces handled by loop
 		// 후행 공백은 루프에서 처리됨
 	}
 	return labels, nil
 }
 
-// EscapeLabelValue escapes a label value for Prometheus text format.
-// EscapeLabelValue는 Prometheus 텍스트 형식을 위해 레이블 값을 이스케이프합니다.
+// EscapeLabelValue는 Prometheus 텍스트 형식을 위해 레이블 값을 이스케이프함.
 func EscapeLabelValue(v string) string {
 	var b strings.Builder
 	for i := 0; i < len(v); i++ {
@@ -189,8 +167,7 @@ func EscapeLabelValue(v string) string {
 	return b.String()
 }
 
-// UnescapeLabelValue unescapes Prometheus label value escapes.
-// UnescapeLabelValue는 Prometheus 레이블 값 이스케이프를 해제합니다.
+// UnescapeLabelValue는 Prometheus 레이블 값 이스케이프를 해제함.
 func UnescapeLabelValue(v string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(v); i++ {
@@ -215,8 +192,7 @@ func UnescapeLabelValue(v string) (string, error) {
 		case 'r':
 			b.WriteByte('\r')
 		default:
-			// Prometheus generally treats unknown as literal char after backslash.
-			// Prometheus는 일반적으로 백슬래시 뒤의 알 수 없는 문자를 리터럴 문자로 취급합니다.
+			// Prometheus는 일반적으로 백슬래시 뒤의 알 수 없는 문자를 리터럴 문자로 취급함.
 			b.WriteByte(v[i])
 		}
 	}

@@ -11,14 +11,12 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
-// Logger keeps pkg/slo independent from klog/logr.
-// Logger는 pkg/slo를 klog/logr로부터 독립적으로 유지합니다.
+// Logger는 pkg/slo를 klog/logr로부터 독립적으로 유지함.
 // type Logger interface {
 //	Logf(format string, args ...any)
 // }
 
-// Engine orchestrates the metrics fetching and SLI evaluation.
-// Engine은 메트릭 수집과 SLI 평가를 조율합니다.
+// Engine은 메트릭 수집과 SLI 평가를 조율함.
 type Engine struct {
 	fetcher fetch.MetricsFetcher
 	// Spec  registry.Registry // (옵션) 레지스트리를 쓰는 호출자를 위해 남길 수 있음, 일단 주석처리함.
@@ -27,8 +25,7 @@ type Engine struct {
 	logf   func(string, ...any)
 }
 
-// New creates a new Engine instance.
-// New는 새로운 Engine 인스턴스를 생성합니다.
+// New는 새로운 Engine 인스턴스를 생성함.
 func New(fetcher fetch.MetricsFetcher, writer summary.Writer, l slo.Logger) *Engine {
 	logf := func(string, ...any) {}
 	if l != nil {
@@ -37,8 +34,7 @@ func New(fetcher fetch.MetricsFetcher, writer summary.Writer, l slo.Logger) *Eng
 	return &Engine{fetcher: fetcher, writer: writer, logf: logf}
 }
 
-// Execute runs the SLO measurement and evaluation process.
-// Execute는 SLO 측정 및 평가 프로세스를 실행합니다.
+// Execute는 SLO 측정 및 평가 프로세스를 실행함.
 func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summary, error) {
 	cfg := req.Config
 	if cfg.StartedAt.IsZero() || cfg.FinishedAt.IsZero() {
@@ -50,11 +46,10 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		rel = &summary.Reliability{}
 	}
 
-	// Fetch snapshots
+	// 스냅샷 수집
 	realStart := time.Now()
-	// startSkew represents the "Deferred start scrape skew", which is the difference
-	// between the requested StartedAt and the actual time fetching began.
-	// NOTE: This represents execution delay of the harness, not Operator Action Delay.
+	// startSkew는 측정 지시 시점(StartedAt)과 실제 스크래핑을 시도한 시점 간의 시차를 의미함.
+	// 참고: 이는 하네스의 실행 지연을 의미하며, 오퍼레이터의 시작 지연이 아님.
 	startSkew := realStart.Sub(cfg.StartedAt).Milliseconds()
 	rel.StartSkewMs = &startSkew
 
@@ -65,7 +60,6 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	if err != nil {
 		rel.CollectionStatus = "Failed"
 		rel.BlockedReason = fmt.Sprintf("fetch(start) failed: %v", err)
-		// philosophy: "measurement failure is not test failure" → return a Summary with warnings
 		// 철학: "측정 실패는 테스트 실패가 아님" → 경고가 포함된 Summary 반환
 		s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(start) failed: %v", err)})
 		e.ensureConfidenceScore(rel)
@@ -79,7 +73,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 
 	end, err := e.fetcher.Fetch(ctx, cfg.FinishedAt)
 	scrapeLatencyEnd := time.Since(realEnd).Milliseconds()
-	// ScrapeLatency is the max of the start and end fetch latencies.
+	// ScrapeLatency는 시작과 종료 데이터 수집 지연 시간 중 최댓값임.
 	maxLatency := scrapeLatencyStart
 	if scrapeLatencyEnd > maxLatency {
 		maxLatency = scrapeLatencyEnd
@@ -96,7 +90,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	}
 
 	rel.CollectionStatus = "Complete"
-	rel.EvaluationStatus = "Complete" // default to complete, downgrade to partial if skipped
+	rel.EvaluationStatus = "Complete" // 초기에는 완전함으로 설정, 누락 시 부분(Partial)으로 강등됨
 
 	sum := summary.Summary{
 		SchemaVersion: "slo.v3",
@@ -144,15 +138,15 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	return &sum, err
 }
 
-// ensureConfidenceScore calculates the confidence score of the measurement.
-// It is intended as a supplementary triage metric, not replacing specific status fields.
-// Rule (v1):
-// - Start at 1.0
-// - CollectionStatus != Complete forces score to 0.0
-// - EvaluationStatus == Partial -> -0.2
-// - missingInputs -> -0.1 each (max -0.3)
-// - skippedSLIs -> -0.1 each (max -0.3)
-// - skew/latency > 5000 -> small deduction (-0.1) as distortion heuristic
+// ensureConfidenceScore는 측정의 신뢰도 점수를 계산함.
+// 이는 보조적인 분류(triage) 지표이며, 특정 상태 필드를 대체하지 않음.
+// 규칙 (v1):
+// - 1.0에서 시작함
+// - CollectionStatus가 Complete이 아니면 점수는 0.0이 됨
+// - EvaluationStatus가 Partial이면 -0.2 감점함
+// - missingInputs 각 -0.1 감점함 (최대 -0.3)
+// - skippedSLIs 각 -0.1 감점함 (최대 -0.3)
+// - skew/latency가 5000을 초과하면 지표 왜곡으로 간주하여 -0.1 감점함
 func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
 	if rel == nil {
 		return
@@ -230,7 +224,7 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	used := make([]string, 0, len(s.Inputs))
 	missing := make([]string, 0)
 
-	// v3: one-input SLI recommended. If multiple inputs exist, we sum them.
+	// v3: 단일 입력 SLI를 권장함. 여러 입력이 존재하면 이를 합산함.
 	var valStart, valEnd float64
 	for _, in := range s.Inputs {
 		used = append(used, in.Key)
@@ -259,13 +253,13 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	case spec.ComputeDelta:
 		value = valEnd - valStart
 		if value < 0 {
-			// v3: counter reset suspected (process restart)
+			// v3: 카운터 초기화가 의심됨 (프로세스 재시작)
 			res.Value = &value
 			res.Status = summary.StatusWarn
 			res.Reason = "delta < 0 (counter reset suspected)"
-			// judge가 있으면 judge 결과로 덮어써버리니까,
-			// 이 경우 judge를 건너뛰는 정책을 택할지 결정해야 함.
-			return res // judge skip
+			// judge가 있으면 judge 결과로 덮어써버리므로,
+			// 이 경우 judge를 생략하는 정책을 택함.
+			return res // judge 생략
 		}
 	default:
 		res.Status = summary.StatusSkip
@@ -282,7 +276,7 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 }
 
 func judge(v float64, rules []spec.Rule) (status summary.Status, reason string) {
-	// v3: fail dominates warn
+	// v3: fail이 warn보다 우선함
 	var warn string
 	for _, r := range rules {
 		if !compare(v, r.Op, r.Target) {
@@ -294,7 +288,7 @@ func judge(v float64, rules []spec.Rule) (status summary.Status, reason string) 
 		case spec.LevelWarn:
 			warn = fmt.Sprintf("rule warn: value %s %v", r.Op, r.Target)
 		default:
-			// TODO(v4): unknown level -> warn/skip?
+			// Step 6 후보: 알 수 없는 레벨에 대해 warn/skip 처리 여부 결정
 		}
 	}
 	if warn != "" {
@@ -320,7 +314,7 @@ func compare(v float64, op spec.Op, target float64) bool {
 	}
 }
 
-// ExecuteRequestStandard is the standardized request shape (formerly V4).
+// ExecuteRequestStandard는 표준화된 요청 형태임 (이전 V4).
 type ExecuteRequestStandard struct {
 	Method      MeasurementMethod
 	Config      RunConfig
@@ -329,7 +323,7 @@ type ExecuteRequestStandard struct {
 	Reliability *summary.Reliability
 }
 
-// ExecuteStandard applies standard defaults and delegates to the engine.
+// ExecuteStandard는 표준 기본값을 적용하고 엔진에 위임함.
 func ExecuteStandard(ctx context.Context, eng *Engine, req ExecuteRequestStandard) (*summary.Summary, error) {
 	if req.Config.Format == "" {
 		req.Config.Format = "v4"

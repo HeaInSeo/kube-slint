@@ -6,29 +6,29 @@ import (
 	"path/filepath"
 )
 
-// Writer는 Summary 아티팩트를 대상 위치에 기록한다.
+// Writer는 Summary 아티팩트를 대상 위치에 기록함.
 type Writer interface {
 	Write(path string, s Summary) error
 }
 
-// JSONFileWriter는 요약을 JSON 파일로 기록한다.
+// JSONFileWriter는 요약을 JSON 파일로 기록함.
 type JSONFileWriter struct{}
 
-// NewJSONFileWriter는 새로운 JSONFileWriter를 생성한다.
+// NewJSONFileWriter는 새로운 JSONFileWriter를 생성함.
 func NewJSONFileWriter() *JSONFileWriter { return &JSONFileWriter{} }
 
-// Write는 원자적 쓰기 내구성(fsync)을 위해 sync=true를 사용한다.
+// Write는 원자적 쓰기 내구성(fsync)을 위해 sync=true를 사용함.
 func (w *JSONFileWriter) Write(path string, s Summary) error {
 	if path == "" {
-		// skip (no output path configured)
+		// 출력 경로가 구성되지 않아 생략함
 		return nil
 	}
 	return writeJSONAtomic(path, s, 0o644, 0o755, true)
 }
 
-// writeJSONAtomic은 JSON을 동일한 디렉토리의 임시 파일에 쓴 다음 이름을 변경한다.
-// - 원자적 교체는 os.Rename(동일 파일 시스템)에 의해 제공된다.
-// - doSync가 true이면, 더 강력한 내구성을 위해 닫기 전에 임시 파일을 fsync 한다.
+// writeJSONAtomic은 JSON을 동일한 디렉터리의 임시 파일에 쓴 다음 이름을 변경함.
+// - 원자적 교체는 os.Rename(동일 파일 시스템)에 의해 보장됨.
+// - doSync가 true이면, 더 강력한 내구성을 위해 닫기 전에 임시 파일을 fsync 갱신함.
 func writeJSONAtomic(path string, s Summary, fileMode, dirMode os.FileMode, doSync bool) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, dirMode); err != nil {

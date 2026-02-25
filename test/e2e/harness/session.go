@@ -153,7 +153,7 @@ func NewSession(cfg SessionConfig) *Session {
 		if discoveredCfg.Gating.GateOnLevel != "" {
 			cfg.GateOnLevel = discoveredCfg.Gating.GateOnLevel
 		}
-		// If explicitly set
+		// 명시적으로 설정된 경우
 		cfg.CleanupEnabled = discoveredCfg.Cleanup.Enabled
 		if discoveredCfg.Cleanup.Mode != "" {
 			cfg.CleanupMode = discoveredCfg.Cleanup.Mode
@@ -200,9 +200,8 @@ func NewSession(cfg SessionConfig) *Session {
 	return &Session{impl: impl}
 }
 
-// reset replaces internal runtime state WITHOUT copying the whole Session struct.
 // reset은 전체 Session 구조체를 복사하지 않고 내부 런타임 상태를 교체함.
-// NOTE: This is NOT a deep copy. from must not be used after calling reset.
+// 참고: 깊은 복사(deep copy)가 아니므로 reset 호출 후 from을 사용해서는 안 됨.
 func (s *Session) reset(from *Session) {
 	if s == nil {
 		return
@@ -216,17 +215,15 @@ func (s *Session) reset(from *Session) {
 	s.impl = from.impl
 }
 
-// ShouldWriteArtifacts reports whether session should write summary output.
-// ShouldWriteArtifacts는 세션이 요약 출력을 기록해야 하는지 여부를 보고함.
+// ShouldWriteArtifacts는 세션이 요약 출력을 기록할지 여부를 보고함.
 func (s *Session) ShouldWriteArtifacts() bool {
-	// 여기서, s != nil 체크를 하는 이유는 Ginkgo 훅 + placeholder 패턴 때문에, 사용될 수 있기때문에 panic 방지용으로 넣음.
+	// Ginkgo 훅과 placeholder 패턴 때문에 s != nil 체크를 추가하여 패닉을 방지함.
 	return s != nil && s.impl != nil && s.impl.Config.ArtifactsDir != ""
 }
 
-// NextSummaryPath returns a unique summary path by appending -<n> on collisions.
 // NextSummaryPath는 충돌 시 -<n>을 추가하여 고유한 요약 경로를 반환함.
 func (s *Session) NextSummaryPath(filename string) (string, error) {
-	// s == nil 체크는 일부러 하는 것이다. 일반적으로는 필요없지만 지금 케이스에서는 필요하다.
+	// s == nil 체크는 현재 구조상 예외적으로 필요하므로 포함됨.
 	if s == nil || s.impl == nil {
 		return "", fmt.Errorf("harness: session not initialized")
 	}
@@ -249,7 +246,6 @@ func (s *Session) NextSummaryPath(filename string) (string, error) {
 	}
 }
 
-// AddWarning records a warning message for BestEffort mode.
 // AddWarning은 BestEffort 모드에 대한 경고 메시지를 기록함.
 func (s *Session) AddWarning(message string) {
 	if s == nil || s.impl == nil || strings.TrimSpace(message) == "" {
@@ -258,10 +254,8 @@ func (s *Session) AddWarning(message string) {
 	s.impl.Warnings = append(s.impl.Warnings, message)
 }
 
-// MarkFailed explicitly flags this session as failed, affecting CleanupMode evaluations.
-// It is monotonic (once failed, cannot be reverted) and idempotent.
-// MarkFailed는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줍니다.
-// 단조적(한 번 실패로 표시되면 되돌릴 수 없음)이며 멱등성을 가집니다.
+// MarkFailed는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줌.
+// 단조적(한 번 실패로 표시되면 되돌릴 수 없음)이며 멱등성을 가짐.
 func (s *Session) MarkFailed() {
 	if s == nil || s.impl == nil {
 		return
@@ -269,15 +263,12 @@ func (s *Session) MarkFailed() {
 	s.impl.hasFailed = true
 }
 
-// OrphanSweepOptions configures the orphan sweep behavior.
 // OrphanSweepOptions는 고아(orphan) 리소스 정리 동작을 설정함.
 type OrphanSweepOptions struct {
 	Enabled bool
 	Mode    string // "report-only" (기본값) | "delete"
 }
 
-// SweepOrphans detects and optionally deletes resources from previous kube-slint run-ids.
-// It explicitly excludes the current session's run-id and limits scope to the current namespace.
 // SweepOrphans는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
 // 현재 세션의 run-id는 명시적으로 제외되며, 현재 namespace로 범위가 제한됨.
 func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) error {
@@ -290,7 +281,7 @@ func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) err
 
 	mode := opts.Mode
 	if mode != "delete" {
-		mode = "report-only" // Default to safety
+		mode = "report-only" // 안전을 위해 기본값 사용
 	}
 
 	ns := s.impl.Config.Namespace
@@ -301,7 +292,7 @@ func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) err
 		return nil
 	}
 
-	// Find orphaned pods managed by kube-slint, excluding current run-id
+	// kube-slint에 의해 관리되며 현재 run-id를 제외한 고아 파드를 검색함
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
 
 	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", labelSelector, "-o", "jsonpath={.items[*].metadata.name}")
@@ -334,10 +325,8 @@ func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) err
 	return nil
 }
 
-// Cleanup removes temporary resources created by the session.
-// It uses run-id and namespace as safety guards to prevent broad deletion.
-// Cleanup은 세션에서 생성된 임시 리소스를 제거합니다.
-// 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용합니다.
+// Cleanup은 세션에서 생성된 임시 리소스를 제거함.
+// 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용함.
 func (s *Session) Cleanup(ctx context.Context) {
 	if s == nil || s.impl == nil {
 		return
@@ -348,12 +337,12 @@ func (s *Session) Cleanup(ctx context.Context) {
 		return
 	}
 
-	// Resolve implicitly enabled state if not explicitly disabled or set via manual mode
+	// 명시적으로 비활성화되거나 수동 모드로 설정되지 않은 경우 암시적 활성화 상태 확인
 	if mode == "" {
 		if s.impl.Config.CleanupEnabled {
 			mode = "always"
 		} else {
-			// fallback default when nothing is specified is manual/none for safety
+			// 안전을 위해 아무것도 지정되지 않았을 때의 폴백 기본값은 manual/none임
 			return
 		}
 	}
@@ -375,7 +364,7 @@ func (s *Session) Cleanup(ctx context.Context) {
 		return
 	}
 
-	// Always restrict by namespace and run-id
+	// 항상 네임스페이스와 run-id로 제한함
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", runID)
 
 	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
@@ -396,7 +385,7 @@ func (s *Session) Start() {
 	if s == nil || s.impl == nil {
 		return
 	}
-	// Defensive: handle nil/invalid Now() injection.
+	// 방어 코드: nil 또는 유효하지 않은 Now() 주입 처리
 	now := s.impl.Config.Now
 	if now == nil {
 		now = time.Now
@@ -435,7 +424,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	}
 
-	// Important: time synchronization and injection time should be discussed separately and documented.
+	// 중요: 시간 동기화 및 주입 시간은 별도로 논의되고 문서화되어야 함
 	now := s.impl.Config.Now
 	if now == nil {
 		now = time.Now
@@ -525,7 +514,7 @@ type curlPodFetcher struct {
 
 func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
 	client := curlpod.New(nil, nil)
-	// Add required safety labels
+	// 필요한 안전 레이블을 추가함
 	client.LabelSelector = fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", impl.RunID)
 
 	return &curlPodFetcher{

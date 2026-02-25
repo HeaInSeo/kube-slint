@@ -5,10 +5,8 @@ import (
 	"time"
 )
 
-// Options is e2e-only configuration.
-// Keep this independent from pkg/slo (v1 legacy).
-// Options는 e2e 전용 설정입니다.
-// pkg/slo와 독립적으로 유지하세요 (v1 레거시).
+// Options는 e2e 전용 설정임.
+// pkg/slo와 독립적으로 유지되어야 함 (v1 레거시).
 type Options struct {
 	Enabled      bool
 	ArtifactsDir string
@@ -20,8 +18,7 @@ type Options struct {
 	TokenRequestTimeout time.Duration
 }
 
-// Validate checks configuration and applies defaults.
-// Validate는 설정을 확인하고 기본값을 적용합니다.
+// Validate는 설정을 확인하고 기본값을 적용함.
 func (o Options) Validate() Options {
 	out := o
 	if out.ArtifactsDir == "" {
@@ -33,8 +30,7 @@ func (o Options) Validate() Options {
 	return out
 }
 
-// SummaryPath returns the path for the summary file.
-// SummaryPath는 요약 파일의 경로를 반환합니다.
+// SummaryPath는 요약 파일의 경로를 반환함.
 func (o Options) SummaryPath(filename string) string {
 	v := o.Validate()
 	if filename == "" {

@@ -9,7 +9,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-// Config defines the inputs for the SLO measurement session.
+// Config는 SLO 측정 세션에 대한 입력을 정의함.
 // type Config struct {
 // 	Enabled bool	// false면 계측 훅 완전 스킵
 // 	Namespace          string
@@ -21,28 +21,28 @@ import (
 // 	Token              string
 // 	ArtifactsDir string
 // 	Tags         map[string]string
-// 	// 게측 코드에서 선택할 수 있도록 해줌.
+// 	// 계측 코드에서 선택할 수 있도록 해줌.
 // 	Method engine.Method
 //     Fetcher fetch.MetricsFetcher
 // }
 
-// Attach registers BeforeEach/AfterEach hooks that call the provider function
-// to get the config for the current test and manage the measurement session.
+// Attach는 제공자 함수를 호출하는 BeforeEach/AfterEach 훅을 등록하여
+// 현재 테스트의 구성을 가져오고 측정 세션을 관리함.
 func Attach(provider func() SessionConfig) (*Session, error) {
-	session := &Session{} // placeholder (impl is set in BeforeEach)
+	session := &Session{} // 자리 표시자 (impl은 BeforeEach에서 설정됨)
 
-	// harness-level toggle (not exposed to operator's test code)
+	// 하네스 레벨 토글 (오퍼레이터의 테스트 코드에 노출되지 않음)
 	enabled := isEnabledByEnv()
 
 	ginkgo.BeforeEach(func() {
 		if !enabled {
-			session.reset(nil) // impl=nil so End() is a no-op/guarded
+			session.reset(nil) // impl=nil이므로 End()는 아무 작업도 수행하지 않음/안전함
 			return
 		}
 
 		cfg := provider()
 
-		// Validate (keep your detailed messages)
+		// 검증 (상세 메시지 유지)
 		if strings.TrimSpace(cfg.Namespace) == "" {
 			ginkgo.Fail(fmt.Sprintf(
 				"harness: invalid config: Namespace is required (Suite=%q TestCase=%q RunID=%q MetricsServiceName=%q SA=%q ArtifactsDir=%q)",
@@ -62,12 +62,12 @@ func Attach(provider func() SessionConfig) (*Session, error) {
 			))
 		}
 
-		// Auto-fill TestCase if empty
+		// 값이 비어있을 경우 TestCase 자동 채우기
 		if strings.TrimSpace(cfg.TestCase) == "" {
 			cfg.TestCase = ginkgo.CurrentSpecReport().LeafNodeText
 		}
 
-		// Ensure Now is set (your Session.NewSession already does this, but safe here too)
+		// Now가 설정되어 있는지 확인 (Session.NewSession에서 이미 수행하지만 여기서도 안전하게 처리)
 		if cfg.Now == nil {
 			cfg.Now = time.Now
 		}
@@ -95,7 +95,7 @@ func Attach(provider func() SessionConfig) (*Session, error) {
 }
 
 func isEnabledByEnv() bool {
-	// TODO: read from E2E_SLO_ENABLED or similar if needed.
-	// For now, always enable since we are in the attach func
+	// E2E_SLO_ENABLED 등에서 읽어오는 로직 추가 검토 (Step 6 후보)
+	// 현재는 attach 함수 내부이므로 항상 활성화됨
 	return true
 }

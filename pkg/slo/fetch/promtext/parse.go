@@ -10,17 +10,7 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 )
 
-// ParseTextToMap parses Prometheus exposition format (text) into a flat map.
-// Key format example:
-//
-//	metric_name{a="b",c="d"}
-//
-// If no labels:
-//
-//	metric_name
-//
-// v3: minimal parser for common cases (counters/gauges).
-// ParseTextToMap은 Prometheus 노출 형식(텍스트)을 플랫 맵으로 파싱합니다.
+// ParseTextToMap은 Prometheus 노출 형식(텍스트)을 플랫 맵으로 파싱함.
 // 키 형식 예시:
 //
 //	metric_name{a="b",c="d"}
@@ -29,7 +19,7 @@ import (
 //
 //	metric_name
 //
-// v3: 일반적인 경우(카운터/게이지)를 위한 최소한의 파서.
+// v3: 일반적인 경우(카운터/게이지)를 위한 최소한의 파서임.
 func ParseTextToMap(r io.Reader) (map[string]float64, error) {
 	out := map[string]float64{}
 	sc := bufio.NewScanner(r)
@@ -39,7 +29,6 @@ func ParseTextToMap(r io.Reader) (map[string]float64, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// split "key value"
 		// "key value" 분리
 		fields := strings.Fields(line)
 		if len(fields) < 2 {
@@ -48,7 +37,6 @@ func ParseTextToMap(r io.Reader) (map[string]float64, error) {
 		rawKey := fields[0]
 		key, err := promkey.Canonicalize(rawKey)
 		if err != nil {
-			// v3 policy: skip malformed metric lines (best-effort parser)
 			// v3 정책: 잘못된 형식의 메트릭 라인 건너뛰기 (최선의 파서)
 			continue
 		}

@@ -10,8 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DiscoveredConfig represents the minimal fields supported in the bridge sprint YAML.
-// DiscoveredConfig는 브리지 스프린트 YAML에서 지원하는 최소 필드를 나타냅니다.
+// DiscoveredConfig는 브리지 스프린트 YAML에서 지원하는 최소 필드를 나타냄.
 type DiscoveredConfig struct {
 	Format     string `yaml:"format" json:"format"`
 	Strictness struct {
@@ -37,29 +36,22 @@ type DiscoveredConfig struct {
 	} `yaml:"reliability" json:"reliability"`
 }
 
-// ConfigSource represents where the configuration was loaded from.
-// ConfigSource는 구성이 로드된 위치를 나타냅니다.
+// ConfigSource는 구성이 로드된 위치를 나타냄.
 type ConfigSource struct {
 	Type     string // "injected" | "env" | "discovered"
 	Path     string // File path if Type is "env" or "discovered"
 	Disabled bool   // True if discovery was disabled via SLINT_DISABLE_DISCOVERY=1
 }
 
-// DiscoverConfig searches for and loads the kube-slint configuration.
-// It follows these priority rules:
-//  1. Environment variable: SLINT_CONFIG_PATH
-//  2. Automatic discovery: .slint.yaml or slint.config.yaml (climbing up directories)
-//
-// DiscoverConfig는 kube-slint 구성을 검색하고 로드합니다.
-// 다음과 같은 우선순위 규칙을 따릅니다:
+// DiscoverConfig는 kube-slint 구성을 검색하고 로드함.
+// 우선순위 규칙:
 //  1. 환경 변수: SLINT_CONFIG_PATH
-//  2. 자동 탐색: .slint.yaml 또는 slint.config.yaml (디렉터리 위로 올라가며 탐색)
+//  2. 자동 탐색: .slint.yaml 또는 slint.config.yaml (디렉터리 상향 탐색)
 func DiscoverConfig(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 	if isDiscoveryDisabled() {
 		return nil, ConfigSource{Type: "injected", Disabled: true}, nil
 	}
 
-	// 1. Check environment variable path
 	// 1. 환경 변수 경로 확인
 	envPath := os.Getenv("SLINT_CONFIG_PATH")
 	if envPath != "" {
@@ -70,7 +62,6 @@ func DiscoverConfig(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 		return cfg, ConfigSource{Type: "env", Path: envPath}, nil
 	}
 
-	// 2. Automatic discovery
 	// 2. 자동 탐색
 	if startDir == "" {
 		var err error
@@ -83,8 +74,7 @@ func DiscoverConfig(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 	targetFiles := []string{".slint.yaml", "slint.config.yaml"}
 	currentDir := startDir
 
-	// Climb up directories, but stop at root
-	// 디렉터리 탐색 종료 조건: 루트 디렉터리에 도달하면 종료
+	// 루트 디렉터리에 도달할 때까지 상위 디렉터리 탐색
 	for {
 		for _, target := range targetFiles {
 			path := filepath.Join(currentDir, target)
@@ -99,14 +89,12 @@ func DiscoverConfig(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 
 		parentDir := filepath.Dir(currentDir)
 		if parentDir == currentDir {
-			// Reached root
 			// 루트 도달
 			break
 		}
 		currentDir = parentDir
 	}
 
-	// Not found, fallback to injected/default
 	// 찾지 못함, 주입/기본값으로 폴백
 	return nil, ConfigSource{Type: "injected"}, nil
 }

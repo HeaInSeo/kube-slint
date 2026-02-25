@@ -1,22 +1,22 @@
 package harness
 
-// TODO(specs): Provide preset bundles as JSON/YAML (checked into repo) so other operators can reuse without Go code.
-//   Example:
+// Step 6 후보: 프리셋 번들을 JSON/YAML로 제공하여 다른 오퍼레이터가 Go 코드 없이 재사용할 수 있도록 지원 예정.
+//   예:
 //     - test/e2e/slo-specs/baseline-v3.json
 //     - harness.LoadSpecsFromFile(path)
 //     - harness.LoadPreset("baseline-v3")
 //
-// TODO(specs): Keep BaselineV3Specs as a Go fallback, but make config-driven specs the primary path.
+// Step 6 후보: BaselineV3Specs는 Go 폴백으로 유지하되, 구성 주도(config-driven) 명세를 주 경로로 설정.
 
 import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 
-// DefaultV3Specs is kept for backward compatibility.
-// It returns the baseline preset set.
+// DefaultV3Specs는 하위 호환성을 위해 유지됨.
+// 기준(baseline) 프리셋 모음을 반환함.
 func DefaultV3Specs() []spec.SLISpec {
 	return BaselineV3Specs()
 }
 
-// BaselineV3Specs is the expanded, reusable preset set:
+// BaselineV3Specs는 확장 가능하고 재사용 가능한 프리셋 모음임:
 // controller-runtime + workqueue + rest-client.
 func BaselineV3Specs() []spec.SLISpec {
 	return []spec.SLISpec{
@@ -30,7 +30,7 @@ func BaselineV3Specs() []spec.SLISpec {
 			Kind:        "delta_counter",
 			Description: "Delta of controller_runtime_reconcile_total during the test window (all results).",
 			Inputs: []spec.MetricRef{
-				// name-only aggregation is supported by parsePrometheusText(out[name]+=val)
+				// 이름만 지정하는 경우 parsePrometheusText에서 값을 누적 연산(out[name]+=val)함
 				spec.PromMetric("controller_runtime_reconcile_total", nil),
 			},
 			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
@@ -56,7 +56,7 @@ func BaselineV3Specs() []spec.SLISpec {
 				spec.PromMetric("controller_runtime_reconcile_total", spec.Labels{"result": "error"}),
 			},
 			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
-			// Optional judge example: error delta should be 0
+			// 판단(judge) 규칙 예시: 에러 델타는 0이어야 함
 			// Judge: &spec.JudgeSpec{Rules: []spec.Rule{{Op: spec.OpGT, Target: 0, Level: spec.LevelFail}}},
 		},
 
@@ -94,9 +94,9 @@ func BaselineV3Specs() []spec.SLISpec {
 			Inputs: []spec.MetricRef{
 				spec.PromMetric("workqueue_depth", nil),
 			},
-			Compute: spec.ComputeSpec{Mode: spec.ComputeSingle}, // end-only gauge would be better in v4; v3 uses single(start)
-			// NOTE(v3): ComputeSingle uses start snapshot in your engine.
-			// If you want end snapshot for gauges, we should add ComputeEnd or ComputeSingleAt in v3.
+			Compute: spec.ComputeSpec{Mode: spec.ComputeSingle}, // v4에서는 end-only gauge 권장, v3는 single(start) 사용함
+			// 참고(v3): ComputeSingle은 엔진에서 스냅샷 시작 값을 사용함.
+			// 게이지에 대해 스냅샷 최종 값을 원한다면, v3에 ComputeEnd 또는 ComputeSingleAt 추가가 필요함.
 		},
 
 		// ---------------------------

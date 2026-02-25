@@ -7,10 +7,8 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
-// CheckStrictness evaluates the reliability of the measurement pipeline based on the StrictnessMode.
-// It enforces the 'Strictness' propagation contract.
-// CheckStrictness는 StrictnessMode를 기반으로 측정 파이프라인의 신뢰도를 평가합니다.
-// 'Strictness' 전파 계약을 강제합니다.
+// CheckStrictness는 StrictnessMode를 기반으로 측정 파이프라인의 신뢰도를 평가함.
+// 'Strictness' 전파 계약을 강제함.
 func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 	if sum == nil || sum.Reliability == nil {
 		return fmt.Errorf("summary or reliability is nil")
@@ -23,7 +21,6 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 
 	rel := sum.Reliability
 
-	// Check for any StatusBlock in results
 	// 결과에 StatusBlock이 있는지 확인
 	var blockReasons []string
 	for _, res := range sum.Results {
@@ -36,8 +33,7 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		blockReasons = append(blockReasons, fmt.Sprintf("pipeline blocked: %s", rel.BlockedReason))
 	}
 
-	// Evaluate skew thresholds for Strictness promotion
-	// Skew threshold 평가를 통해 문제가 있으면 Blocked 사유로 추가합니다.
+	// Skew threshold 평가를 통해 문제가 있으면 Blocked 사유로 추가함
 	if cfg.MaxStartSkewMs > 0 && rel.StartSkewMs != nil && *rel.StartSkewMs > cfg.MaxStartSkewMs {
 		blockReasons = append(blockReasons, fmt.Sprintf("start skew (%dms) exceeded threshold (%dms)", *rel.StartSkewMs, cfg.MaxStartSkewMs))
 	}
@@ -53,8 +49,7 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 
 	switch mode {
 	case "BestEffort":
-		// BestEffort does not promote pipeline failures to test errors.
-		// BestEffort는 파이프라인 실패를 테스트 에러로 승격하지 않습니다.
+		// BestEffort는 파이프라인 실패를 테스트 에러로 승격하지 않음
 		return nil
 
 	case "StrictCollection":
@@ -68,7 +63,7 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		}
 
 	case "RequiredSLIs":
-		// Example implementation for RequiredSLIs
+		// RequiredSLIs에 대한 구현 예시임
 		if isCollectionFailed || isEvaluationFailed {
 			return fmt.Errorf("RequiredSLIs violation: pipeline failed, reasons: %s", strings.Join(blockReasons, ", "))
 		}
@@ -77,13 +72,13 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		}
 
 	default:
-		// Check global block reasons if any unknown strictness is passed
+		// 알 수 없는 strictness가 전달될 경우 전역 블록 사유 확인
 		if len(blockReasons) > 0 {
 			return fmt.Errorf("pipeline blocked (%s): %s", mode, strings.Join(blockReasons, ", "))
 		}
 	}
 
-	// Always fail if there's explicit blocking reasons in strict modes
+	// strict 모드에서 명시적 블록 사유가 있으면 항상 실패 처리함
 	if mode != "BestEffort" && len(blockReasons) > 0 {
 		return fmt.Errorf("pipeline blocked: %s", strings.Join(blockReasons, ", "))
 	}
@@ -91,10 +86,8 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 	return nil
 }
 
-// CheckGating evaluates successfully computed SLIs against the gating policy.
-// It enforces the 'GatingPolicy' propagation contract.
-// CheckGating은 성공적으로 계산된 SLI를 게이팅 정책에 따라 평가합니다.
-// 'GatingPolicy' 전파 계약을 강제합니다.
+// CheckGating은 성공적으로 계산된 SLI를 게이팅 정책에 따라 평가함.
+// 'GatingPolicy' 전파 계약을 강제함.
 func CheckGating(cfg SessionConfig, sum *summary.Summary) error {
 	if sum == nil {
 		return fmt.Errorf("summary is nil")
@@ -108,8 +101,7 @@ func CheckGating(cfg SessionConfig, sum *summary.Summary) error {
 	var gatingFailures []string
 
 	for _, res := range sum.Results {
-		// Ignore skipped or blocked results, those are handled by Strictness
-		// 건너뛰거나 차단된 결과는 무시합니다. 이는 Strictness에서 처리됩니다.
+		// 건너뛰거나 차단된 결과는 무시함. 이는 Strictness 단위에서 처리됨.
 		if res.Status == summary.StatusSkip || res.Status == summary.StatusBlock {
 			continue
 		}

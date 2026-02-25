@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// LoadOptions Options holds E2E test configuration loaded from environment variables.
+// LoadOptions는 환경 변수에서 로드된 E2E 테스트 설정을 포함하는 Options를 반환함.
 func LoadOptions() Options {
 	return Options{
 		Enabled: boolEnv("SLOLAB_ENABLED", false),
@@ -22,9 +22,9 @@ func LoadOptions() Options {
 	}
 }
 
-// --- helpers (규칙 통일: "1"/"true"/"yes"/"on" 모두 허용) ---
+// --- 헬퍼 함수 (규칙 통일: "1"/"true"/"yes"/"on" 모두 허용) ---
 
-// stringEnv returns environment variable as string.
+// stringEnv는 환경 변수를 문자열로 반환함.
 func stringEnv(key, def string) string {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
@@ -33,7 +33,7 @@ func stringEnv(key, def string) string {
 	return v
 }
 
-// boolEnv parses environment variable as bool.
+// boolEnv는 환경 변수를 bool로 파싱함.
 func boolEnv(key string, def bool) bool {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
@@ -49,7 +49,7 @@ func boolEnv(key string, def bool) bool {
 	}
 }
 
-// durationEnv parses environment variable as time.Duration. 다만, 숫자만 들어오면 초단위로 간주.
+// durationEnv는 환경 변수를 time.Duration으로 파싱함. 숫자만 입력되면 초 단위로 간주함.
 func durationEnv(key string, def time.Duration) time.Duration {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {

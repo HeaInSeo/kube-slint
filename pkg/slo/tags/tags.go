@@ -1,7 +1,6 @@
 package tags
 
-// AutoTagsInput defines the auto-tag fields.
-// AutoTagsInput은 자동 태그 필드를 정의함
+// AutoTagsInput은 자동 태그 필드를 정의함.
 type AutoTagsInput struct {
 	Suite     string
 	TestCase  string
@@ -9,8 +8,7 @@ type AutoTagsInput struct {
 	RunID     string
 }
 
-// AutoTags returns the auto-tags map.
-// AutoTags는 자동 태그 맵을 반환함
+// AutoTags는 자동 태그 맵을 반환함.
 func AutoTags(input AutoTagsInput) map[string]string {
 	return map[string]string{
 		"suite":     input.Suite,
@@ -20,8 +18,7 @@ func AutoTags(input AutoTagsInput) map[string]string {
 	}
 }
 
-// MergeTags merges user tags over auto-tags (user overrides).
-// MergeTags는 사용자 태그를 자동 태그 위에 병합함 (사용자 재정의).
+// MergeTags는 사용자 태그를 자동 태그 위에 병합함(사용자 재정의).
 func MergeTags(userTags map[string]string, autoTags map[string]string) map[string]string {
 	merged := map[string]string{}
 	for key, value := range autoTags {

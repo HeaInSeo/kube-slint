@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// CurlPod encapsulates the curl pod lifecycle without external adapters.
-// CurlPod는 외부 어댑터 없이 curl 파드 수명 주기를 캡슐화합니다.
+// CurlPod는 외부 어댑터 없이 curl 파드 수명 주기를 캡슐화함.
 type CurlPod struct {
 	Client             *Client
 	Namespace          string
@@ -18,8 +17,7 @@ type CurlPod struct {
 	ServiceURLFormat string
 }
 
-// Run executes the curl pod lifecycle and returns logs.
-// Run은 curl 파드 수명 주기를 실행하고 로그를 반환합니다.
+// Run은 curl 파드 수명 주기를 실행하고 로그를 반환함.
 func (c *CurlPod) Run(ctx context.Context, waitTimeout time.Duration, logsTimeout time.Duration) (string, error) {
 	client := c.Client
 	if client == nil {

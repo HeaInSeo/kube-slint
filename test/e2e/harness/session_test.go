@@ -43,7 +43,7 @@ func TestSession_AutoRunID(t *testing.T) {
 }
 
 func TestSession_End(t *testing.T) {
-	// Mock fetcher
+	// 모의 fetcher 설정
 	mockFetcher := &mockFetcher{}
 
 	cfg := SessionConfig{
@@ -70,25 +70,23 @@ func (m *mockFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, er
 	}, nil
 }
 
-// ExampleSession_End shows the recommended way to use the harness in E2E tests, particularly for Cleanup.
-// 권장되는 E2E 테스트 하네스 사용 패턴 예시입니다.
+// ExampleSession_End는 권장되는 E2E 테스트 하네스 사용 패턴 예시임.
 func ExampleSession_End() {
-	var ctx context.Context // assume valid context
+	var ctx context.Context // 유효한 context로 가정
 
 	cfg := SessionConfig{
 		Namespace: "operator-system",
 		TestCase:  "E2E Integration Test",
-		// Mode determines when to delete temporary resources
+		// Mode는 임시 리소스를 삭제할 시기를 결정함
 		CleanupMode: "on-success",
 	}
 
 	sess := NewSession(cfg)
 
-	// mockTestFailed represents the test framework's failure state (e.g., Ginkgo's CurrentSpecReport().Failed())
-	// mockTestFailed는 테스트 프레임워크의 실패 상태를 나타냅니다.
+	// mockTestFailed는 테스트 프레임워크의 실패 상태를 나타냄
 	var mockTestFailed bool
 
-	// 1. defer Cleanup first so it runs at the end. Use MarkFailed to sync test state.
+	// 1. Cleanup을 먼저 defer로 등록하여 마지막에 실행되도록 하고, MarkFailed로 테스트 상태를 동기화함
 	defer func() {
 		if mockTestFailed {
 			sess.MarkFailed()
@@ -96,37 +94,36 @@ func ExampleSession_End() {
 		sess.Cleanup(ctx)
 	}()
 
-	// 2. Start the measurement window
+	// 2. 측정 창(window) 시작
 	sess.Start()
 
-	// 3. Do operator interactions, wait for convergence...
+	// 3. 오퍼레이터 활동 유발 및 수렴 대기...
 	// ... doWork() ...
 	// if err != nil { mockTestFailed = true; return }
 
-	// 4. End the measurement window and trigger evaluations.
-	// CheckStrictness/Gating is enforced during End().
+	// 4. 측정 창을 종료하고 평가를 시작함.
+	// End() 실행 중 CheckStrictness/Gating 규칙이 적용됨.
 	_, err := sess.End(ctx)
 	if err != nil {
 		mockTestFailed = true
 		// e.g. Expect(err).ToNot(HaveOccurred()) in Ginkgo
 	}
 
-	// 5. (Optional) Sweep left-over resources from previous runs (e.g., OOM killed tests)
-	// It is recommended to use "report-only" to avoid unexpected deletions during CI.
-	// 이전 실행에서 남겨진 고아 리소스 정리(선택). CI 시에는 "report-only" 모드를 권장함.
+	// 5. 이전 실행에서 남겨진 고아 리소스 정리 (선택 사항)
+	// 예기치 않은 삭제를 막기 위해 "report-only" 모드 사용을 권장함.
 	_ = sess.SweepOrphans(ctx, OrphanSweepOptions{Enabled: true, Mode: "report-only"})
 }
 
 func TestSession_SweepOrphans_Disabled(t *testing.T) {
 	cfg := SessionConfig{Namespace: "ns", RunID: "run-1"}
 	sess := NewSession(cfg)
-	// Shouldn't panic or error when disabled
+	// 비활성화 시 패닉이나 에러가 발생하면 안 됨
 	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: false})
 	assert.NoError(t, err)
 }
 
 func TestSession_SweepOrphans_MissingGuard(t *testing.T) {
-	// Missing Namespace should result in a skip, not an error.
+	// 다중 실행 안전을 위해 Namespace가 없으면 에러가 아닌 생략(skip) 처리되어야 함
 	cfg := SessionConfig{RunID: "run-1"}
 	sess := NewSession(cfg)
 	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: true, Mode: "report-only"})

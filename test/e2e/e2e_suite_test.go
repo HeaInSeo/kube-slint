@@ -18,29 +18,22 @@ import (
 )
 
 var (
-	// Optional Environment Variables:
-	// - CERT_MANAGER_INSTALL_SKIP=true: Skips CertManager installation during test setup.
 	// 선택적 환경 변수:
-	// - CERT_MANAGER_INSTALL_SKIP=true: 테스트 설정 중 CertManager 설치를 건너뜁니다.
+	// - CERT_MANAGER_INSTALL_SKIP=true: 테스트 설정 중 CertManager 설치를 생략함.
 	skipCertManagerInstall = os.Getenv("CERT_MANAGER_INSTALL_SKIP") == "true"
 
-	// isCertManagerAlreadyInstalled will be set true when CertManager CRDs are found on the cluster.
-	// isCertManagerAlreadyInstalled는 CertManager CRD가 클러스터에서 발견되면 true로 설정됩니다.
+	// isCertManagerAlreadyInstalled는 CertManager CRD가 클러스터에서 발견되면 true로 설정됨.
 	isCertManagerAlreadyInstalled = false
 
-	// projectImage is the name of the image which will be built and loaded with the code source changes to be tested.
-	// projectImage는 테스트할 코드 소스 변경 사항으로 빌드되고 로드될 이미지의 이름입니다.
+	// projectImage는 테스트할 코드 소스 변경 사항으로 빌드되고 로드될 이미지의 이름임.
 	projectImage = "example.com/kube-slint:v0.0.1"
 
-	// logger is the suite logger. It is always safe (nil -> no-op).
-	// logger는 스위트 로거입니다. 항상 안전합니다 (nil -> no-op).
+	// logger는 스위트 로거임. 항상 안전함 (nil -> no-op).
 	logger = slo.NewLogger(e2eutil.GinkgoLog)
 
-	// runner is used by kubeutil/devutil helpers (context-aware).
-	// runner는 kubeutil/devutil 헬퍼(컨텍스트 인식)에서 사용됩니다.
+	// runner는 kubeutil/devutil 헬퍼(컨텍스트 인식)에서 사용됨.
 	runner kubeutil.CmdRunner = kubeutil.DefaultRunner{}
-	// useExistingCluster determines whether to use an existing cluster or provision Kind.
-	// useExistingCluster는 기존 클러스터를 사용할지 아니면 Kind를 프로비저닝할지 결정합니다.
+	// useExistingCluster는 기존 클러스터를 사용할지 아니면 Kind를 프로비저닝할지 결정함.
 	useExistingCluster = os.Getenv("USE_EXISTING_CLUSTER") == "true"
 )
 
@@ -51,10 +44,8 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// A reasonable default guard for setup steps.
-	// Individual kubectl commands also have their own timeouts (e.g. kubectl wait --timeout).
-	// 설정 단계를 위한 합리적인 기본 가드입니다.
-	// 개별 kubectl 명령어들도 자체적인 타임아웃을 가지고 있습니다 (예: kubectl wait --timeout).
+	// 설정 단계를 위한 합리적인 기본 타임아웃임.
+	// 개별 kubectl 명령어들도 자체적인 타임아웃을 가지고 있음 (예: kubectl wait --timeout).
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -76,7 +67,7 @@ var _ = BeforeSuite(func() {
 			To(Succeed(), "Failed to load the manager(Operator) image into Kind")
 	}
 
-	// Setup CertManager before the suite if not skipped and if not already installed.
+	// 스킵되지 않았고 아직 설치되지 않은 경우 스위트 진행 전 CertManager를 설정함.
 	if skipCertManagerInstall {
 		logger.Logf("CERT_MANAGER_INSTALL_SKIP=true: skipping cert-manager setup")
 		return
