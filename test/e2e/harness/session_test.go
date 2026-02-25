@@ -74,30 +74,40 @@ func (m *mockFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, er
 // 권장되는 E2E 테스트 하네스 사용 패턴 예시입니다.
 func ExampleSession_End() {
 	var ctx context.Context // assume valid context
-	
+
 	cfg := SessionConfig{
 		Namespace: "operator-system",
 		TestCase:  "E2E Integration Test",
 		// Mode determines when to delete temporary resources
-		CleanupMode: "on-success", 
+		CleanupMode: "on-success",
 	}
-	
+
 	sess := NewSession(cfg)
-	// 1. defer Cleanup first so it runs at the end.
-	defer sess.Cleanup(ctx)
-	
+
+	// mockTestFailed represents the test framework's failure state (e.g., Ginkgo's CurrentSpecReport().Failed())
+	// mockTestFailed는 테스트 프레임워크의 실패 상태를 나타냅니다.
+	var mockTestFailed bool
+
+	// 1. defer Cleanup first so it runs at the end. Use MarkFailed to sync test state.
+	defer func() {
+		if mockTestFailed {
+			sess.MarkFailed()
+		}
+		sess.Cleanup(ctx)
+	}()
+
 	// 2. Start the measurement window
 	sess.Start()
 
 	// 3. Do operator interactions, wait for convergence...
 	// ... doWork() ...
+	// if err != nil { mockTestFailed = true; return }
 
 	// 4. End the measurement window and trigger evaluations.
-	// If the test failed logically earlier or CheckStrictness/Gating fails, 
-	// err is evaluated and CleanupMode rules apply automatically.
+	// CheckStrictness/Gating is enforced during End().
 	_, err := sess.End(ctx)
 	if err != nil {
+		mockTestFailed = true
 		// e.g. Expect(err).ToNot(HaveOccurred()) in Ginkgo
-		panic(err)
 	}
 }

@@ -244,6 +244,17 @@ func (s *Session) AddWarning(message string) {
 	s.impl.Warnings = append(s.impl.Warnings, message)
 }
 
+// MarkFailed explicitly flags this session as failed, affecting CleanupMode evaluations.
+// It is monotonic (once failed, cannot be reverted) and idempotent.
+// MarkFailed는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줍니다.
+// 단조적(한 번 실패로 표시되면 되돌릴 수 없음)이며 멱등성을 가집니다.
+func (s *Session) MarkFailed() {
+	if s == nil || s.impl == nil {
+		return
+	}
+	s.impl.hasFailed = true
+}
+
 // Cleanup removes temporary resources created by the session.
 // It uses run-id and namespace as safety guards to prevent broad deletion.
 // Cleanup은 세션에서 생성된 임시 리소스를 제거합니다.
@@ -422,7 +433,6 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		return sum, gatingErr
 	}
 
-	s.impl.hasFailed = false
 	return sum, nil
 }
 

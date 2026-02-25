@@ -427,15 +427,23 @@ cfg := harness.SessionConfig{
 sess := harness.NewSession(cfg)
 
 // 1. defer를 통한 세션 종료 및 안전한 Cleanup (마지막에 실행됨)
-defer sess.Cleanup(ctx)
+// 테스트 본문에 패닉/Assertion 실패가 발생했을 때 CleanupMode 규칙이 정상 동작하도록, 
+// 프레임워크의 실패 상태를 런타임에 읽어와 sess에 주입(MarkFailed)해야 합니다.
+defer func() {
+	if CurrentSpecReport().Failed() { // Ginkgo 프레임워크 예시
+		sess.MarkFailed()
+	}
+	sess.Cleanup(ctx)
+}()
 
 // 2. 측정 시작
 sess.Start()
 
 // 3. 오퍼레이터 활동 대기 (doWork)
+// ... 만약 여기서 테스트가 중단(Fail)되면 defer 훅이 이를 감지하여 MarkFailed()를 호출합니다.
 
 // 4. 측정 종료 및 전파 규약(CheckStrictness / CheckGating) 검사
-// 에러 리턴 시 sess 내부에 실패 상태가 저장되어 CleanupMode 규칙이 적용됩니다.
+// End() 내부에서 자동으로 Gating 위반 등을 검사해 에러일 경우 실패 상태로 내부 처리됩니다.
 _, err := sess.End(ctx)
 if err != nil {
 	// Ginkgo Assertion 등을 통해 실패 전파

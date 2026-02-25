@@ -52,6 +52,9 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 
 	// Fetch snapshots
 	realStart := time.Now()
+	// startSkew represents the "Deferred start scrape skew", which is the difference
+	// between the requested StartedAt and the actual time fetching began.
+	// NOTE: This represents execution delay of the harness, not Operator Action Delay.
 	startSkew := realStart.Sub(cfg.StartedAt).Milliseconds()
 	rel.StartSkewMs = &startSkew
 
