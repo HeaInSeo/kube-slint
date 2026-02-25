@@ -595,10 +595,12 @@ Counter delta 계산에서 `end < start` 발생 시:
 
 따라서 장기적으로:
 
-- TTL 기반 orphan sweeper
-- 다음 실행 시 stale run-id 정리
-    
-    를 고려한다 (로드맵 항목)
+- **v4.4 최소형 Orphan Sweeper 도입**:
+  장기적인 안전성을 보완하고자 `SweepOrphans` 기능이 도입되었습니다.
+  - 기본 동작은 **Report Only (탐지/경고용)**이며 자동 무단 삭제를 방지합니다.
+  - 삭제를 원할 경우 반드시 `mode="delete"`를 지정하고 사용자 책임 하에 명시적으로 호출해야 합니다.
+  - 안전 지대: 현재 세션의 `run-id`는 제외되며 `namespace` 범위로 제한됩니다.
+- 추가 고도화(TTL 기반 자동 백그라운드 스위퍼 등)는 장기 로드맵으로 남습니다.
     
 
 ---

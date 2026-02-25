@@ -110,4 +110,25 @@ func ExampleSession_End() {
 		mockTestFailed = true
 		// e.g. Expect(err).ToNot(HaveOccurred()) in Ginkgo
 	}
+
+	// 5. (Optional) Sweep left-over resources from previous runs (e.g., OOM killed tests)
+	// It is recommended to use "report-only" to avoid unexpected deletions during CI.
+	// 이전 실행에서 남겨진 고아 리소스 정리(선택). CI 시에는 "report-only" 모드를 권장함.
+	_ = sess.SweepOrphans(ctx, OrphanSweepOptions{Enabled: true, Mode: "report-only"})
+}
+
+func TestSession_SweepOrphans_Disabled(t *testing.T) {
+	cfg := SessionConfig{Namespace: "ns", RunID: "run-1"}
+	sess := NewSession(cfg)
+	// Shouldn't panic or error when disabled
+	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: false})
+	assert.NoError(t, err)
+}
+
+func TestSession_SweepOrphans_MissingGuard(t *testing.T) {
+	// Missing Namespace should result in a skip, not an error.
+	cfg := SessionConfig{RunID: "run-1"}
+	sess := NewSession(cfg)
+	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: true, Mode: "report-only"})
+	assert.NoError(t, err)
 }

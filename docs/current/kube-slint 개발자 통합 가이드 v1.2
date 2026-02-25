@@ -468,7 +468,23 @@ if err != nil {
 > 반드시 `run-id`/namespace 범위를 함께 사용한다.
 > 
 
-## 10.5 디버깅 시 보존 전략
+## 10.5 Orphan Sweeper (고아 리소스 정리)
+
+`CleanupMode`와 별도로, 이전 테스트 중단 등으로 인해 클러스터에 남아 있는 kube-slint 리소스(curl pod 등)를 탐지하고 정리할 수 있습니다.
+
+- **기본 동작 (Report Only)**: `SweepOrphans(ctx, opts)` 호출 시 `Mode: "report-only"`가 기본값입니다. 삭제 없이 개수와 목록만 로깅하고 넘어가므로 CI 도중 예기치 않은 전체 삭제를 방지합니다.
+- **안전 제한**: 
+  - 현재 구동 중인 `run-id`는 대상에서 명시적으로 제외됩니다.
+  - 현재 설정된 `namespace` 내에서만 탐지/삭제를 수행합니다.
+- **명시적 삭제**: 실 삭제를 원할 경우 반드시 `OrphanSweepOptions{Mode: "delete"}`를 넘겨야 합니다.
+
+## 10.6 운영 실수 방지 체크리스트
+
+1. **자동 삭제 오해 금지**: `CleanupMode` 규칙에 맞지 않으면 리소스가 자동으로 지워지지 않습니다. 디버깅 후엔 명시적으로 삭제하세요.
+2. **Sweep 전 대상 확인**: 운영 환경에서 `sweep(delete)` 모드를 돌리기 전에 반드시 `report-only`로 대상 목록(orphans)을 점검하세요.
+3. **Selector 주의**: `kubectl delete` 등 수동 작업 시 `managed-by=kube-slint`만으로 삭제하지 마세요. `slint-run-id`와 `namespace`를 조합해 범위를 좁히세요.
+
+## 10.7 디버깅 시 보존 전략
 
 - `cleanup.mode=on-success` 또는 `retainOnFailure=true`를 사용해 실패 시 리소스를 남겨 원인 분석 가능하게 한다.
 

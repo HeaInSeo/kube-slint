@@ -61,7 +61,7 @@ type sessionImpl struct {
 
 	// Tunables (defaults are set in NewSession)
 	ServiceURLFormat string
-	// TODO: 향후 추가되거나 올릴예정임.
+	// Step 6 후보. 구성 확장 여지 있음
 	CurlImage string
 	// ServiceURLFormat 에서 결정됨. 일단 주석으로 남겨둠, 혹시 필요하면 살림.
 	//MetricsPort      int
@@ -101,7 +101,7 @@ func NewSession(cfg SessionConfig) *Session {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	// TODO: 기본적으로 InsideSnapshot을 사용한다. 그런데 오류처리할지 고민중
+	// InsideSnapshot 기본 사용. 오류 처리 로직 추가 검토 (Step 6 후보)
 	if cfg.Method == "" {
 		cfg.Method = engine.InsideSnapshot
 	}
@@ -169,7 +169,7 @@ func NewSession(cfg SessionConfig) *Session {
 
 	mergedTags := tags.MergeTags(cfg.Tags, autoTags)
 
-	// TODO:Specs default, 이건 확인해봐야 한다.
+	// Specs 기본값 확인 및 개선 (Step 6 후보)
 	resolvedSpecs := defaultSpecs(cfg.Specs)
 
 	// Writer default
@@ -267,6 +267,71 @@ func (s *Session) MarkFailed() {
 		return
 	}
 	s.impl.hasFailed = true
+}
+
+// OrphanSweepOptions configures the orphan sweep behavior.
+// OrphanSweepOptions는 고아(orphan) 리소스 정리 동작을 설정함.
+type OrphanSweepOptions struct {
+	Enabled bool
+	Mode    string // "report-only" (기본값) | "delete"
+}
+
+// SweepOrphans detects and optionally deletes resources from previous kube-slint run-ids.
+// It explicitly excludes the current session's run-id and limits scope to the current namespace.
+// SweepOrphans는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
+// 현재 세션의 run-id는 명시적으로 제외되며, 현재 namespace로 범위가 제한됨.
+func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) error {
+	if s == nil || s.impl == nil {
+		return nil
+	}
+	if !opts.Enabled {
+		return nil
+	}
+
+	mode := opts.Mode
+	if mode != "delete" {
+		mode = "report-only" // Default to safety
+	}
+
+	ns := s.impl.Config.Namespace
+	runID := s.impl.RunID
+
+	if ns == "" || runID == "" {
+		fmt.Printf("kube-slint [orphan-sweep]: skip - missing namespace or run-id for safety guard\n")
+		return nil
+	}
+
+	// Find orphaned pods managed by kube-slint, excluding current run-id
+	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
+
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", labelSelector, "-o", "jsonpath={.items[*].metadata.name}")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
+	}
+
+	podsStr := strings.TrimSpace(string(out))
+	if podsStr == "" {
+		fmt.Printf("kube-slint [orphan-sweep]: no orphan resources detected\n")
+		return nil
+	}
+
+	orphans := strings.Split(podsStr, " ")
+	fmt.Printf("kube-slint [orphan-sweep]: detected %d orphan(s): %v\n", len(orphans), orphans)
+
+	if mode == "delete" {
+		fmt.Printf("kube-slint [orphan-sweep]: proceeding with deletion for %d orphan(s)...\n", len(orphans))
+		delCmd := exec.CommandContext(ctx, "kubectl", "delete", "pods", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
+		delOut, delErr := delCmd.CombinedOutput()
+		if delErr != nil {
+			return fmt.Errorf("failed to delete orphans: %v (output: %s)", delErr, string(delOut))
+		}
+		fmt.Printf("kube-slint [orphan-sweep]: deletion complete\n")
+	} else {
+		fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion. To delete, set option mode='delete'.\n")
+	}
+
+	return nil
 }
 
 // Cleanup removes temporary resources created by the session.
@@ -451,7 +516,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 }
 
 // ---- (TEMP) Default Fetcher: curlpod + promtext ----
-// TODO(harness-thin): 아래 구현은 pkg/slo/fetch/* 또는 test-side adapter로 옮기는 게 목표.
+// Step 6 후보. 아래 구현은 pkg/slo/fetch/* 또는 test-side adapter로 이동 예정.
 
 type curlPodFetcher struct {
 	impl *sessionImpl
@@ -520,6 +585,6 @@ func defaultSpecs(specs []spec.SLISpec) []spec.SLISpec {
 	if specs != nil {
 		return specs
 	}
-	// TODO: Replace DefaultV3Specs with a cleaner 'DefaultSpecs' or load from file.
+	// Step 6 후보. DefaultSpecs 개선 또는 파일 로드 방식으로 대체 예정.
 	return DefaultV3Specs()
 }
