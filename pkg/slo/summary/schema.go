@@ -16,6 +16,9 @@ const (
 	// StatusFail indicates a failure.
 	// StatusFail은 실패를 나타냅니다.
 	StatusFail Status = "fail"
+	// StatusBlock indicates a measurement/pipeline failure.
+	// StatusBlock은 측정/파이프라인 실패를 나타냅니다.
+	StatusBlock Status = "block"
 	// StatusSkip indicates the check was skipped.
 	// StatusSkip은 체크가 건너뛰어졌음을 나타냅니다.
 	StatusSkip Status = "skip"
@@ -29,8 +32,27 @@ type Summary struct {
 
 	Config RunConfig `json:"config"`
 
+	Reliability *Reliability `json:"reliability,omitempty"`
+
 	Results  []SLIResult `json:"results"`
 	Warnings []string    `json:"warnings,omitempty"`
+}
+
+// Reliability contains diagnostic and reliability status of the measurement.
+// Reliability는 측정의 진단 및 신뢰도 상태를 포함합니다.
+type Reliability struct {
+	CollectionStatus string   `json:"collectionStatus,omitempty"` // Complete | Partial | Failed
+	EvaluationStatus string   `json:"evaluationStatus,omitempty"` // Complete | Partial | Failed
+	BlockedReason    string   `json:"blockedReason,omitempty"`
+	MissingInputs    []string `json:"missingInputs,omitempty"`
+	SkippedSLIs      []string `json:"skippedSLIs,omitempty"`
+
+	ConfigSourceType string `json:"configSourceType,omitempty"` // injected | env | discovered
+	ConfigSourcePath string `json:"configSourcePath,omitempty"`
+
+	StartSkewMs     *int64 `json:"startSkewMs,omitempty"`
+	EndSkewMs       *int64 `json:"endSkewMs,omitempty"`
+	ScrapeLatencyMs *int64 `json:"scrapeLatencyMs,omitempty"`
 }
 
 // RunConfig is embedded in the summary (so analysis tools can be method-agnostic).
@@ -69,7 +91,7 @@ type SLIResult struct {
 	Value  *float64           `json:"value,omitempty"`
 	Fields map[string]float64 `json:"fields,omitempty"`
 
-	Status Status `json:"status"` // "pass" | "warn" | "fail" | "skip"
+	Status Status `json:"status"` // "pass" | "warn" | "fail" | "block" | "skip"
 
 	Reason string `json:"reason,omitempty"`
 

@@ -40,6 +40,10 @@ type SessionConfig struct {
 	Specs   []spec.SLISpec
 	Fetcher fetch.MetricsFetcher
 	Writer  summary.Writer
+
+	// Internal metadata
+	ConfigSourceType string
+	ConfigSourcePath string
 }
 
 type sessionImpl struct {
@@ -94,6 +98,35 @@ func NewSession(cfg SessionConfig) *Session {
 	runID := strings.TrimSpace(cfg.RunID)
 	if runID == "" {
 		runID = fmt.Sprintf("local-%d", cfg.Now().Unix())
+	}
+
+	// 1. Discover Configuration (Bridge Sprint)
+	// 1. 설정 자동 탐색 (브리지 스프린트)
+	discoveredCfg, source, err := DiscoverConfig("")
+	if err != nil {
+		fmt.Printf("kube-slint [discovery]: warning - %v\n", err)
+	}
+
+	cfg.ConfigSourceType = source.Type
+	cfg.ConfigSourcePath = source.Path
+
+	if source.Disabled {
+		fmt.Println("kube-slint [discovery]: discovery disabled via SLINT_DISABLE_DISCOVERY")
+	} else {
+		if source.Path != "" {
+			fmt.Printf("kube-slint [discovery]: resolved config source type=%s path=%s\n", source.Type, source.Path)
+		} else {
+			fmt.Printf("kube-slint [discovery]: resolved config source type=%s\n", source.Type)
+		}
+	}
+
+	// 2. Apply Discovered Configuration onto SessionConfig (Thin Wrapper)
+	// 2. 탐색된 설정을 SessionConfig에 반영 (얇은 래퍼)
+	if discoveredCfg != nil {
+		if discoveredCfg.Write.ArtifactsDir != "" && cfg.ArtifactsDir == "" {
+			cfg.ArtifactsDir = discoveredCfg.Write.ArtifactsDir
+		}
+		// TODO(future): apply Strictness, Gating, and Cleanup configs when implemented in Stage 2.
 	}
 
 	autoTags := tags.AutoTags(tags.AutoTagsInput{
@@ -280,18 +313,35 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		outPath = path
 	}
 
-	return engine.ExecuteStandard(ctx, eng, engine.ExecuteRequestStandard{
+	sum, err := engine.ExecuteStandard(ctx, eng, engine.ExecuteRequestStandard{
 		Method: m,
 		Config: engine.RunConfig{
 			RunID:      s.impl.RunID,
 			StartedAt:  started,
 			FinishedAt: finished,
-			Format:     "v4",
+			Format:     "v4.4",
 			Tags:       s.impl.Tags,
 		},
 		Specs:   s.impl.specs,
-		OutPath: outPath,
+		OutPath: outPath, // Note: The initial write does NOT include Reliability. Next step will fix this.
 	})
+
+	// Inject Reliability info post-execution.
+	// In Step 2, this struct will be passed all the way down.
+	// 실행 사후에 신뢰도 정보 주입. Step 2에서 이 구조체가 하위로 끝까지 전달될 예정입니다.
+	if sum != nil {
+		if sum.Reliability == nil {
+			sum.Reliability = &summary.Reliability{}
+		}
+		sum.Reliability.ConfigSourceType = s.impl.Config.ConfigSourceType
+		sum.Reliability.ConfigSourcePath = s.impl.Config.ConfigSourcePath
+		// Best-effort overwrite config file
+		if outPath != "" {
+			_ = s.impl.writer.Write(outPath, *sum)
+		}
+	}
+
+	return sum, err
 }
 
 // ---- (TEMP) Default Fetcher: curlpod + promtext ----
