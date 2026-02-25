@@ -127,7 +127,7 @@ func TestSummary_JSON_ConfidenceScore(t *testing.T) {
 			ConfidenceScore: &val,
 		},
 	}
-	
+
 	b, err := json.Marshal(sum)
 	assert.NoError(t, err)
 

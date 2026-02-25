@@ -111,7 +111,7 @@ func ExampleSession_End() {
 
 	// 5. 이전 실행에서 남겨진 고아 리소스 정리 (선택 사항)
 	// 예기치 않은 삭제를 막기 위해 "report-only" 모드 사용을 권장함.
-	_ = sess.SweepOrphans(ctx, OrphanSweepOptions{Enabled: true, Mode: "report-only"})
+	_ = sess.SweepOrphans(ctx, OrphanSweepOptions{Enabled: true, Mode: "report-only", Limit: 10})
 }
 
 func TestSession_SweepOrphans_Disabled(t *testing.T) {

@@ -266,7 +266,9 @@ func (s *Session) MarkFailed() {
 // OrphanSweepOptions는 고아(orphan) 리소스 정리 동작을 설정함.
 type OrphanSweepOptions struct {
 	Enabled bool
-	Mode    string // "report-only" (기본값) | "delete"
+	Mode    string        // "report-only" (기본값) | "delete"
+	Limit   int           // 한 번에 삭제/보고할 최대 고아 리소스 수 (0이면 무제한)
+	MaxAge  time.Duration // 이 시간보다 오래된 리소스만 대상으로 함 (0이면 검사 안 함)
 }
 
 // SweepOrphans는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
@@ -295,31 +297,102 @@ func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) err
 	// kube-slint에 의해 관리되며 현재 run-id를 제외한 고아 파드를 검색함
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
 
-	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", labelSelector, "-o", "jsonpath={.items[*].metadata.name}")
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", labelSelector, "-o", "jsonpath={range .items[*]}{.metadata.name},{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
 	}
 
-	podsStr := strings.TrimSpace(string(out))
-	if podsStr == "" {
-		fmt.Printf("kube-slint [orphan-sweep]: no orphan resources detected\n")
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n", mode, ns, runID)
 		return nil
 	}
 
-	orphans := strings.Split(podsStr, " ")
-	fmt.Printf("kube-slint [orphan-sweep]: detected %d orphan(s): %v\n", len(orphans), orphans)
+	type orphanInfo struct {
+		Name      string
+		RunID     string
+		CreatedAt time.Time
+	}
+
+	var allOrphans []orphanInfo
+	now := time.Now()
+
+	for _, line := range lines {
+		parts := strings.SplitN(line, ",", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		name, rId, tsStr := parts[0], parts[1], parts[2]
+
+		ts, err := time.Parse(time.RFC3339, tsStr)
+		if err != nil {
+			fmt.Printf("kube-slint [orphan-sweep]: warning - failed to parse creation timestamp for pod %s: %v\n", name, err)
+			continue
+		}
+
+		if opts.MaxAge > 0 && now.Sub(ts) < opts.MaxAge {
+			continue
+		}
+
+		allOrphans = append(allOrphans, orphanInfo{Name: name, RunID: rId, CreatedAt: ts})
+	}
+
+	if len(allOrphans) == 0 {
+		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources matched criteria (e.g. MaxAge)\n", mode, ns, runID)
+		return nil
+	}
+
+	targetOrphans := allOrphans
+	skippedCount := 0
+	if opts.Limit > 0 && len(targetOrphans) > opts.Limit {
+		skippedCount = len(targetOrphans) - opts.Limit
+		targetOrphans = targetOrphans[:opts.Limit]
+	}
+
+	// 요약 결과 출력
+	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n", mode, ns, runID, opts.Limit, opts.MaxAge)
+	fmt.Printf("kube-slint [orphan-sweep]: detected %d matching orphan(s) ", len(allOrphans))
+	if skippedCount > 0 {
+		fmt.Printf("(processing %d, skipping %d due to limit)\n", len(targetOrphans), skippedCount)
+	} else {
+		fmt.Printf("(processing all)\n")
+	}
+
+	var targetNames []string
+	summaryByRunID := make(map[string]int)
+	for _, o := range targetOrphans {
+		targetNames = append(targetNames, o.Name)
+		summaryByRunID[o.RunID]++
+	}
+
+	fmt.Printf("kube-slint [orphan-sweep]: target run-ids: ")
+	for r, c := range summaryByRunID {
+		fmt.Printf("[%s: %d pods] ", r, c)
+	}
+	fmt.Printf("\n")
 
 	if mode == "delete" {
-		fmt.Printf("kube-slint [orphan-sweep]: proceeding with deletion for %d orphan(s)...\n", len(orphans))
-		delCmd := exec.CommandContext(ctx, "kubectl", "delete", "pods", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
+		if len(targetNames) == 0 {
+			// This shouldn't happen based on earlier checks, but being defensive
+			fmt.Printf("kube-slint [orphan-sweep]: no targets to delete\n")
+			return nil
+		}
+
+		fmt.Printf("kube-slint [orphan-sweep]: proceeding with deletion for %d orphan(s)...\n", len(targetNames))
+
+		// Chunk deletes to avoid hitting command line length limits if many
+		args := append([]string{"delete", "pods", "-n", ns, "--ignore-not-found=true"}, targetNames...)
+		delCmd := exec.CommandContext(ctx, "kubectl", args...)
 		delOut, delErr := delCmd.CombinedOutput()
+
 		if delErr != nil {
 			return fmt.Errorf("failed to delete orphans: %v (output: %s)", delErr, string(delOut))
 		}
 		fmt.Printf("kube-slint [orphan-sweep]: deletion complete\n")
 	} else {
-		fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion. To delete, set option mode='delete'.\n")
+		fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion of %v\n", targetNames)
+		fmt.Printf("kube-slint [orphan-sweep]: to delete, set option mode='delete'\n")
 	}
 
 	return nil

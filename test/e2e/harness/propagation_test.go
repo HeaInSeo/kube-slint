@@ -18,39 +18,39 @@ func TestCheckStrictness_SkewThresholds(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name: "BestEffort_NoThresholds",
-			cfg:  SessionConfig{StrictnessMode: "BestEffort"},
-			rel:  summary.Reliability{StartSkewMs: &val2000},
+			name:        "BestEffort_NoThresholds",
+			cfg:         SessionConfig{StrictnessMode: "BestEffort"},
+			rel:         summary.Reliability{StartSkewMs: &val2000},
 			expectError: false,
 		},
 		{
-			name: "BestEffort_ExceedThresholds",
-			cfg:  SessionConfig{StrictnessMode: "BestEffort", MaxStartSkewMs: 1000},
-			rel:  summary.Reliability{StartSkewMs: &val2000},
+			name:        "BestEffort_ExceedThresholds",
+			cfg:         SessionConfig{StrictnessMode: "BestEffort", MaxStartSkewMs: 1000},
+			rel:         summary.Reliability{StartSkewMs: &val2000},
 			expectError: false, // BestEffort 모드에서는 무시되고 nil을 반환해야 함
 		},
 		{
-			name: "StrictCollection_UnderThresholds",
-			cfg:  SessionConfig{StrictnessMode: "StrictCollection", MaxStartSkewMs: 3000},
-			rel:  summary.Reliability{StartSkewMs: &val2000, CollectionStatus: "Complete"},
+			name:        "StrictCollection_UnderThresholds",
+			cfg:         SessionConfig{StrictnessMode: "StrictCollection", MaxStartSkewMs: 3000},
+			rel:         summary.Reliability{StartSkewMs: &val2000, CollectionStatus: "Complete"},
 			expectError: false,
 		},
 		{
-			name: "StrictCollection_ExceedStartSkew",
-			cfg:  SessionConfig{StrictnessMode: "StrictCollection", MaxStartSkewMs: 1500},
-			rel:  summary.Reliability{StartSkewMs: &val2000, CollectionStatus: "Complete"},
+			name:        "StrictCollection_ExceedStartSkew",
+			cfg:         SessionConfig{StrictnessMode: "StrictCollection", MaxStartSkewMs: 1500},
+			rel:         summary.Reliability{StartSkewMs: &val2000, CollectionStatus: "Complete"},
 			expectError: true, // 임계값 초과
 		},
 		{
-			name: "StrictCollection_ExceedEndSkew",
-			cfg:  SessionConfig{StrictnessMode: "StrictCollection", MaxEndSkewMs: 500},
-			rel:  summary.Reliability{EndSkewMs: &val1000, CollectionStatus: "Complete"},
+			name:        "StrictCollection_ExceedEndSkew",
+			cfg:         SessionConfig{StrictnessMode: "StrictCollection", MaxEndSkewMs: 500},
+			rel:         summary.Reliability{EndSkewMs: &val1000, CollectionStatus: "Complete"},
 			expectError: true,
 		},
 		{
-			name: "StrictEvaluation_ExceedScrapeLatency",
-			cfg:  SessionConfig{StrictnessMode: "StrictEvaluation", MaxScrapeLatencyMs: 1500},
-			rel:  summary.Reliability{ScrapeLatencyMs: &val2000, CollectionStatus: "Complete", EvaluationStatus: "Complete"},
+			name:        "StrictEvaluation_ExceedScrapeLatency",
+			cfg:         SessionConfig{StrictnessMode: "StrictEvaluation", MaxScrapeLatencyMs: 1500},
+			rel:         summary.Reliability{ScrapeLatencyMs: &val2000, CollectionStatus: "Complete", EvaluationStatus: "Complete"},
 			expectError: true,
 		},
 	}

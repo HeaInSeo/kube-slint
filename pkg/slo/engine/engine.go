@@ -159,19 +159,19 @@ func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
 		if rel.EvaluationStatus == "Partial" {
 			score -= 0.2
 		}
-		
+
 		missingPenalty := float64(len(rel.MissingInputs)) * 0.1
 		if missingPenalty > 0.3 {
 			missingPenalty = 0.3
 		}
 		score -= missingPenalty
-		
+
 		skippedPenalty := float64(len(rel.SkippedSLIs)) * 0.1
 		if skippedPenalty > 0.3 {
 			skippedPenalty = 0.3
 		}
 		score -= skippedPenalty
-		
+
 		if rel.StartSkewMs != nil && *rel.StartSkewMs > 5000 {
 			score -= 0.1
 		}
@@ -188,7 +188,7 @@ func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
 	} else if score > 1.0 {
 		score = 1.0
 	}
-	
+
 	rel.ConfidenceScore = &score
 }
 
