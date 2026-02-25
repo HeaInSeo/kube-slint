@@ -68,6 +68,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		// philosophy: "measurement failure is not test failure" → return a Summary with warnings
 		// 철학: "측정 실패는 테스트 실패가 아님" → 경고가 포함된 Summary 반환
 		s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(start) failed: %v", err)})
+		e.ensureConfidenceScore(rel)
 		_ = e.writer.Write(req.OutPath, *s)
 		return s, nil
 	}
@@ -78,16 +79,18 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 
 	end, err := e.fetcher.Fetch(ctx, cfg.FinishedAt)
 	scrapeLatencyEnd := time.Since(realEnd).Milliseconds()
-	// ScrapeLatency is updated to reflect the slower of the two for simplicity,
-	// or sequentially adding if we want total scrape time. We'll store max latency.
-	if scrapeLatencyEnd > scrapeLatencyStart {
-		rel.ScrapeLatencyMs = &scrapeLatencyEnd
+	// ScrapeLatency is the max of the start and end fetch latencies.
+	maxLatency := scrapeLatencyStart
+	if scrapeLatencyEnd > maxLatency {
+		maxLatency = scrapeLatencyEnd
 	}
+	rel.ScrapeLatencyMs = &maxLatency
 
 	if err != nil {
 		rel.CollectionStatus = "Failed"
 		rel.BlockedReason = fmt.Sprintf("fetch(end) failed: %v", err)
 		s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(end) failed: %v", err)})
+		e.ensureConfidenceScore(rel)
 		_ = e.writer.Write(req.OutPath, *s)
 		return s, nil
 	}
@@ -133,10 +136,66 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		rel.EvaluationStatus = "Partial"
 	}
 
+	e.ensureConfidenceScore(rel)
+
 	if err := e.writer.Write(req.OutPath, sum); err != nil {
 		return nil, err
 	}
 	return &sum, err
+}
+
+// ensureConfidenceScore calculates the confidence score of the measurement.
+// It is intended as a supplementary triage metric, not replacing specific status fields.
+// Rule (v1):
+// - Start at 1.0
+// - CollectionStatus != Complete forces score to 0.0
+// - EvaluationStatus == Partial -> -0.2
+// - missingInputs -> -0.1 each (max -0.3)
+// - skippedSLIs -> -0.1 each (max -0.3)
+// - skew/latency > 5000 -> small deduction (-0.1) as distortion heuristic
+func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
+	if rel == nil {
+		return
+	}
+	score := 1.0
+
+	if rel.CollectionStatus != "Complete" {
+		score = 0.0
+	} else {
+		if rel.EvaluationStatus == "Partial" {
+			score -= 0.2
+		}
+		
+		missingPenalty := float64(len(rel.MissingInputs)) * 0.1
+		if missingPenalty > 0.3 {
+			missingPenalty = 0.3
+		}
+		score -= missingPenalty
+		
+		skippedPenalty := float64(len(rel.SkippedSLIs)) * 0.1
+		if skippedPenalty > 0.3 {
+			skippedPenalty = 0.3
+		}
+		score -= skippedPenalty
+		
+		if rel.StartSkewMs != nil && *rel.StartSkewMs > 5000 {
+			score -= 0.1
+		}
+		if rel.EndSkewMs != nil && *rel.EndSkewMs > 5000 {
+			score -= 0.1
+		}
+		if rel.ScrapeLatencyMs != nil && *rel.ScrapeLatencyMs > 5000 {
+			score -= 0.1
+		}
+	}
+
+	if score < 0.0 {
+		score = 0.0
+	} else if score > 1.0 {
+		score = 1.0
+	}
+	
+	rel.ConfidenceScore = &score
 }
 
 func (e *Engine) emptySummary(cfg RunConfig, rel *summary.Reliability, warnings []string) *summary.Summary {

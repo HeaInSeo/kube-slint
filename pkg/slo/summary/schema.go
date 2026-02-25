@@ -47,6 +47,8 @@ type Reliability struct {
 	MissingInputs    []string `json:"missingInputs,omitempty"`
 	SkippedSLIs      []string `json:"skippedSLIs,omitempty"`
 
+	ConfidenceScore *float64 `json:"confidenceScore,omitempty"` // 0.0 ~ 1.0 보조 지표
+
 	ConfigSourceType string `json:"configSourceType,omitempty"` // injected | env | discovered
 	ConfigSourcePath string `json:"configSourcePath,omitempty"`
 

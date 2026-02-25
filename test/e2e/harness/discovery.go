@@ -15,7 +15,12 @@ import (
 type DiscoveredConfig struct {
 	Format     string `yaml:"format" json:"format"`
 	Strictness struct {
-		Mode string `yaml:"mode" json:"mode"`
+		Mode       string `yaml:"mode" json:"mode"`
+		Thresholds struct {
+			MaxStartSkewMs     int64 `yaml:"maxStartSkewMs" json:"maxStartSkewMs"`
+			MaxEndSkewMs       int64 `yaml:"maxEndSkewMs" json:"maxEndSkewMs"`
+			MaxScrapeLatencyMs int64 `yaml:"maxScrapeLatencyMs" json:"maxScrapeLatencyMs"`
+		} `yaml:"thresholds" json:"thresholds"`
 	} `yaml:"strictness" json:"strictness"`
 	Gating struct {
 		GateOnLevel string `yaml:"gateOnLevel" json:"gateOnLevel"`

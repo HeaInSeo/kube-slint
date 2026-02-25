@@ -36,6 +36,18 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		blockReasons = append(blockReasons, fmt.Sprintf("pipeline blocked: %s", rel.BlockedReason))
 	}
 
+	// Evaluate skew thresholds for Strictness promotion
+	// Skew threshold 평가를 통해 문제가 있으면 Blocked 사유로 추가합니다.
+	if cfg.MaxStartSkewMs > 0 && rel.StartSkewMs != nil && *rel.StartSkewMs > cfg.MaxStartSkewMs {
+		blockReasons = append(blockReasons, fmt.Sprintf("start skew (%dms) exceeded threshold (%dms)", *rel.StartSkewMs, cfg.MaxStartSkewMs))
+	}
+	if cfg.MaxEndSkewMs > 0 && rel.EndSkewMs != nil && *rel.EndSkewMs > cfg.MaxEndSkewMs {
+		blockReasons = append(blockReasons, fmt.Sprintf("end skew (%dms) exceeded threshold (%dms)", *rel.EndSkewMs, cfg.MaxEndSkewMs))
+	}
+	if cfg.MaxScrapeLatencyMs > 0 && rel.ScrapeLatencyMs != nil && *rel.ScrapeLatencyMs > cfg.MaxScrapeLatencyMs {
+		blockReasons = append(blockReasons, fmt.Sprintf("scrape latency (%dms) exceeded threshold (%dms)", *rel.ScrapeLatencyMs, cfg.MaxScrapeLatencyMs))
+	}
+
 	isCollectionFailed := rel.CollectionStatus == "Failed" || rel.CollectionStatus == "Partial"
 	isEvaluationFailed := rel.EvaluationStatus == "Failed" || rel.EvaluationStatus == "Partial"
 

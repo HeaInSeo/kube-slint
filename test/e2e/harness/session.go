@@ -46,7 +46,11 @@ type SessionConfig struct {
 	ConfigSourceType string
 	ConfigSourcePath string
 
-	StrictnessMode string // BestEffort | StrictCollection | StrictEvaluation
+	StrictnessMode     string // BestEffort | StrictCollection | StrictEvaluation
+	MaxStartSkewMs     int64
+	MaxEndSkewMs       int64
+	MaxScrapeLatencyMs int64
+
 	GateOnLevel    string // none | warn | fail
 	CleanupEnabled bool
 	CleanupMode    string // always | on-success | on-failure | manual
@@ -136,6 +140,16 @@ func NewSession(cfg SessionConfig) *Session {
 		if discoveredCfg.Strictness.Mode != "" {
 			cfg.StrictnessMode = discoveredCfg.Strictness.Mode
 		}
+		if discoveredCfg.Strictness.Thresholds.MaxStartSkewMs > 0 {
+			cfg.MaxStartSkewMs = discoveredCfg.Strictness.Thresholds.MaxStartSkewMs
+		}
+		if discoveredCfg.Strictness.Thresholds.MaxEndSkewMs > 0 {
+			cfg.MaxEndSkewMs = discoveredCfg.Strictness.Thresholds.MaxEndSkewMs
+		}
+		if discoveredCfg.Strictness.Thresholds.MaxScrapeLatencyMs > 0 {
+			cfg.MaxScrapeLatencyMs = discoveredCfg.Strictness.Thresholds.MaxScrapeLatencyMs
+		}
+
 		if discoveredCfg.Gating.GateOnLevel != "" {
 			cfg.GateOnLevel = discoveredCfg.Gating.GateOnLevel
 		}

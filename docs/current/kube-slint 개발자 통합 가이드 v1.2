@@ -300,6 +300,17 @@ reliability:
 > 구현 전/이행 중 상태라면, 이 섹션에 “현재는 로그만 남는다” 같은 상태를 명시적으로 적어야 한다. 모호하게 두면 안 된다.
 > 
 
+## 6.4 Reliability 보조 지표 및 Skew 임계값 차단
+
+### ConfidenceScore (신뢰도 점수)
+v3 스키마의 `Summary.Reliability`에는 `confidenceScore` (0.0~1.0) 필드가 제공됩니다. 이는 다양한 신뢰도 요인(수집 실패, 평가 부분 성공, 누락된 입력, 과도한 Skew 등)을 종합한 **요약/triage 용 보조 지표**입니다. 단, 이 단일 점수만으로 테스트를 통과/실패시키지 않으며 기존 분해 필드(`collectionStatus` 등)를 대체하지 않습니다.
+
+### Skew Threshold Strict 승격
+수집 시간이 너무 크게 지연되어 측정 창의 형태가 왜곡(Skew)되는 경우, `.slint.yaml` 에 임계값(`maxStartSkewMs` 등)을 설정하면 Strictness 검사에서 이를 에러(BLOCK)로 승격시킬 수 있습니다.
+- 임계값이 미설정된 경우: 기존처럼 동작
+- 임계값이 설정 + `BestEffort` 모드: 경고성 의미로 기록만 수행하고 차단 안 함
+- 임계값이 설정 + `Strict` 모드: `CheckStrictness` 과정에서 해당 런의 실패(에러) 유발
+
 ---
 
 ## 7) Reliability 데이터 해석 가이드 (사용자 해석 부담 줄이기)
