@@ -126,7 +126,7 @@ func loadConfigFile(path string) (*DiscoveredConfig, error) {
 	}
 
 	var cfg DiscoveredConfig
-	
+
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".json" {
 		if err := json.Unmarshal(b, &cfg); err != nil {
