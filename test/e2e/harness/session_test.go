@@ -57,7 +57,7 @@ func TestSession_End(t *testing.T) {
 	summary, err := sess.End(context.Background())
 	assert.NoError(t, err)
 	assert.NotNil(t, summary)
-	assert.Equal(t, "v4", summary.Config.Format)
+	assert.Equal(t, "v4.4", summary.Config.Format)
 }
 
 type mockFetcher struct{}
