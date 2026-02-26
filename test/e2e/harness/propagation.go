@@ -19,9 +19,11 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		mode = "BestEffort" // default
 	}
 
-	rel := sum.Reliability
+	blockReasons := buildStrictnessBlockReasons(cfg, sum)
+	return evaluateStrictnessDecision(mode, sum.Reliability, blockReasons)
+}
 
-	// 결과에 StatusBlock이 있는지 확인
+func buildStrictnessBlockReasons(cfg SessionConfig, sum *summary.Summary) []string {
 	var blockReasons []string
 	for _, res := range sum.Results {
 		if res.Status == summary.StatusBlock {
@@ -29,11 +31,11 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 		}
 	}
 
+	rel := sum.Reliability
 	if rel.BlockedReason != "" {
 		blockReasons = append(blockReasons, fmt.Sprintf("pipeline blocked: %s", rel.BlockedReason))
 	}
 
-	// Skew threshold 평가를 통해 문제가 있으면 Blocked 사유로 추가함
 	if cfg.MaxStartSkewMs > 0 && rel.StartSkewMs != nil && *rel.StartSkewMs > cfg.MaxStartSkewMs {
 		blockReasons = append(blockReasons, fmt.Sprintf("start skew (%dms) exceeded threshold (%dms)", *rel.StartSkewMs, cfg.MaxStartSkewMs))
 	}
@@ -43,7 +45,10 @@ func CheckStrictness(cfg SessionConfig, sum *summary.Summary) error {
 	if cfg.MaxScrapeLatencyMs > 0 && rel.ScrapeLatencyMs != nil && *rel.ScrapeLatencyMs > cfg.MaxScrapeLatencyMs {
 		blockReasons = append(blockReasons, fmt.Sprintf("scrape latency (%dms) exceeded threshold (%dms)", *rel.ScrapeLatencyMs, cfg.MaxScrapeLatencyMs))
 	}
+	return blockReasons
+}
 
+func evaluateStrictnessDecision(mode string, rel *summary.Reliability, blockReasons []string) error {
 	isCollectionFailed := rel.CollectionStatus == "Failed" || rel.CollectionStatus == "Partial"
 	isEvaluationFailed := rel.EvaluationStatus == "Failed" || rel.EvaluationStatus == "Partial"
 

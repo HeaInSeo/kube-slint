@@ -97,11 +97,49 @@ type Session struct {
 // NewSession builds a session with defaults applied.
 // NewSession은 기본값이 적용된 세션을 생성함.
 func NewSession(cfg SessionConfig) *Session {
-	// Defaults
+	cfg = applySessionBaseDefaults(cfg)
+	cfg = discoverAndApplyConfig(cfg)
+
+	autoTags := tags.AutoTags(tags.AutoTagsInput{
+		Suite:     cfg.Suite,
+		TestCase:  cfg.TestCase,
+		Namespace: cfg.Namespace,
+		RunID:     cfg.RunID,
+	})
+
+	mergedTags := tags.MergeTags(cfg.Tags, autoTags)
+	resolvedSpecs := defaultSpecs(cfg.Specs)
+
+	w := cfg.Writer
+	if w == nil {
+		w = summary.NewJSONFileWriter()
+	}
+
+	impl := &sessionImpl{
+		Config: cfg,
+
+		ServiceURLFormat: "https://%s.%s.svc:8443/metrics",
+		CurlImage:        "curlimages/curl:latest",
+
+		ScrapeTimeout:      2 * time.Minute,
+		WaitPodDoneTimeout: 5 * time.Minute,
+		LogsTimeout:        2 * time.Minute,
+
+		RunID: cfg.RunID,
+		Tags:  mergedTags,
+
+		specs:   resolvedSpecs,
+		fetcher: cfg.Fetcher,
+		writer:  w,
+	}
+
+	return &Session{impl: impl}
+}
+
+func applySessionBaseDefaults(cfg SessionConfig) SessionConfig {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	// InsideSnapshot 기본 사용. 오류 처리 로직 추가 검토 (Step 6 후보)
 	if cfg.Method == "" {
 		cfg.Method = engine.InsideSnapshot
 	}
@@ -110,9 +148,11 @@ func NewSession(cfg SessionConfig) *Session {
 	if runID == "" {
 		runID = fmt.Sprintf("local-%d", cfg.Now().Unix())
 	}
+	cfg.RunID = runID
+	return cfg
+}
 
-	// 1. Discover Configuration (Bridge Sprint)
-	// 1. 설정 자동 탐색 (브리지 스프린트)
+func discoverAndApplyConfig(cfg SessionConfig) SessionConfig {
 	discoveredCfg, source, err := DiscoverConfig("")
 	if err != nil {
 		fmt.Printf("kube-slint [discovery]: warning - %v\n", err)
@@ -131,8 +171,6 @@ func NewSession(cfg SessionConfig) *Session {
 		}
 	}
 
-	// 2. Apply Discovered Configuration onto SessionConfig (Thin Wrapper)
-	// 2. 탐색된 설정을 SessionConfig에 반영 (얇은 래퍼)
 	if discoveredCfg != nil {
 		if discoveredCfg.Write.ArtifactsDir != "" && cfg.ArtifactsDir == "" {
 			cfg.ArtifactsDir = discoveredCfg.Write.ArtifactsDir
@@ -153,51 +191,12 @@ func NewSession(cfg SessionConfig) *Session {
 		if discoveredCfg.Gating.GateOnLevel != "" {
 			cfg.GateOnLevel = discoveredCfg.Gating.GateOnLevel
 		}
-		// 명시적으로 설정된 경우
 		cfg.CleanupEnabled = discoveredCfg.Cleanup.Enabled
 		if discoveredCfg.Cleanup.Mode != "" {
 			cfg.CleanupMode = discoveredCfg.Cleanup.Mode
 		}
 	}
-
-	autoTags := tags.AutoTags(tags.AutoTagsInput{
-		Suite:     cfg.Suite,
-		TestCase:  cfg.TestCase,
-		Namespace: cfg.Namespace,
-		RunID:     runID,
-	})
-
-	mergedTags := tags.MergeTags(cfg.Tags, autoTags)
-
-	// Specs 기본값 확인 및 개선 (Step 6 후보)
-	resolvedSpecs := defaultSpecs(cfg.Specs)
-
-	// Writer default
-	w := cfg.Writer
-	if w == nil {
-		w = summary.NewJSONFileWriter()
-	}
-
-	impl := &sessionImpl{
-		Config: cfg,
-
-		//MetricsPort:      8443,
-		ServiceURLFormat: "https://%s.%s.svc:8443/metrics",
-		CurlImage:        "curlimages/curl:latest",
-
-		ScrapeTimeout:      2 * time.Minute,
-		WaitPodDoneTimeout: 5 * time.Minute,
-		LogsTimeout:        2 * time.Minute,
-
-		RunID: runID,
-		Tags:  mergedTags,
-
-		specs:   resolvedSpecs,
-		fetcher: cfg.Fetcher,
-		writer:  w,
-	}
-
-	return &Session{impl: impl}
+	return cfg
 }
 
 // reset은 전체 Session 구조체를 복사하지 않고 내부 런타임 상태를 교체함.
@@ -270,27 +269,8 @@ func (s *Session) Cleanup(ctx context.Context) {
 		return
 	}
 
-	mode := s.impl.Config.CleanupMode
-	if mode == "manual" {
-		return
-	}
-
-	// 명시적으로 비활성화되거나 수동 모드로 설정되지 않은 경우 암시적 활성화 상태 확인
-	if mode == "" {
-		if s.impl.Config.CleanupEnabled {
-			mode = "always"
-		} else {
-			// 안전을 위해 아무것도 지정되지 않았을 때의 폴백 기본값은 manual/none임
-			return
-		}
-	}
-
-	if mode == "on-success" && s.impl.hasFailed {
-		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test failed\n", mode)
-		return
-	}
-	if mode == "on-failure" && !s.impl.hasFailed {
-		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test succeeded\n", mode)
+	shouldRun := shouldRunCleanup(s.impl.Config.CleanupMode, s.impl.Config.CleanupEnabled, s.impl.hasFailed)
+	if !shouldRun {
 		return
 	}
 
@@ -302,7 +282,35 @@ func (s *Session) Cleanup(ctx context.Context) {
 		return
 	}
 
-	// 항상 네임스페이스와 run-id로 제한함
+	runCleanupActions(ctx, ns, runID)
+}
+
+func shouldRunCleanup(mode string, enabled, hasFailed bool) bool {
+	if mode == "manual" {
+		return false
+	}
+
+	if mode == "" {
+		if enabled {
+			mode = "always"
+		} else {
+			return false
+		}
+	}
+
+	if mode == "on-success" && hasFailed {
+		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test failed\n", mode)
+		return false
+	}
+	if mode == "on-failure" && !hasFailed {
+		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test succeeded\n", mode)
+		return false
+	}
+
+	return true
+}
+
+func runCleanupActions(ctx context.Context, ns, runID string) {
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", runID)
 
 	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
