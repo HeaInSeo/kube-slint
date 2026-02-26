@@ -177,9 +177,11 @@ func finalizeSweepResult(res *SweepResult) {
 }
 
 func appendSkipGuard(res *SweepResult) {
+	res.Summary.Skipped++
 	res.Summary.SkippedByReason["missing_guard"]++
-	res.Warnings = append(res.Warnings, "skip - missing namespace or run-id for safety guard")
-	fmt.Printf("kube-slint [orphan-sweep]: skip - missing namespace or run-id for safety guard\n")
+	warnMsg := "skip - missing namespace or run-id for safety guard"
+	res.Warnings = append(res.Warnings, warnMsg)
+	fmt.Printf("kube-slint [orphan-sweep]: %s\n", warnMsg)
 }
 
 func normalizeSweepMode(modeReq string, res *SweepResult) {
@@ -236,7 +238,9 @@ func evaluateSweepCandidate(line string, opts OrphanSweepOptions, ns string, sta
 
 	ts, err := parseTimestamp(tsStr)
 	if err != nil {
-		fmt.Printf("kube-slint [orphan-sweep]: warning - failed to parse creation timestamp for pod %s: %v\n", name, err)
+		warnMsg := fmt.Sprintf("failed to parse creation timestamp for pod %s: %v", name, err)
+		res.Warnings = append(res.Warnings, warnMsg)
+		fmt.Printf("kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
 		if opts.MaxAge > 0 {
 			appendSkipReason(res, &item, "timestamp_parse_failed")
 			return
