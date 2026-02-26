@@ -10,7 +10,12 @@ import (
 	"time"
 )
 
-// OrphanSweepOptions는 고아(orphan) 리소스 정리 동작을 설정함.
+const (
+	modeReportOnly = "report-only"
+	modeDelete     = "delete"
+)
+
+// OrphanSweepOptions 는 고아(orphan) 리소스 정리 동작을 설정함.
 type OrphanSweepOptions struct {
 	Enabled bool
 	Mode    string        // "report-only" (기본값) | "delete"
@@ -21,7 +26,7 @@ type OrphanSweepOptions struct {
 // DevSweepOptions 제공: 로컬 개발 시 짧은 MaxAge와 적은 Limit
 var DevSweepOptions = OrphanSweepOptions{
 	Enabled: true,
-	Mode:    "report-only",
+	Mode:    modeReportOnly,
 	Limit:   10,
 	MaxAge:  10 * time.Minute,
 }
@@ -96,7 +101,7 @@ func WriteSweepResultJSON(w io.Writer, r SweepResult) error {
 	return enc.Encode(r)
 }
 
-// SweepOrphans는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
+// SweepOrphans 는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
 // 기존 API 호환성을 위해 SweepOrphansWithResult 결과를 버리고 성공 여부만 반환함.
 func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) error {
 	_, err := s.SweepOrphansWithResult(ctx, opts)
@@ -137,7 +142,8 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 		return res, err
 	}
 	if len(lines) == 0 {
-		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n", res.Apply.ModeEffective, ns, runID)
+		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n",
+			res.Apply.ModeEffective, ns, runID)
 		finalizeSweepResult(&res)
 		return res, nil
 	}
@@ -191,9 +197,9 @@ func normalizeSweepMode(modeReq string, res *SweepResult) {
 	fallbackReason := ""
 
 	if modeEff == "" {
-		modeEff = "report-only"
-	} else if modeEff != "delete" && modeEff != "report-only" {
-		modeEff = "report-only"
+		modeEff = modeReportOnly
+	} else if modeEff != modeDelete && modeEff != modeReportOnly {
+		modeEff = modeReportOnly
 		fallback = true
 		fallbackReason = "invalid_mode"
 		warnMsg := fmt.Sprintf("invalid mode %q provided, falling back to report-only", modeReq)
@@ -207,7 +213,9 @@ func normalizeSweepMode(modeReq string, res *SweepResult) {
 }
 
 func listOrphanCandidates(ctx context.Context, ns, selector string) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", selector, "-o", "jsonpath={range .items[*]}{.metadata.name},{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}")
+	jp := "jsonpath={range .items[*]}{.metadata.name}" +
+		",{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}"
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", selector, "-o", jp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
@@ -226,7 +234,9 @@ func parseTimestamp(tsStr string) (time.Time, error) {
 	return time.Parse(time.RFC3339, tsStr)
 }
 
-func evaluateSweepCandidate(line string, opts OrphanSweepOptions, ns string, startedAt time.Time, res *SweepResult, targetNames *[]string, hitLimit *int) {
+func evaluateSweepCandidate(
+	line string, opts OrphanSweepOptions, ns string, startedAt time.Time,
+	res *SweepResult, targetNames *[]string, hitLimit *int) {
 	parts := strings.SplitN(line, ",", 3)
 	if len(parts) != 3 {
 		return
@@ -264,7 +274,7 @@ func evaluateSweepCandidate(line string, opts OrphanSweepOptions, ns string, sta
 	*targetNames = append(*targetNames, name)
 	item.Action = "would-delete"
 	item.Reason = "matched"
-	if res.Apply.ModeEffective != "delete" {
+	if res.Apply.ModeEffective != modeDelete {
 		res.Summary.WouldDelete++
 	}
 	res.Items = append(res.Items, item)
@@ -278,8 +288,10 @@ func appendSkipReason(res *SweepResult, item *SweepItem, reason string) {
 	res.Items = append(res.Items, *item)
 }
 
-func printSweepSummary(res *SweepResult, ns, runID string, opts OrphanSweepOptions, targetNames []string, hitLimit int) {
-	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n", res.Apply.ModeEffective, ns, runID, opts.Limit, opts.MaxAge)
+func printSweepSummary(
+	res *SweepResult, ns, runID string, opts OrphanSweepOptions, targetNames []string, hitLimit int) {
+	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n",
+		res.Apply.ModeEffective, ns, runID, opts.Limit, opts.MaxAge)
 	fmt.Printf("kube-slint [orphan-sweep]: detected %d matching orphan(s) ", res.Summary.Evaluated)
 	if hitLimit > 0 {
 		fmt.Printf("(processing %d, skipping %d due to limit)\n", len(targetNames), hitLimit)
@@ -289,7 +301,7 @@ func printSweepSummary(res *SweepResult, ns, runID string, opts OrphanSweepOptio
 }
 
 func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res *SweepResult) error {
-	if res.Apply.ModeEffective != "delete" {
+	if res.Apply.ModeEffective != modeDelete {
 		if len(targetNames) > 0 {
 			fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion of %v\n", targetNames)
 			fmt.Printf("kube-slint [orphan-sweep]: to delete, set option mode='delete'\n")

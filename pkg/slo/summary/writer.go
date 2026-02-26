@@ -6,15 +6,15 @@ import (
 	"path/filepath"
 )
 
-// Writer는 Summary 아티팩트를 대상 위치에 기록함.
+// Writer 는 Summary 아티팩트를 대상 위치에 기록함.
 type Writer interface {
 	Write(path string, s Summary) error
 }
 
-// JSONFileWriter는 요약을 JSON 파일로 기록함.
+// JSONFileWriter 는 요약을 JSON 파일로 기록함.
 type JSONFileWriter struct{}
 
-// NewJSONFileWriter는 새로운 JSONFileWriter를 생성함.
+// NewJSONFileWriter 는 새로운 JSONFileWriter를 생성함.
 func NewJSONFileWriter() *JSONFileWriter { return &JSONFileWriter{} }
 
 // Write는 원자적 쓰기 내구성(fsync)을 위해 sync=true를 사용함.

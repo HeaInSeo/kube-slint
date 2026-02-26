@@ -64,7 +64,7 @@ type sessionImpl struct {
 	// Step 6 후보. 구성 확장 여지 있음
 	CurlImage string
 	// ServiceURLFormat 에서 결정됨. 일단 주석으로 남겨둠, 혹시 필요하면 살림.
-	//MetricsPort      int
+	// MetricsPort      int
 	// 추후
 	// type SessionConfig struct {
 	//     MetricsScheme string // "https"
@@ -90,6 +90,7 @@ type sessionImpl struct {
 	hasFailed bool
 }
 
+// Session 은 측정 세션을 관리함.
 type Session struct {
 	impl *sessionImpl
 }
@@ -172,29 +173,33 @@ func discoverAndApplyConfig(cfg SessionConfig) SessionConfig {
 	}
 
 	if discoveredCfg != nil {
-		if discoveredCfg.Write.ArtifactsDir != "" && cfg.ArtifactsDir == "" {
-			cfg.ArtifactsDir = discoveredCfg.Write.ArtifactsDir
-		}
-		if discoveredCfg.Strictness.Mode != "" {
-			cfg.StrictnessMode = discoveredCfg.Strictness.Mode
-		}
-		if discoveredCfg.Strictness.Thresholds.MaxStartSkewMs > 0 {
-			cfg.MaxStartSkewMs = discoveredCfg.Strictness.Thresholds.MaxStartSkewMs
-		}
-		if discoveredCfg.Strictness.Thresholds.MaxEndSkewMs > 0 {
-			cfg.MaxEndSkewMs = discoveredCfg.Strictness.Thresholds.MaxEndSkewMs
-		}
-		if discoveredCfg.Strictness.Thresholds.MaxScrapeLatencyMs > 0 {
-			cfg.MaxScrapeLatencyMs = discoveredCfg.Strictness.Thresholds.MaxScrapeLatencyMs
-		}
+		cfg = mergeDiscoveredConfig(cfg, discoveredCfg)
+	}
+	return cfg
+}
 
-		if discoveredCfg.Gating.GateOnLevel != "" {
-			cfg.GateOnLevel = discoveredCfg.Gating.GateOnLevel
-		}
-		cfg.CleanupEnabled = discoveredCfg.Cleanup.Enabled
-		if discoveredCfg.Cleanup.Mode != "" {
-			cfg.CleanupMode = discoveredCfg.Cleanup.Mode
-		}
+func mergeDiscoveredConfig(cfg SessionConfig, d *DiscoveredConfig) SessionConfig {
+	if d.Write.ArtifactsDir != "" && cfg.ArtifactsDir == "" {
+		cfg.ArtifactsDir = d.Write.ArtifactsDir
+	}
+	if d.Strictness.Mode != "" {
+		cfg.StrictnessMode = d.Strictness.Mode
+	}
+	if d.Strictness.Thresholds.MaxStartSkewMs > 0 {
+		cfg.MaxStartSkewMs = d.Strictness.Thresholds.MaxStartSkewMs
+	}
+	if d.Strictness.Thresholds.MaxEndSkewMs > 0 {
+		cfg.MaxEndSkewMs = d.Strictness.Thresholds.MaxEndSkewMs
+	}
+	if d.Strictness.Thresholds.MaxScrapeLatencyMs > 0 {
+		cfg.MaxScrapeLatencyMs = d.Strictness.Thresholds.MaxScrapeLatencyMs
+	}
+	if d.Gating.GateOnLevel != "" {
+		cfg.GateOnLevel = d.Gating.GateOnLevel
+	}
+	cfg.CleanupEnabled = d.Cleanup.Enabled
+	if d.Cleanup.Mode != "" {
+		cfg.CleanupMode = d.Cleanup.Mode
 	}
 	return cfg
 }
@@ -214,13 +219,13 @@ func (s *Session) reset(from *Session) {
 	s.impl = from.impl
 }
 
-// ShouldWriteArtifacts는 세션이 요약 출력을 기록할지 여부를 보고함.
+// ShouldWriteArtifacts 는 세션이 요약 출력을 기록할지 여부를 보고함.
 func (s *Session) ShouldWriteArtifacts() bool {
 	// Ginkgo 훅과 placeholder 패턴 때문에 s != nil 체크를 추가하여 패닉을 방지함.
 	return s != nil && s.impl != nil && s.impl.Config.ArtifactsDir != ""
 }
 
-// NextSummaryPath는 충돌 시 -<n>을 추가하여 고유한 요약 경로를 반환함.
+// NextSummaryPath 는 충돌 시 -<n>을 추가하여 고유한 요약 경로를 반환함.
 func (s *Session) NextSummaryPath(filename string) (string, error) {
 	// s == nil 체크는 현재 구조상 예외적으로 필요하므로 포함됨.
 	if s == nil || s.impl == nil {
@@ -245,7 +250,7 @@ func (s *Session) NextSummaryPath(filename string) (string, error) {
 	}
 }
 
-// AddWarning은 BestEffort 모드에 대한 경고 메시지를 기록함.
+// AddWarning 은 BestEffort 모드에 대한 경고 메시지를 기록함.
 func (s *Session) AddWarning(message string) {
 	if s == nil || s.impl == nil || strings.TrimSpace(message) == "" {
 		return
@@ -253,7 +258,7 @@ func (s *Session) AddWarning(message string) {
 	s.impl.Warnings = append(s.impl.Warnings, message)
 }
 
-// MarkFailed는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줌.
+// MarkFailed 는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줌.
 // 단조적(한 번 실패로 표시되면 되돌릴 수 없음)이며 멱등성을 가짐.
 func (s *Session) MarkFailed() {
 	if s == nil || s.impl == nil {
@@ -262,7 +267,7 @@ func (s *Session) MarkFailed() {
 	s.impl.hasFailed = true
 }
 
-// Cleanup은 세션에서 생성된 임시 리소스를 제거함.
+// Cleanup 은 세션에서 생성된 임시 리소스를 제거함.
 // 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용함.
 func (s *Session) Cleanup(ctx context.Context) {
 	if s == nil || s.impl == nil {
@@ -350,11 +355,13 @@ func (s *Session) Start() {
 //  - 목표: Method/FetchStrategy(또는 Source) 선택은 e2e_test.go(provider)가 결정하고,
 //    harness는 검증/시간윈도우(StartedAt/FinishedAt)/Engine 실행 + artifact 경로 계산만 담당한다.
 //  - 조치:
-//    1) newCurlPodFetcher/curlPodFetcher/parsePrometheusText를 harness 밖(예: harness/source/curlpod 또는 test-side adapter)으로 이동.
+//    1) newCurlPodFetcher/curlPodFetcher/parsePrometheusText를 harness 밖
+//       (예: harness/source/curlpod 또는 test-side adapter)으로 이동.
 //    2) End()에서 "fetcher nil이면 curlpod" 같은 암묵 기본값 제거(또는 NewSession 단계에서만 기본값 처리).
 //    3) Method는 Config.Method를 그대로 사용(하드코딩 금지)하고, 장기적으로는 Method도 필수 입력으로 강제.
 //    4) (선택) Source.Build(ctx) -> fetcher 생성 패턴 도입하여, K8s 의존 구현은 adapter에 격리.
 
+// End concludes the measurement session.
 func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	if s == nil || s.impl == nil {
 		return nil, fmt.Errorf("harness: session not initialized")

@@ -10,13 +10,13 @@ package harness
 
 import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 
-// DefaultV3Specs는 하위 호환성을 위해 유지됨.
+// DefaultV3Specs 는 하위 호환성을 위해 유지됨.
 // 기준(baseline) 프리셋 모음을 반환함.
 func DefaultV3Specs() []spec.SLISpec {
 	return BaselineV3Specs()
 }
 
-// BaselineV3Specs는 확장 가능하고 재사용 가능한 프리셋 모음임:
+// BaselineV3Specs 는 확장 가능하고 재사용 가능한 프리셋 모음임:
 // controller-runtime + workqueue + rest-client.
 func BaselineV3Specs() []spec.SLISpec {
 	return []spec.SLISpec{

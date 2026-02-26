@@ -2,23 +2,23 @@ package summary
 
 import "time"
 
-// Status는 SLIResult의 정규화된 평가 상태임.
+// Status 는 SLIResult의 정규화된 평가 상태임.
 type Status string
 
 const (
-	// StatusPass는 성공을 나타냄.
+	// StatusPass 는 성공을 나타냄.
 	StatusPass Status = "pass"
-	// StatusWarn은 경고를 나타냄.
+	// StatusWarn 은 경고를 나타냄.
 	StatusWarn Status = "warn"
-	// StatusFail은 실패를 나타냄.
+	// StatusFail 은 실패를 나타냄.
 	StatusFail Status = "fail"
-	// StatusBlock은 측정/파이프라인 실패를 나타냄.
+	// StatusBlock 은 측정/파이프라인 실패를 나타냄.
 	StatusBlock Status = "block"
-	// StatusSkip은 체크가 생략됨을 나타냄.
+	// StatusSkip 은 체크가 생략됨을 나타냄.
 	StatusSkip Status = "skip"
 )
 
-// Summary는 계약 출력임. 모든 측정 방식은 이 스키마로 수렴해야 함.
+// Summary 는 계약 출력임. 모든 측정 방식은 이 스키마로 수렴해야 함.
 type Summary struct {
 	SchemaVersion string    `json:"schemaVersion"`
 	GeneratedAt   time.Time `json:"generatedAt"`
@@ -31,7 +31,7 @@ type Summary struct {
 	Warnings []string    `json:"warnings,omitempty"`
 }
 
-// Reliability는 측정의 진단 및 신뢰도 상태를 포함함.
+// Reliability 는 측정의 진단 및 신뢰도 상태를 포함함.
 type Reliability struct {
 	CollectionStatus string   `json:"collectionStatus,omitempty"` // Complete | Partial | Failed
 	EvaluationStatus string   `json:"evaluationStatus,omitempty"` // Complete | Partial | Failed
@@ -49,7 +49,7 @@ type Reliability struct {
 	ScrapeLatencyMs *int64 `json:"scrapeLatencyMs,omitempty"`
 }
 
-// RunConfig는 Summary에 포함됨 (분석 도구가 측정 방식에 구애받지 않도록 함).
+// RunConfig 는 Summary에 포함됨 (분석 도구가 측정 방식에 구애받지 않도록 함).
 type RunConfig struct {
 	RunID      string            `json:"runId,omitempty"`
 	StartedAt  time.Time         `json:"startedAt"`
@@ -62,13 +62,13 @@ type RunConfig struct {
 	EvidencePaths map[string]string `json:"evidencePaths,omitempty"`
 }
 
-// RunMode는 실행이 어떻게 수행되었는지를 설명함.
+// RunMode 는 실행이 어떻게 수행되었는지를 설명함.
 type RunMode struct {
 	Location string `json:"location"` // "inside" | "outside"
 	Trigger  string `json:"trigger"`  // "none" | "annotation"
 }
 
-// SLIResult는 단일 SLI의 평가 결과를 포함함.
+// SLIResult 는 단일 SLI의 평가 결과를 포함함.
 type SLIResult struct {
 	ID          string `json:"id"`
 	Title       string `json:"title,omitempty"`
@@ -88,7 +88,7 @@ type SLIResult struct {
 	InputsMissing []string `json:"inputsMissing,omitempty"`
 }
 
-// EnsureFormat은 schemaVersion을 보존하면서 포맷 힌트(기본값 v4)를 설정함.
+// EnsureFormat 은 schemaVersion을 보존하면서 포맷 힌트(기본값 v4)를 설정함.
 func EnsureFormat(config map[string]any) map[string]any {
 	if config == nil {
 		config = map[string]any{}

@@ -16,7 +16,7 @@ import (
 //	Logf(format string, args ...any)
 // }
 
-// Engine은 메트릭 수집과 SLI 평가를 조율함.
+// Engine 은 메트릭 수집과 SLI 평가를 조율함.
 type Engine struct {
 	fetcher fetch.MetricsFetcher
 	// Spec  registry.Registry // (옵션) 레지스트리를 쓰는 호출자를 위해 남길 수 있음, 일단 주석처리함.
@@ -25,7 +25,7 @@ type Engine struct {
 	logf   func(string, ...any)
 }
 
-// New는 새로운 Engine 인스턴스를 생성함.
+// New 는 새로운 Engine 인스턴스를 생성함.
 func New(fetcher fetch.MetricsFetcher, writer summary.Writer, l slo.Logger) *Engine {
 	logf := func(string, ...any) {}
 	if l != nil {
@@ -34,7 +34,7 @@ func New(fetcher fetch.MetricsFetcher, writer summary.Writer, l slo.Logger) *Eng
 	return &Engine{fetcher: fetcher, writer: writer, logf: logf}
 }
 
-// Execute는 SLO 측정 및 평가 프로세스를 실행함.
+// Execute 는 SLO 측정 및 평가 프로세스를 실행함.
 func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summary, error) {
 	cfg := req.Config
 	if cfg.StartedAt.IsZero() || cfg.FinishedAt.IsZero() {
@@ -314,7 +314,7 @@ func compare(v float64, op spec.Op, target float64) bool {
 	}
 }
 
-// ExecuteRequestStandard는 표준화된 요청 형태임 (이전 V4).
+// ExecuteRequestStandard 는 표준화된 요청 형태임 (이전 V4).
 type ExecuteRequestStandard struct {
 	Method      MeasurementMethod
 	Config      RunConfig
@@ -323,7 +323,7 @@ type ExecuteRequestStandard struct {
 	Reliability *summary.Reliability
 }
 
-// ExecuteStandard는 표준 기본값을 적용하고 엔진에 위임함.
+// ExecuteStandard 는 표준 기본값을 적용하고 엔진에 위임함.
 func ExecuteStandard(ctx context.Context, eng *Engine, req ExecuteRequestStandard) (*summary.Summary, error) {
 	if req.Config.Format == "" {
 		req.Config.Format = "v4"

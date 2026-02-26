@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DiscoveredConfig는 브리지 스프린트 YAML에서 지원하는 최소 필드를 나타냄.
+// DiscoveredConfig 는 브리지 스프린트 YAML에서 지원하는 최소 필드를 나타냄.
 type DiscoveredConfig struct {
 	Format     string `yaml:"format" json:"format"`
 	Strictness struct {
@@ -36,14 +36,14 @@ type DiscoveredConfig struct {
 	} `yaml:"reliability" json:"reliability"`
 }
 
-// ConfigSource는 구성이 로드된 위치를 나타냄.
+// ConfigSource 는 구성이 로드된 위치를 나타냄.
 type ConfigSource struct {
 	Type     string // "injected" | "env" | "discovered"
 	Path     string // File path if Type is "env" or "discovered"
 	Disabled bool   // True if discovery was disabled via SLINT_DISABLE_DISCOVERY=1
 }
 
-// DiscoverConfig는 kube-slint 구성을 검색하고 로드함.
+// DiscoverConfig 는 kube-slint 구성을 검색하고 로드함.
 // 우선순위 규칙:
 //  1. 환경 변수: SLINT_CONFIG_PATH
 //  2. 자동 탐색: .slint.yaml 또는 slint.config.yaml (디렉터리 상향 탐색)

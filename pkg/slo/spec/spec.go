@@ -7,7 +7,7 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 )
 
-// MetricRef는 SLI에 대한 메트릭 입력을 식별함.
+// MetricRef 는 SLI에 대한 메트릭 입력을 식별함.
 // v3: 가장 단순한 형태는 정규 프로메테우스 "텍스트 키" 문자열을 사용함.
 // 예: controller_runtime_reconcile_total{result="success"}
 type MetricRef struct {

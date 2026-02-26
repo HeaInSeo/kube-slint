@@ -48,9 +48,13 @@ func TestCheckStrictness_SkewThresholds(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "StrictEvaluation_ExceedScrapeLatency",
-			cfg:         SessionConfig{StrictnessMode: "StrictEvaluation", MaxScrapeLatencyMs: 1500},
-			rel:         summary.Reliability{ScrapeLatencyMs: &val2000, CollectionStatus: "Complete", EvaluationStatus: "Complete"},
+			name: "StrictEvaluation_ExceedScrapeLatency",
+			cfg:  SessionConfig{StrictnessMode: "StrictEvaluation", MaxScrapeLatencyMs: 1500},
+			rel: summary.Reliability{
+				ScrapeLatencyMs:  &val2000,
+				CollectionStatus: "Complete",
+				EvaluationStatus: "Complete",
+			},
 			expectError: true,
 		},
 	}

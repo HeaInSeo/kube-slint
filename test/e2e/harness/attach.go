@@ -26,7 +26,7 @@ import (
 //     Fetcher fetch.MetricsFetcher
 // }
 
-// Attach는 제공자 함수를 호출하는 BeforeEach/AfterEach 훅을 등록하여
+// Attach 는 제공자 함수를 호출하는 BeforeEach/AfterEach 훅을 등록하여
 // 현재 테스트의 구성을 가져오고 측정 세션을 관리함.
 func Attach(provider func() SessionConfig) (*Session, error) {
 	session := &Session{} // 자리 표시자 (impl은 BeforeEach에서 설정됨)

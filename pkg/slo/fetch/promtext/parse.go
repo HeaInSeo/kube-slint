@@ -10,7 +10,7 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 )
 
-// ParseTextToMap은 Prometheus 노출 형식(텍스트)을 플랫 맵으로 파싱함.
+// ParseTextToMap 은 Prometheus 노출 형식(텍스트)을 플랫 맵으로 파싱함.
 // 키 형식 예시:
 //
 //	metric_name{a="b",c="d"}
