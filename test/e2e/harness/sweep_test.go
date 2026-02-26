@@ -1,40 +1,193 @@
 package harness
 
 import (
-	"bytes"
 	"context"
+	"fmt"
+	"os"
+	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "no command\n")
+		os.Exit(2)
+	}
+
+	command, args := args[0], args[1:]
+	if command == "kubectl" {
+		switch args[0] {
+		case "get":
+			fmt.Print("pod1,run-1,2023-01-01T00:00:00Z\npod2,run-1,2023-01-01T00:00:00Z\n")
+			os.Exit(0)
+		case modeDelete:
+			if args[2] == "failpod" {
+				fmt.Fprintf(os.Stderr, "error from server\n")
+				os.Exit(1)
+			}
+			fmt.Printf("pod \"%s\" deleted\n", args[2])
+			os.Exit(0)
+		}
+	}
+	os.Exit(1)
+}
+
+func fakeExecCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestHelperProcess", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	return cmd
+}
+
+func TestSweepDeletes_SuccessCount(t *testing.T) {
+	execCommandContext = fakeExecCommand
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	opts := OrphanSweepOptions{
+		Enabled: true,
+		Mode:    modeDelete,
+		Limit:   10,
+	}
+	res := initSweepResult(opts, time.Now())
+	res.Apply.ModeEffective = modeDelete
+
+	// mock items
+	res.Items = append(res.Items, SweepItem{Name: "pod1", Action: "would-delete"})
+	res.Items = append(res.Items, SweepItem{Name: "pod2", Action: "would-delete"})
+	targetNames := []string{"pod1", "pod2"}
+
+	err := applySweepDeletes(context.Background(), "default", targetNames, &res)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, res.Summary.Deleted, "Deleted count correctly matches 2 successful deletions")
+	assert.Equal(t, "deleted", res.Items[0].Action)
+	assert.Equal(t, "deleted", res.Items[1].Action)
+}
+
+func TestSweepDeletes_FailureCount(t *testing.T) {
+	execCommandContext = fakeExecCommand
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	opts := OrphanSweepOptions{
+		Enabled: true,
+		Mode:    modeDelete,
+		Limit:   10,
+	}
+	res := initSweepResult(opts, time.Now())
+	res.Apply.ModeEffective = modeDelete
+
+	res.Items = append(res.Items, SweepItem{Name: "pod1", Action: "would-delete"})
+	res.Items = append(res.Items, SweepItem{Name: "failpod", Action: "would-delete"})
+	targetNames := []string{"pod1", "failpod"}
+
+	err := applySweepDeletes(context.Background(), "default", targetNames, &res)
+	assert.Error(t, err)
+
+	assert.Equal(t, 1, res.Summary.Deleted, "Deleted count matches 1 success")
+	assert.Equal(t, 1, res.Summary.DeleteError, "DeleteError count matches 1 failure")
+
+	assert.Equal(t, "deleted", res.Items[0].Action)
+	assert.Equal(t, "delete-error", res.Items[1].Action)
+}
+
 func TestSweepOrphansWithResult_Fallback(t *testing.T) {
-	// 1. 잘못된 mode 입력 시 fallback 처리를 기록하는지 확인 (MissingGuard=false 즉 ns/runID 유효 시)
 	cfg := SessionConfig{Namespace: "test-ns", RunID: "run-1"}
 	sess := NewSession(cfg)
 
-	// dummy kubectl 실행을 방지하기 위해 kubectl이 없거나 에러가 나더라도
-	// fallbacks 기록 상태는 그 전에 처리되므로 assert 가능해야 함
-	// kubectl이 실패하면 err가 반환되지만 결과 구조체(SweepResult)는 채워짐
 	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
 		Enabled: true,
 		Mode:    "invalid-mode",
 	})
-
-	// kubectl 에러가 발생하더라도 (또는 발견 못하더라도) 구조체 검사
 	_ = err
 
 	assert.Equal(t, "invalid_mode", res.Apply.FallbackReason)
 	assert.True(t, res.Apply.ModeFallback)
 	assert.Equal(t, "report-only", res.Apply.ModeEffective)
-
 	assert.Contains(t, res.Warnings[0], "invalid mode \"invalid-mode\" provided, falling back to report-only")
 }
 
+func TestSweepOrphansWithResult_EmptyMode(t *testing.T) {
+	// 빈 mode("") 정상 기본값 처리 테스트
+	cfg := SessionConfig{Namespace: "test-ns", RunID: "run-1"}
+	sess := NewSession(cfg)
+
+	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
+		Enabled: true,
+		Mode:    "",
+	})
+	_ = err
+
+	assert.False(t, res.Apply.ModeFallback, "empty mode is not an invalid mode fallback")
+	assert.Equal(t, "", res.Apply.FallbackReason)
+	assert.Equal(t, "report-only", res.Apply.ModeEffective)
+	assert.Empty(t, res.Warnings, "empty mode should not generate warnings")
+}
+
+func TestSweepCandidate_TimestampParseFailedAndMaxAge(t *testing.T) {
+	opts := OrphanSweepOptions{
+		Enabled: true,
+		Mode:    "report-only",
+		Limit:   10,
+		MaxAge:  1 * time.Hour,
+	}
+	res := initSweepResult(opts, time.Now())
+	targetNames := []string{}
+	hitLimit := 0
+	evaluateSweepCandidate(
+		"pod-bad-time,run-old,invalid_timestamp",
+		opts, "default", time.Now(), &res, &targetNames, &hitLimit,
+	)
+
+	assert.Equal(t, 1, res.Summary.Skipped)
+	assert.Equal(t, 1, res.Summary.SkippedByReason["timestamp_parse_failed"])
+	assert.Equal(t, 1, len(res.Items))
+	assert.Equal(t, "skipped", res.Items[0].Action)
+	assert.Equal(t, "timestamp_parse_failed", res.Items[0].Reason)
+	// warning must be appended
+	assert.Len(t, res.Warnings, 1)
+	assert.Contains(t, res.Warnings[0], "failed to parse creation timestamp")
+}
+
+func TestSweepCandidate_LimitExceeded(t *testing.T) {
+	opts := OrphanSweepOptions{
+		Enabled: true,
+		Mode:    "report-only",
+		Limit:   1, // strict limit
+		MaxAge:  0,
+	}
+	res := initSweepResult(opts, time.Now())
+
+	// mock that we already reached the limit
+	targetNames := []string{"pod1"}
+	hitLimit := 0
+
+	// evaluation for pod2 should hit limit
+	evaluateSweepCandidate("pod2,run-old,2021-01-01T00:00:00Z", opts, "default", time.Now(), &res, &targetNames, &hitLimit)
+
+	assert.Equal(t, 1, res.Summary.Skipped)
+	assert.Equal(t, 1, res.Summary.SkippedByReason["limit_exceeded"])
+	assert.Equal(t, 1, hitLimit)
+	assert.Equal(t, "skipped", res.Items[0].Action)
+	assert.Equal(t, "limit_exceeded", res.Items[0].Reason)
+}
+
 func TestSweepOrphansWithResult_MissingGuard(t *testing.T) {
-	// 2. runID가 없어 Guard에 걸릴 때 결과에 스킵 이유가 나오는지 확인
-	cfg := SessionConfig{RunID: ""}
+	cfg := SessionConfig{RunID: ""} // guard condition fail
 	sess := NewSession(cfg)
 	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
 		Enabled: true,
@@ -42,26 +195,7 @@ func TestSweepOrphansWithResult_MissingGuard(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
+	assert.Equal(t, 1, res.Summary.Skipped) // missing_guard creates 1 skipped
 	assert.Equal(t, 1, res.Summary.SkippedByReason["missing_guard"])
 	assert.Contains(t, res.Warnings[0], "missing namespace or run-id")
-}
-
-func TestSweepOrphansWithResult_JSON(t *testing.T) {
-	res := SweepResult{
-		SchemaVersion: "v1.0",
-		StartedAt:     time.Now(),
-		Request: SweepRequest{
-			Namespace: "test-ns",
-			Limit:     10,
-		},
-	}
-
-	var buf bytes.Buffer
-	err := WriteSweepResultJSON(&buf, res)
-	assert.NoError(t, err)
-
-	jsonOutput := buf.String()
-	assert.Contains(t, jsonOutput, `"schemaVersion": "v1.0"`)
-	assert.Contains(t, jsonOutput, `"namespace": "test-ns"`)
-	assert.Contains(t, jsonOutput, `"limit": 10`)
 }

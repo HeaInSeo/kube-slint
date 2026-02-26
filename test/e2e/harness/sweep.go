@@ -15,6 +15,8 @@ const (
 	modeDelete     = "delete"
 )
 
+var execCommandContext = exec.CommandContext
+
 // OrphanSweepOptions 는 고아(orphan) 리소스 정리 동작을 설정함.
 type OrphanSweepOptions struct {
 	Enabled bool
@@ -215,7 +217,7 @@ func normalizeSweepMode(modeReq string, res *SweepResult) {
 func listOrphanCandidates(ctx context.Context, ns, selector string) ([]string, error) {
 	jp := "jsonpath={range .items[*]}{.metadata.name}" +
 		",{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}"
-	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", selector, "-o", jp)
+	cmd := execCommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", selector, "-o", jp)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
@@ -322,7 +324,7 @@ func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res
 	}
 
 	for _, name := range targetNames {
-		cmd := exec.CommandContext(ctx, "kubectl", "delete", "pods", name, "-n", ns, "--ignore-not-found=true")
+		cmd := execCommandContext(ctx, "kubectl", "delete", "pods", name, "-n", ns, "--ignore-not-found=true")
 		delOut, delErr := cmd.CombinedOutput()
 		idx, ok := itemIdx[name]
 		if !ok {

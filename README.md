@@ -1,17 +1,33 @@
 # kube-slint
 
-`kube-slint` is a pure Go framework and observability stack for tracking Operational SLIs (Service Level Indicators) in Kubernetes Operators.
+`kube-slint` is a pure Go framework, E2E test harness, and observability stack for tracking Operational SLIs (Service Level Indicators) in Kubernetes Operators.
 
-> **IMPORTANT:** This repository has transitioned from a standalone operator to a library/observability framework. The `operator runtime` (e.g., `cmd/main.go`, `controller-runtime` manager loops) has been removed. 
+> **IMPORTANT:** This repository has transitioned from a standalone operator to a library/observability framework. The `operator runtime` (e.g., `cmd/main.go`, `controller-runtime` manager loops) has been removed.
+
+## Features
+
+- **SLI Declarative Specifications (`pkg/slo/spec`)**: Create and enforce metrics definitions like Churn Rate, Convergence Time, etc.
+- **Test Harness (`test/e2e/harness`)**: An embeddable E2E testing framework that executes inside Kubernetes clusters, evaluates SLIs over time, and generates strictly formatted JSON reports (`summary.json`) using configurable reliability and strictness scoring.
+- **Orphan Sweeper**: Ensures robust cleanup of test infrastructure across runs using `report-only` and `delete` modes.
 
 ## How to Use
 
 The repository is now divided into two primary concepts:
 
-1. **Deploying the Observability Stack (Kustomize)**
-2. **Instrumenting your Operator (Go Library)**
+1. **Instrumenting your Operator (Go Library)**
+2. **Deploying the Observability Stack (Kustomize)**
 
-### 1. Deploying the Observability Stack (Kustomize)
+### 1. Instrumenting your Operator (Go Library)
+
+Use the `pkg/slo` library in your own Operator code to calculate Churn Rate, Convergence Time, and other SLO metrics. You can also embed the harness into your E2E tests:
+
+```sh
+go get github.com/HeaInSeo/kube-slint@latest
+```
+
+> **Note:** `kube-slint` (the Go code) is responsible for *calculating, evaluating, and reporting* SLI JSON outputs inside the cluster harness. The Kustomize stack is entirely responsible for *deploying* the observability targets.
+
+### 2. Deploying the Observability Stack (Kustomize)
 
 The Kustomize manifests here provide the Prometheus tags, recording rules, and dashboards needed for monitoring `kube-slint` metrics.
 
@@ -34,29 +50,7 @@ resources:
   - github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>
 ```
 
-To test the generated output without downloading, you can run a targeted build with a real SHA:
-```sh
-kustomize build github.com/HeaInSeo/kube-slint//config/default?ref=ca156d34b0efde18bb54fcf1e9d07727e5e4dce3 | kubectl apply -f -
-```
-
-**Local Installation**  
-Alternatively, if you have cloned the repository locally:
-```sh
-kustomize build config/default | kubectl apply -f -
-```
-
-### 2. Instrumenting your Operator (Go Library)
-
-Use the `pkg/slo` library in your own Operator code to calculate Churn Rate, Convergence Time, and other SLO metrics. 
-
-> **Note:** `kube-slint` (the Go code) is responsible for *calculating and reporting* SLI JSON output. The Kustomize stack is entirely responsible for *deploying* the observability targets. They serve different purposes.
-
-Ensure your Go modules reference the correct version of this project:
-```sh
-go get github.com/HeaInSeo/kube-slint@latest
-```
-
-> **Note on ServiceMonitors & NetworkPolicies:** Base manifests (like `monitor.yaml` or `metrics_service.yaml`) contain labels specific to individual operators. We have moved the `kube-slint` specific legacy components into `config/samples/`. You MUST copy/adapt these samples to match your target operator's metrics service and labels.
+> **Note on ServiceMonitors & NetworkPolicies:** Base manifests contain labels specific to individual operators. We have moved the `kube-slint` specific legacy components into `config/samples/`. You MUST copy/adapt these samples to match your target operator's metrics service and labels.
 
 ---
 
@@ -64,22 +58,16 @@ go get github.com/HeaInSeo/kube-slint@latest
 
 Since this project no longer acts as a running service, standard Go testing tools apply.
 
-### Makefile Targets
-We provide standard Makefile targets for development and testing:
-- **`make build`**: Compiles the library code (`go build ./...`).
-- **`make test`**: Runs unit tests (`go test ./...`).
-- **`make fmt`**: Formats the codebase.
-- **`make vet`**: Vets the codebase.
-- **`make lint`**: Runs `golangci-lint` (recommended before submitting PRs).
+### Development Commands
+
+We provide standard targets for development and testing. **Always ensure `go mod tidy` passes clean diffs before pushing.**
+
+- `bin/golangci-lint run --timeout=10m --config=.golangci.yml ./...` : Run static analysis.
+- `go test ./...` : Run unit tests (including E2E harness simulation).
+- `go mod tidy` : Clean missing dependencies.
+- `git diff --exit-code` : Validate dependency integrity.
 
 > Many legacy deployment commands (`run`, `docker-build`, `deploy`, `install`, etc.) have been stubbed as no-ops with friendly guidance to prevent confusion for returning developers.
-
-### Running End-To-End (E2E) Tests
-If you want to validate changes against a live cluster:
-```sh
-make test-e2e
-```
-*(Requires `kind` installed locally to spin up a transient test cluster)*
 
 ---
 
