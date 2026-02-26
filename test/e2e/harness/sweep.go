@@ -107,6 +107,56 @@ func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) err
 // It returns a SweepResult struct containing the detailed outcome of the sweep operation.
 func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOptions) (SweepResult, error) {
 	startedAt := time.Now()
+	res := initSweepResult(opts, startedAt)
+
+	if s == nil || s.impl == nil || !opts.Enabled {
+		finalizeSweepResult(&res)
+		return res, nil
+	}
+
+	ns := s.impl.Config.Namespace
+	runID := s.impl.RunID
+	if ns == "" || runID == "" {
+		appendSkipGuard(&res)
+		finalizeSweepResult(&res)
+		return res, nil
+	}
+
+	res.Request.Namespace = ns
+	res.Request.CurrentRunID = runID
+	res.Request.ExcludeCurrentRunID = true
+	res.Request.ModeRequested = opts.Mode
+	normalizeSweepMode(opts.Mode, &res)
+
+	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
+	res.Request.Selector = labelSelector
+
+	lines, err := listOrphanCandidates(ctx, ns, labelSelector)
+	if err != nil {
+		finalizeSweepResult(&res)
+		return res, err
+	}
+	if len(lines) == 0 {
+		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n", res.Apply.ModeEffective, ns, runID)
+		finalizeSweepResult(&res)
+		return res, nil
+	}
+
+	var targetNames []string
+	var hitLimit int
+	for _, line := range lines {
+		evaluateSweepCandidate(line, opts, ns, startedAt, &res, &targetNames, &hitLimit)
+	}
+
+	printSweepSummary(&res, ns, runID, opts, targetNames, hitLimit)
+
+	err = applySweepDeletes(ctx, ns, targetNames, &res)
+
+	finalizeSweepResult(&res)
+	return res, err
+}
+
+func initSweepResult(opts OrphanSweepOptions, startedAt time.Time) SweepResult {
 	res := SweepResult{
 		SchemaVersion: "v1.0",
 		StartedAt:     startedAt,
@@ -116,32 +166,31 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 		Items:    []SweepItem{},
 		Warnings: []string{},
 	}
+	res.Request.Limit = opts.Limit
+	res.Request.MaxAgeSeconds = int(opts.MaxAge.Seconds())
+	return res
+}
 
-	if s == nil || s.impl == nil || !opts.Enabled {
-		res.FinishedAt = time.Now()
-		res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-		return res, nil
-	}
+func finalizeSweepResult(res *SweepResult) {
+	res.FinishedAt = time.Now()
+	res.DurationMs = res.FinishedAt.Sub(res.StartedAt).Milliseconds()
+}
 
-	ns := s.impl.Config.Namespace
-	runID := s.impl.RunID
+func appendSkipGuard(res *SweepResult) {
+	res.Summary.SkippedByReason["missing_guard"]++
+	res.Warnings = append(res.Warnings, "skip - missing namespace or run-id for safety guard")
+	fmt.Printf("kube-slint [orphan-sweep]: skip - missing namespace or run-id for safety guard\n")
+}
 
-	if ns == "" || runID == "" {
-		res.Summary.SkippedByReason["missing_guard"]++
-		res.Warnings = append(res.Warnings, "skip - missing namespace or run-id for safety guard")
-		fmt.Printf("kube-slint [orphan-sweep]: skip - missing namespace or run-id for safety guard\n")
-		res.FinishedAt = time.Now()
-		res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-		return res, nil
-	}
-
-	// Normalize mode
-	modeReq := strings.TrimSpace(opts.Mode)
+func normalizeSweepMode(modeReq string, res *SweepResult) {
+	modeReq = strings.TrimSpace(modeReq)
 	modeEff := modeReq
 	fallback := false
 	fallbackReason := ""
 
-	if modeEff != "delete" && modeEff != "report-only" {
+	if modeEff == "" {
+		modeEff = "report-only"
+	} else if modeEff != "delete" && modeEff != "report-only" {
 		modeEff = "report-only"
 		fallback = true
 		fallbackReason = "invalid_mode"
@@ -150,147 +199,135 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 		fmt.Printf("kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
 	}
 
-	res.Request = SweepRequest{
-		Namespace:           ns,
-		ModeRequested:       modeReq,
-		Limit:               opts.Limit,
-		MaxAgeSeconds:       int(opts.MaxAge.Seconds()),
-		ExcludeCurrentRunID: true,
-		CurrentRunID:        runID,
-	}
+	res.Apply.ModeEffective = modeEff
+	res.Apply.ModeFallback = fallback
+	res.Apply.FallbackReason = fallbackReason
+}
 
-	res.Apply = SweepApply{
-		ModeEffective:  modeEff,
-		ModeFallback:   fallback,
-		FallbackReason: fallbackReason,
-	}
-
-	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
-	res.Request.Selector = labelSelector
-
-	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", labelSelector, "-o", "jsonpath={range .items[*]}{.metadata.name},{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}")
+func listOrphanCandidates(ctx context.Context, ns, selector string) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", ns, "-l", selector, "-o", "jsonpath={range .items[*]}{.metadata.name},{.metadata.labels.slint-run-id},{.metadata.creationTimestamp}{\"\\n\"}{end}")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		res.FinishedAt = time.Now()
-		res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-		return res, fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
+		return nil, fmt.Errorf("failed to list orphans: %v (output: %s)", err, string(out))
 	}
-
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
-		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n", modeEff, ns, runID)
-		res.FinishedAt = time.Now()
-		res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-		return res, nil
+	if len(lines) == 1 && lines[0] == "" {
+		return nil, nil // empty
+	}
+	return lines, nil
+}
+
+func parseTimestamp(tsStr string) (time.Time, error) {
+	if ts, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
+		return ts, nil
+	}
+	return time.Parse(time.RFC3339, tsStr)
+}
+
+func evaluateSweepCandidate(line string, opts OrphanSweepOptions, ns string, startedAt time.Time, res *SweepResult, targetNames *[]string, hitLimit *int) {
+	parts := strings.SplitN(line, ",", 3)
+	if len(parts) != 3 {
+		return
+	}
+	res.Summary.Scanned++
+	name, rId, tsStr := parts[0], parts[1], parts[2]
+
+	item := SweepItem{Kind: "Pod", Namespace: ns, Name: name, RunID: rId, CreatedAt: tsStr}
+
+	ts, err := parseTimestamp(tsStr)
+	if err != nil {
+		fmt.Printf("kube-slint [orphan-sweep]: warning - failed to parse creation timestamp for pod %s: %v\n", name, err)
+		if opts.MaxAge > 0 {
+			appendSkipReason(res, &item, "timestamp_parse_failed")
+			return
+		}
+	} else {
+		item.AgeSeconds = int64(startedAt.Sub(ts).Seconds())
+		if opts.MaxAge > 0 && startedAt.Sub(ts) < opts.MaxAge {
+			appendSkipReason(res, &item, "max_age_not_reached")
+			return
+		}
 	}
 
-	var targetNames []string
-	var hitLimit int
+	res.Summary.Evaluated++
 
-	for _, line := range lines {
-		parts := strings.SplitN(line, ",", 3)
-		if len(parts) != 3 {
-			continue
-		}
-		res.Summary.Scanned++
-		name, rId, tsStr := parts[0], parts[1], parts[2]
-
-		item := SweepItem{
-			Kind:      "Pod",
-			Namespace: ns,
-			Name:      name,
-			RunID:     rId,
-			CreatedAt: tsStr,
-		}
-
-		ts, err := time.Parse(time.RFC3339, tsStr)
-		if err == nil {
-			item.AgeSeconds = int64(startedAt.Sub(ts).Seconds())
-			if opts.MaxAge > 0 && startedAt.Sub(ts) < opts.MaxAge {
-				item.Action = "skipped"
-				item.Reason = "max_age_not_reached"
-				res.Summary.Skipped++
-				res.Summary.SkippedByReason[item.Reason]++
-				res.Items = append(res.Items, item)
-				continue
-			}
-		} else {
-			fmt.Printf("kube-slint [orphan-sweep]: warning - failed to parse creation timestamp for pod %s: %v\n", name, err)
-		}
-
-		res.Summary.Evaluated++
-
-		if opts.Limit > 0 && len(targetNames) >= opts.Limit {
-			item.Action = "skipped"
-			item.Reason = "limit_exceeded"
-			res.Summary.Skipped++
-			res.Summary.SkippedByReason[item.Reason]++
-			res.Items = append(res.Items, item)
-			hitLimit++
-			continue
-		}
-
-		targetNames = append(targetNames, name)
-
-		if modeEff == "delete" {
-			item.Action = "would-delete"
-			item.Reason = "matched"
-		} else {
-			item.Action = "would-delete"
-			item.Reason = "matched"
-			res.Summary.WouldDelete++
-		}
-		res.Items = append(res.Items, item)
+	if opts.Limit > 0 && len(*targetNames) >= opts.Limit {
+		appendSkipReason(res, &item, "limit_exceeded")
+		*hitLimit++
+		return
 	}
 
-	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n", modeEff, ns, runID, opts.Limit, opts.MaxAge)
+	*targetNames = append(*targetNames, name)
+	item.Action = "would-delete"
+	item.Reason = "matched"
+	if res.Apply.ModeEffective != "delete" {
+		res.Summary.WouldDelete++
+	}
+	res.Items = append(res.Items, item)
+}
+
+func appendSkipReason(res *SweepResult, item *SweepItem, reason string) {
+	item.Action = "skipped"
+	item.Reason = reason
+	res.Summary.Skipped++
+	res.Summary.SkippedByReason[reason]++
+	res.Items = append(res.Items, *item)
+}
+
+func printSweepSummary(res *SweepResult, ns, runID string, opts OrphanSweepOptions, targetNames []string, hitLimit int) {
+	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n", res.Apply.ModeEffective, ns, runID, opts.Limit, opts.MaxAge)
 	fmt.Printf("kube-slint [orphan-sweep]: detected %d matching orphan(s) ", res.Summary.Evaluated)
 	if hitLimit > 0 {
 		fmt.Printf("(processing %d, skipping %d due to limit)\n", len(targetNames), hitLimit)
 	} else {
 		fmt.Printf("(processing all)\n")
 	}
+}
 
-	if modeEff == "delete" {
-		if len(targetNames) == 0 {
-			fmt.Printf("kube-slint [orphan-sweep]: no targets to delete\n")
-		} else {
-			fmt.Printf("kube-slint [orphan-sweep]: proceeding with deletion for %d orphan(s)...\n", len(targetNames))
-
-			args := append([]string{"delete", "pods", "-n", ns, "--ignore-not-found=true"}, targetNames...)
-			delCmd := exec.CommandContext(ctx, "kubectl", args...)
-			delOut, delErr := delCmd.CombinedOutput()
-
-			if delErr != nil {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("delete command failed: %v", delErr))
-				for i := range res.Items {
-					if res.Items[i].Action == "would-delete" {
-						res.Items[i].Action = "delete-error"
-						res.Items[i].Error = fmt.Sprintf("kubectl fail: %v", delErr)
-						res.Summary.DeleteError++
-					}
-				}
-				res.FinishedAt = time.Now()
-				res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-				return res, fmt.Errorf("failed to delete orphans: %v (output: %s)", delErr, string(delOut))
-			} else {
-				for i := range res.Items {
-					if res.Items[i].Action == "would-delete" {
-						res.Items[i].Action = "deleted"
-						res.Summary.Deleted++
-					}
-				}
-				fmt.Printf("kube-slint [orphan-sweep]: deletion complete\n")
-			}
-		}
-	} else {
+func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res *SweepResult) error {
+	if res.Apply.ModeEffective != "delete" {
 		if len(targetNames) > 0 {
 			fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion of %v\n", targetNames)
 			fmt.Printf("kube-slint [orphan-sweep]: to delete, set option mode='delete'\n")
 		}
+		return nil
+	}
+	if len(targetNames) == 0 {
+		fmt.Printf("kube-slint [orphan-sweep]: no targets to delete\n")
+		return nil
 	}
 
-	res.FinishedAt = time.Now()
-	res.DurationMs = res.FinishedAt.Sub(startedAt).Milliseconds()
-	return res, nil
+	fmt.Printf("kube-slint [orphan-sweep]: proceeding with individual deletion for %d orphan(s)...\n", len(targetNames))
+	var hasError bool
+
+	itemIdx := make(map[string]int)
+	for i, it := range res.Items {
+		itemIdx[it.Name] = i
+	}
+
+	for _, name := range targetNames {
+		cmd := exec.CommandContext(ctx, "kubectl", "delete", "pods", name, "-n", ns, "--ignore-not-found=true")
+		delOut, delErr := cmd.CombinedOutput()
+		idx, ok := itemIdx[name]
+		if !ok {
+			continue // Should not happen
+		}
+
+		if delErr != nil {
+			hasError = true
+			res.Warnings = append(res.Warnings, fmt.Sprintf("delete failed for %s: %v", name, delErr))
+			res.Items[idx].Action = "delete-error"
+			res.Items[idx].Error = fmt.Sprintf("kubectl fail: %v (out: %s)", delErr, strings.TrimSpace(string(delOut)))
+			res.Summary.DeleteError++
+		} else {
+			res.Items[idx].Action = "deleted"
+			res.Summary.Deleted++
+		}
+	}
+
+	if hasError {
+		return fmt.Errorf("some orphan deletions failed, check result for details")
+	}
+	fmt.Printf("kube-slint [orphan-sweep]: deletion complete\n")
+	return nil
 }
