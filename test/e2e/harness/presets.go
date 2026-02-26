@@ -1,13 +1,5 @@
 package harness
 
-// Step 6 후보: 프리셋 번들을 JSON/YAML로 제공하여 다른 오퍼레이터가 Go 코드 없이 재사용할 수 있도록 지원 예정.
-//   예:
-//     - test/e2e/slo-specs/baseline-v3.json
-//     - harness.LoadSpecsFromFile(path)
-//     - harness.LoadPreset("baseline-v3")
-//
-// Step 6 후보: BaselineV3Specs는 Go 폴백으로 유지하되, 구성 주도(config-driven) 명세를 주 경로로 설정.
-
 import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 
 // DefaultV3Specs 는 하위 호환성을 위해 유지됨.

@@ -67,7 +67,6 @@ func Attach(provider func() SessionConfig) (*Session, error) {
 }
 
 func isEnabledByEnv() bool {
-	// E2E_SLO_ENABLED 등에서 읽어오는 로직 추가 검토 (Step 6 후보)
 	// 현재는 attach 함수 내부이므로 항상 활성화됨
 	return true
 }

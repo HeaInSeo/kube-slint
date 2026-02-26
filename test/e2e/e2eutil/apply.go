@@ -9,8 +9,6 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/devutil"
 )
 
-// TODO 일단 생각하기.
-
 // Logger 는 ApplyTemplate에 필요한 최소한의 계약임.
 type Logger interface {
 	Logf(format string, args ...any)

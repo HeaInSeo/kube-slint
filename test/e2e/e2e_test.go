@@ -20,14 +20,12 @@ import (
 	"github.com/HeaInSeo/kube-slint/test/e2e/manifests"
 )
 
-// Step 6 후보: 이거 따로 빼야 함.
 const namespace = "kube-slint-system"
 const serviceAccountName = "kube-slint-controller-manager"
 const metricsServiceName = "kube-slint-controller-manager-metrics-service"
 
 var _ = Describe("Manager", Ordered, func() {
 	var (
-		// Step 6 후보: 추후 런타임에 쓰이는 정보들, 초기 설정에 관련된 정보들, 계측에 필요한 설정 등은 정리했지만 문서로 만들어 둘 것.
 		cfg     e2eenv.Options
 		rootDir string
 
@@ -52,7 +50,6 @@ var _ = Describe("Manager", Ordered, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
-		// Step 6 후보: e2eutil로 뺄 것.
 		run := func(cmd *exec.Cmd, msg string) string {
 			cmd.Dir = rootDir
 			out, err := runner.Run(ctx, logger, cmd)
@@ -66,7 +63,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// metadata:
 		//   name: %s
 		// `, namespace)
-		// Step 6 후보: apply.go에서 ApplyTemplate 적용할지 고민 중
+
 		nsManifest, err := devutil.RenderTemplateFileString(
 			rootDir,
 			"test/e2e/manifests/namespace.tmpl.yaml.gotmpl",
@@ -91,7 +88,6 @@ var _ = Describe("Manager", Ordered, func() {
 		By("controller-manager 배포")
 		run(exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage)), "controller-manager 배포 실패")
 
-		// Step 6 후보: 추후 ApplyClusterRoleBinding을 감싸서 구현할 수도 있는데 고민 중.
 		By("controller-manager SA에 대한 메트릭 리더(reader) RBAC 보장 (멱등성)")
 		Expect(kubeutil.ApplyClusterRoleBinding(
 			ctx, logger, runner,
@@ -107,30 +103,29 @@ var _ = Describe("Manager", Ordered, func() {
 			By("E2E_SKIP_CLEANUP 활성화됨: 정리 건너뜀")
 			return
 		}
-		// Step 6 후보: 10*time.Minute 따로 뺄 것.
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 
 		By("최선(best-effort): curl-metrics 파드 정리")
 		_ = cm.CleanupByLabel(ctx, namespace)
-		// Step 6 후보: 기본 Makefile에 대한 의존성이 생기지만 무시해도 될 듯함.
+
 		By("controller-manager 배포 해제 (최선의 노력)")
 		cmd := exec.Command("make", "undeploy")
 		cmd.Dir = rootDir
 		_, _ = runner.Run(ctx, logger, cmd)
-		// Step 6 후보: 기본 Makefile에 대한 의존성이 생기지만 무시해도 될 듯함.
+
 		By("CRD 제거 (최선의 노력)")
 		cmd = exec.Command("make", "uninstall")
 		cmd.Dir = rootDir
 		_, _ = runner.Run(ctx, logger, cmd)
-		// Step 6 후보: curlmetrics.go 사용하자.
+
 		By("매니저 네임스페이스 제거 (최선의 노력)")
 		cmd = exec.Command("kubectl", "delete", "ns", namespace, "--ignore-not-found=true")
 		cmd.Dir = rootDir
 		_, _ = runner.Run(ctx, logger, cmd)
 	})
 
-	// Step 6 후보: opts *WaitOptions로 할지 고민 중. 5*time.Minute 따로 뺄 것.
 	BeforeEach(func() {
 		waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer waitCancel()
@@ -186,7 +181,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// Expect(t).NotTo(BeEmpty())
 
 		return harness.SessionConfig{
-			// Step 6 후보: Enabled 지울지 고민하자. 일단 주석 처리함.
+
 			// Enabled: 			cfg.Enabled,
 			Namespace:          namespace,
 			MetricsServiceName: metricsServiceName,
@@ -197,10 +192,10 @@ var _ = Describe("Manager", Ordered, func() {
 			// ServiceAccountName: serviceAccountName,
 			// Token:              t,
 			ArtifactsDir: cfg.ArtifactsDir,
-			// Step 6 후보: 일단 이렇게 주석 처리함. 확인 필요.
+
 			// Fetcher: metricsFetcher,
 
-			// Step 6 후보(태그): 런 상관관계(correlation) 분석을 위해 실행 메타 태그를 추가함.
+			// 참고: 런 상관관계(correlation) 분석을 위해 실행 메타 태그를 추가할 수 있음.
 			// 예: git commit SHA, kind cluster name, controller image tag, k8s version, CI run id 등
 			// Tags: map[string]string{
 			// 	"commit":  "",

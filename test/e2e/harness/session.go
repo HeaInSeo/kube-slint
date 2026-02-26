@@ -61,16 +61,7 @@ type sessionImpl struct {
 
 	// Tunables (defaults are set in NewSession)
 	ServiceURLFormat string
-	// Step 6 후보. 구성 확장 여지 있음
-	CurlImage string
-	// ServiceURLFormat 에서 결정됨. 일단 주석으로 남겨둠, 혹시 필요하면 살림.
-	// MetricsPort      int
-	// 추후
-	// type SessionConfig struct {
-	//     MetricsScheme string // "https"
-	//     MetricsPort   int    // 8443
-	//     MetricsPath   string // "/metrics"
-	// } 이런식으로 필요할지 생각해보자. 일단 주석으로 남겨둠.
+	CurlImage        string
 
 	ScrapeTimeout      time.Duration
 	WaitPodDoneTimeout time.Duration
@@ -350,16 +341,6 @@ func (s *Session) Start() {
 }
 
 // End는 측정을 완료함.
-// TODO(harness-thin):
-//  - harness는 "연결자(glue)"로 얇아야 한다. 현재는 curlpod/promtext 구현까지 포함되어 두텁다.
-//  - 목표: Method/FetchStrategy(또는 Source) 선택은 e2e_test.go(provider)가 결정하고,
-//    harness는 검증/시간윈도우(StartedAt/FinishedAt)/Engine 실행 + artifact 경로 계산만 담당한다.
-//  - 조치:
-//    1) newCurlPodFetcher/curlPodFetcher/parsePrometheusText를 harness 밖
-//       (예: harness/source/curlpod 또는 test-side adapter)으로 이동.
-//    2) End()에서 "fetcher nil이면 curlpod" 같은 암묵 기본값 제거(또는 NewSession 단계에서만 기본값 처리).
-//    3) Method는 Config.Method를 그대로 사용(하드코딩 금지)하고, 장기적으로는 Method도 필수 입력으로 강제.
-//    4) (선택) Source.Build(ctx) -> fetcher 생성 패턴 도입하여, K8s 의존 구현은 adapter에 격리.
 
 // End concludes the measurement session.
 func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
@@ -384,14 +365,6 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	}
 	finished := now()
 
-	// TODO(harness-thin):
-	//  - harness는 "연결자(glue)"로 얇아야 한다. 현재는 curlpod/promtext 구현까지 포함되어 두텁다.
-	//  - 목표: Method/FetchStrategy(또는 Source) 선택은 e2e_test.go(provider)가 결정하고,
-	//    harness는 검증/시간윈도우(StartedAt/FinishedAt)/Engine 실행 + artifact 경로 계산만 담당한다.
-	//  - 조치:
-	//    1) newCurlPodFetcher/curlPodFetcher/parsePrometheusText를 harness 밖으로 이동.
-	//    2) End()의 fetcher fallback 정책 정리(장기적으로는 명시 주입).
-	//    3) Method 하드코딩 금지, 장기적으로 Method 필수화.
 	m := s.impl.Config.Method
 	if m == "" {
 		m = engine.InsideSnapshot
@@ -458,7 +431,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 }
 
 // ---- (TEMP) Default Fetcher: curlpod + promtext ----
-// Step 6 후보. 아래 구현은 pkg/slo/fetch/* 또는 test-side adapter로 이동 예정.
+// 임시 기본 Fetcher 구현체임.
 
 type curlPodFetcher struct {
 	impl *sessionImpl
@@ -527,6 +500,6 @@ func defaultSpecs(specs []spec.SLISpec) []spec.SLISpec {
 	if specs != nil {
 		return specs
 	}
-	// Step 6 후보. DefaultSpecs 개선 또는 파일 로드 방식으로 대체 예정.
+
 	return DefaultV3Specs()
 }
