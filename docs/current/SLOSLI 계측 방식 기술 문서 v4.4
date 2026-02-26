@@ -601,6 +601,13 @@ Counter delta 계산에서 `end < start` 발생 시:
   - 삭제를 원할 경우 반드시 `mode="delete"`를 지정하고 사용자 책임 하에 명시적으로 호출해야 합니다.
   - 안전 지대: 현재 세션의 `run-id`는 제외되며 `namespace` 범위로 제한됩니다.
   - 추가 제어: 한 번에 지울 대상을 제한하는 `limit`과 너무 최근에 생성된 리소스를 보호하는 `maxAge` 옵션을 지원하여 불의의 사고를 방지합니다.
+
+- **SweepResult 스키마 및 동작 시맨틱 (Step 7 추가)**:
+  - `request` / `apply`: 사용자가 요청한 옵션(`modeRequested` 등)과 실제 적용된 옵션(`modeEffective`)을 분리 기록하여 투명성을 높입니다.
+  - **Mode Fallback**: 잘못된 모드가 입력될 경우 위험을 피하기 위해 자동으로 `report-only`로 폴백하며, 이 사실을 `modeFallback=true` 및 `fallbackReason="invalid_mode"`로 기록합니다.
+  - **wouldDelete vs deleted**: `report-only` 모드에서는 삭제 조건을 만족하더라도 대상 카운트가 `wouldDelete`로 집계되어 시뮬레이션 결과를 명확히 알 수 있으며, `delete` 모드에서 실제 삭제된 경우에만 `deleted`가 증가합니다. Limit에 의해 제외된 대상은 `skipped` 처리됩니다.
+  - **다중 API 제공**: 하위 호환성을 위해 에러만 리턴하는 기존 `SweepOrphans`를 유지하되, 모든 결과를 담은 JSON 형식의 아티팩트 데이터를 원할 경우 `SweepOrphansWithResult` 신규 함수 사용을 권장합니다.
+
 - 추가 고도화(TTL 기반 자동 백그라운드 스위퍼 등)는 장기 로드맵으로 남습니다.
     
 

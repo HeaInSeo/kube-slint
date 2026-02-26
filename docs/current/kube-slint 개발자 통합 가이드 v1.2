@@ -480,6 +480,23 @@ if err != nil {
   - `maxAge`: 리소스의 생성 시간 기준을 두어, 실행 중인 최신 리소스가 지워지지 않도록 보호합니다 (예: 1시간 이전 생성분만 타겟).
 - **명시적 삭제**: 실 삭제를 원할 경우 반드시 `OrphanSweepOptions{Mode: "delete"}` 등 명시적 옵션을 명기해야 합니다.
 
+**프리셋(Preset) 사용 및 JSON Artifact 저장**:
+보통의 경우 내장된 프리셋(`DevSweepOptions`, `CISweepOptions`)을 사용하여 옵션을 간편하게 설정할 수 있으며, 이 기본 방향 역시 **절대 안전(`report-only`)**입니다.
+상세한 내역을 JSON 문서로 저장하고 분석하려면 `SweepOrphansWithResult` 함수를 통해 아티팩트를 출력할 수 있습니다.
+
+```go
+// 1. CI 프리셋 적용 (Limit 100, MaxAge 1h)
+res, err := sess.SweepOrphansWithResult(ctx, harness.CISweepOptions)
+if err != nil {
+	fmt.Printf("sweeper error: %v\n", err)
+}
+
+// 2. 결과를 JSON 아티팩트로 저장 (선택 사항)
+f, _ := os.Create("orphan-sweep-result.json")
+defer f.Close()
+_ = harness.WriteSweepResultJSON(f, res)
+```
+
 ## 10.6 운영 실수 방지 체크리스트
 
 1. **자동 삭제 오해 금지**: `CleanupMode` 규칙에 맞지 않으면 리소스가 자동으로 지워지지 않습니다. 디버깅 후엔 명시적으로 삭제하세요.
