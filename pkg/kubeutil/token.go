@@ -79,7 +79,9 @@ func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns
 	}
 }
 
-func requestServiceAccountTokenOnce(ctx context.Context, r CmdRunner, logger slo.Logger, ns, sa string) (string, error) {
+func requestServiceAccountTokenOnce(
+	ctx context.Context, r CmdRunner, logger slo.Logger, ns, sa string,
+) (string, error) {
 	cmd := exec.Command("kubectl", "create", "--raw",
 		fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s/token", ns, sa),
 		"-f", "-",
