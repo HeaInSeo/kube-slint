@@ -92,8 +92,12 @@ func TestEngine_ConfidenceScore(t *testing.T) {
 			expectedScore: 0.0,
 		},
 		{
-			name:          "PartialEvalAndMissing",
-			relIn:         summary.Reliability{CollectionStatus: "Complete", EvaluationStatus: "Partial", MissingInputs: []string{"A", "B"}},
+			name: "PartialEvalAndMissing",
+			relIn: summary.Reliability{
+				CollectionStatus: "Complete",
+				EvaluationStatus: "Partial",
+				MissingInputs:    []string{"A", "B"},
+			},
 			expectedScore: 0.6, // 1.0 - 0.2 - 0.2 = 0.6
 		},
 		{
@@ -102,8 +106,12 @@ func TestEngine_ConfidenceScore(t *testing.T) {
 			expectedScore: 0.8, // 1.0 - 0.1 - 0.1 = 0.8
 		},
 		{
-			name:          "CappedPenalties",
-			relIn:         summary.Reliability{CollectionStatus: "Complete", MissingInputs: []string{"A", "B", "C", "D"}, SkippedSLIs: []string{"X", "Y", "Z", "W"}},
+			name: "CappedPenalties",
+			relIn: summary.Reliability{
+				CollectionStatus: "Complete",
+				MissingInputs:    []string{"A", "B", "C", "D"},
+				SkippedSLIs:      []string{"X", "Y", "Z", "W"},
+			},
 			expectedScore: 0.4, // 1.0 - 0.3 (max missing) - 0.3 (max skipped) = 0.4
 		},
 	}

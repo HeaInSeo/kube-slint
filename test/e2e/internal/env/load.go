@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// LoadOptions는 환경 변수에서 로드된 E2E 테스트 설정을 포함하는 Options를 반환함.
+// LoadOptions 는 환경 변수에서 로드된 E2E 테스트 설정을 포함하는 Options를 반환함.
 func LoadOptions() Options {
 	return Options{
 		Enabled: boolEnv("SLOLAB_ENABLED", false),

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Options는 e2e 전용 설정임.
+// Options 는 e2e 전용 설정임.
 // pkg/slo와 독립적으로 유지되어야 함 (v1 레거시).
 type Options struct {
 	Enabled      bool
@@ -18,7 +18,7 @@ type Options struct {
 	TokenRequestTimeout time.Duration
 }
 
-// Validate는 설정을 확인하고 기본값을 적용함.
+// Validate 는 설정을 확인하고 기본값을 적용함.
 func (o Options) Validate() Options {
 	out := o
 	if out.ArtifactsDir == "" {
@@ -30,7 +30,7 @@ func (o Options) Validate() Options {
 	return out
 }
 
-// SummaryPath는 요약 파일의 경로를 반환함.
+// SummaryPath 는 요약 파일의 경로를 반환함.
 func (o Options) SummaryPath(filename string) string {
 	v := o.Validate()
 	if filename == "" {

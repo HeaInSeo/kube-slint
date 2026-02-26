@@ -11,10 +11,10 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
-// PodLabelSelector는 curl 파드에 사용되는 레이블임.
+// PodLabelSelector 는 curl 파드에 사용되는 레이블임.
 const PodLabelSelector = "app=curl-metrics"
 
-// Client는 curl-metrics 파드를 실행하고 로그를 가져옴.
+// Client 는 curl-metrics 파드를 실행하고 로그를 가져옴.
 // 테스트 지향적임 (kubectl + curlimages/curl 사용).
 type Client struct {
 	Logger slo.Logger
@@ -27,7 +27,7 @@ type Client struct {
 	ServiceURLFormat string // e.g. "https://%s.%s.svc:8443/metrics"
 }
 
-// New는 안전한 기본값으로 클라이언트를 생성함.
+// New 는 안전한 기본값으로 클라이언트를 생성함.
 // logger는 nil일 수 있음.
 func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 	if r == nil {
@@ -43,7 +43,7 @@ func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 	}
 }
 
-// RunOnce는 /metrics를 스크랩하는 수명이 짧은 curl 파드를 생성함.
+// RunOnce 는 /metrics를 스크랩하는 수명이 짧은 curl 파드를 생성함.
 // 생성된 파드 이름을 반환함.
 // 기다리지 않으므로 WaitDone을 호출한 다음 Logs를 호출해야 함.
 func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, serviceAccountName string) (string, error) {
@@ -100,7 +100,7 @@ curl -ksS --fail-with-body -H "Authorization: Bearer %s" "%s";`, token, metricsU
 	return podName, err
 }
 
-// WaitDone은 curl 파드가 종료 단계(Succeeded/Failed)에 도달할 때까지 기다림.
+// WaitDone 은 curl 파드가 종료 단계(Succeeded/Failed)에 도달할 때까지 기다림.
 func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Duration) error {
 	c.Logger = slo.NewLogger(c.Logger)
 	if c.Runner == nil {
@@ -136,7 +136,7 @@ func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Dur
 	}
 }
 
-// Logs는 주어진 파드의 kubectl 로그를 반환함.
+// Logs 는 주어진 파드의 kubectl 로그를 반환함.
 func (c *Client) Logs(ctx context.Context, ns, podName string) (string, error) {
 	c.Logger = slo.NewLogger(c.Logger)
 	if c.Runner == nil {
@@ -147,7 +147,7 @@ func (c *Client) Logs(ctx context.Context, ns, podName string) (string, error) {
 	return c.Runner.Run(ctx, c.Logger, cmd)
 }
 
-// DeletePodNoWait는 기다리지 않고 최선의 노력(best-effort)으로 파드를 삭제함.
+// DeletePodNoWait 는 기다리지 않고 최선의 노력(best-effort)으로 파드를 삭제함.
 func (c *Client) DeletePodNoWait(ctx context.Context, ns, podName string) error {
 	c.Logger = slo.NewLogger(c.Logger)
 	if c.Runner == nil {
@@ -164,7 +164,7 @@ func (c *Client) DeletePodNoWait(ctx context.Context, ns, podName string) error 
 	return err
 }
 
-// CleanupByLabel은 레이블 셀렉터로 모든 curl-metrics 파드를 삭제함 (최선의 노력, 기다리지 않음).
+// CleanupByLabel 은 레이블 셀렉터로 모든 curl-metrics 파드를 삭제함 (최선의 노력, 기다리지 않음).
 func (c *Client) CleanupByLabel(ctx context.Context, ns string) error {
 	c.Logger = slo.NewLogger(c.Logger)
 	if c.Runner == nil {

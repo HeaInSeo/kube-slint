@@ -36,7 +36,7 @@ var _ = Describe("Manager", Ordered, func() {
 		// 테스트마다 공유됨
 		metricsToken string
 		metricsPod   *curlpod.CurlPod
-		//token   string
+		// token   string
 	)
 
 	BeforeAll(func() {
@@ -79,10 +79,11 @@ var _ = Describe("Manager", Ordered, func() {
 		cmd.Stdin = strings.NewReader(nsManifest)
 		run(cmd, "Failed to apply namespace with security policy")
 
-		//By("labeling the namespace to enforce the security policy")
-		//cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace, "pod-security.kubernetes.io/enforce=baseline")
-		//cmd.Dir = rootDir
-		//run(cmd, "Failed to label namespace with security policy")
+		// By("labeling the namespace to enforce the security policy")
+		// cmd = exec.Command("kubectl", "label", "--overwrite", "ns", namespace,
+		// 	"pod-security.kubernetes.io/enforce=baseline")
+		// cmd.Dir = rootDir
+		// run(cmd, "Failed to label namespace with security policy")
 
 		By("CRD 설치")
 		run(exec.Command("make", "install"), "CRD 설치 실패")
@@ -186,18 +187,18 @@ var _ = Describe("Manager", Ordered, func() {
 
 		return harness.SessionConfig{
 			// Step 6 후보: Enabled 지울지 고민하자. 일단 주석 처리함.
-			//Enabled: 			cfg.Enabled,
+			// Enabled: 			cfg.Enabled,
 			Namespace:          namespace,
 			MetricsServiceName: metricsServiceName,
 			TestCase:           "", // 하네스에 의해 자동 채워짐
 			Suite:              "e2e",
 
 			RunID: cfg.RunID,
-			//ServiceAccountName: serviceAccountName,
-			//Token:              t,
+			// ServiceAccountName: serviceAccountName,
+			// Token:              t,
 			ArtifactsDir: cfg.ArtifactsDir,
 			// Step 6 후보: 일단 이렇게 주석 처리함. 확인 필요.
-			//Fetcher: metricsFetcher,
+			// Fetcher: metricsFetcher,
 
 			// Step 6 후보(태그): 런 상관관계(correlation) 분석을 위해 실행 메타 태그를 추가함.
 			// 예: git commit SHA, kind cluster name, controller image tag, k8s version, CI run id 등

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Parse는 Prometheus 메트릭 키 토큰을 이름과 레이블로 파싱함.
+// Parse 는 Prometheus 메트릭 키 토큰을 이름과 레이블로 파싱함.
 // 토큰 예시:
 //
 //	metric_name
@@ -40,7 +40,7 @@ func Parse(token string) (name string, labels map[string]string, err error) {
 	return name, labels, nil
 }
 
-// Format은 이름과 레이블을 정규 키 문자열로 포맷함.
+// Format 은 이름과 레이블을 정규 키 문자열로 포맷함.
 // 레이블은 키로 정렬되며, 값은 이스케이프됨.
 func Format(name string, labels map[string]string) string {
 	if len(labels) == 0 {
@@ -69,7 +69,7 @@ func Format(name string, labels map[string]string) string {
 	return b.String()
 }
 
-// Canonicalize는 원시 토큰을 정규 키 문자열로 변환함.
+// Canonicalize 는 원시 토큰을 정규 키 문자열로 변환함.
 func Canonicalize(token string) (string, error) {
 	name, labels, err := Parse(token)
 	if err != nil {
@@ -162,7 +162,7 @@ func parseQuotedLabelValueRaw(s string, i int, key string) (string, int, error) 
 	return raw.String(), i, nil
 }
 
-// EscapeLabelValue는 Prometheus 텍스트 형식을 위해 레이블 값을 이스케이프함.
+// EscapeLabelValue 는 Prometheus 텍스트 형식을 위해 레이블 값을 이스케이프함.
 func EscapeLabelValue(v string) string {
 	var b strings.Builder
 	for i := 0; i < len(v); i++ {
@@ -184,7 +184,7 @@ func EscapeLabelValue(v string) string {
 	return b.String()
 }
 
-// UnescapeLabelValue는 Prometheus 레이블 값 이스케이프를 해제함.
+// UnescapeLabelValue 는 Prometheus 레이블 값 이스케이프를 해제함.
 func UnescapeLabelValue(v string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(v); i++ {

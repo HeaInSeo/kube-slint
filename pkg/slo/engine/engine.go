@@ -11,6 +11,8 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
+const statusComplete = "Complete"
+
 // Logger는 pkg/slo를 klog/logr로부터 독립적으로 유지함.
 // type Logger interface {
 //	Logf(format string, args ...any)
@@ -89,8 +91,8 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		return s, nil
 	}
 
-	rel.CollectionStatus = "Complete"
-	rel.EvaluationStatus = "Complete" // 초기에는 완전함으로 설정, 누락 시 부분(Partial)으로 강등됨
+	rel.CollectionStatus = statusComplete
+	rel.EvaluationStatus = statusComplete // 초기에는 완전함으로 설정, 누락 시 부분(Partial)으로 강등됨
 
 	sum := summary.Summary{
 		SchemaVersion: "slo.v3",

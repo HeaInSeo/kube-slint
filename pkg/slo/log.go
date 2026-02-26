@@ -18,5 +18,5 @@ func NewLogger(l Logger) Logger {
 	return l
 }
 
-// 원할 경우 사용할 수 있는 내보내진 NopLogger 싱글톤임.
+// NopLogger 는 원할 경우 사용할 수 있는 내보내진 NopLogger 싱글톤임.
 var NopLogger Logger = nopLogger{}
