@@ -263,8 +263,6 @@ func (s *Session) MarkFailed() {
 	s.impl.hasFailed = true
 }
 
-
-
 // Cleanup은 세션에서 생성된 임시 리소스를 제거함.
 // 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용함.
 func (s *Session) Cleanup(ctx context.Context) {

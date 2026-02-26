@@ -41,36 +41,8 @@ func Attach(provider func() SessionConfig) (*Session, error) {
 		}
 
 		cfg := provider()
-
-		// 검증 (상세 메시지 유지)
-		if strings.TrimSpace(cfg.Namespace) == "" {
-			ginkgo.Fail(fmt.Sprintf(
-				"harness: invalid config: Namespace is required (Suite=%q TestCase=%q RunID=%q MetricsServiceName=%q SA=%q ArtifactsDir=%q)",
-				cfg.Suite, cfg.TestCase, cfg.RunID, cfg.MetricsServiceName, cfg.ServiceAccountName, cfg.ArtifactsDir,
-			))
-		}
-		if strings.TrimSpace(cfg.MetricsServiceName) == "" {
-			ginkgo.Fail(fmt.Sprintf(
-				"harness: invalid config: MetricsServiceName is required (Namespace=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
-				cfg.Namespace, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
-			))
-		}
-		if strings.TrimSpace(cfg.Token) == "" {
-			ginkgo.Fail(fmt.Sprintf(
-				"harness: invalid config: Token is empty (Namespace=%q MetricsServiceName=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
-				cfg.Namespace, cfg.MetricsServiceName, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
-			))
-		}
-
-		// 값이 비어있을 경우 TestCase 자동 채우기
-		if strings.TrimSpace(cfg.TestCase) == "" {
-			cfg.TestCase = ginkgo.CurrentSpecReport().LeafNodeText
-		}
-
-		// Now가 설정되어 있는지 확인 (Session.NewSession에서 이미 수행하지만 여기서도 안전하게 처리)
-		if cfg.Now == nil {
-			cfg.Now = time.Now
-		}
+		validateSessionConfigOrFail(cfg)
+		cfg = fillSessionDefaults(cfg)
 
 		newSess := NewSession(cfg)
 
@@ -98,4 +70,35 @@ func isEnabledByEnv() bool {
 	// E2E_SLO_ENABLED 등에서 읽어오는 로직 추가 검토 (Step 6 후보)
 	// 현재는 attach 함수 내부이므로 항상 활성화됨
 	return true
+}
+
+func validateSessionConfigOrFail(cfg SessionConfig) {
+	if strings.TrimSpace(cfg.Namespace) == "" {
+		ginkgo.Fail(fmt.Sprintf(
+			"harness: invalid config: Namespace is required (Suite=%q TestCase=%q RunID=%q MetricsServiceName=%q SA=%q ArtifactsDir=%q)",
+			cfg.Suite, cfg.TestCase, cfg.RunID, cfg.MetricsServiceName, cfg.ServiceAccountName, cfg.ArtifactsDir,
+		))
+	}
+	if strings.TrimSpace(cfg.MetricsServiceName) == "" {
+		ginkgo.Fail(fmt.Sprintf(
+			"harness: invalid config: MetricsServiceName is required (Namespace=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
+			cfg.Namespace, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
+		))
+	}
+	if strings.TrimSpace(cfg.Token) == "" {
+		ginkgo.Fail(fmt.Sprintf(
+			"harness: invalid config: Token is empty (Namespace=%q MetricsServiceName=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
+			cfg.Namespace, cfg.MetricsServiceName, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
+		))
+	}
+}
+
+func fillSessionDefaults(cfg SessionConfig) SessionConfig {
+	if strings.TrimSpace(cfg.TestCase) == "" {
+		cfg.TestCase = ginkgo.CurrentSpecReport().LeafNodeText
+	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
+	return cfg
 }

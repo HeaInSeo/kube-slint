@@ -82,67 +82,84 @@ func parseLabels(s string) (map[string]string, error) {
 	labels := map[string]string{}
 	i := 0
 	for {
-		// 공백/쉼표 건너뛰기
-		for i < len(s) && (s[i] == ' ' || s[i] == ',') {
-			i++
-		}
+		i = skipLabelDelims(s, i)
 		if i >= len(s) {
 			break
 		}
 
-		// 키 파싱
-		start := i
-		for i < len(s) && s[i] != '=' {
-			i++
+		key, next, err := parseLabelKey(s, i)
+		if err != nil {
+			return nil, err
 		}
-		if i >= len(s) {
-			return nil, fmt.Errorf("invalid labels (missing '='): %q", s)
-		}
-		key := strings.TrimSpace(s[start:i])
-		i++ // '='
+		i = next
 
-		// 여는 따옴표 확인
-		for i < len(s) && s[i] == ' ' {
-			i++
+		raw, next, err := parseQuotedLabelValueRaw(s, i, key)
+		if err != nil {
+			return nil, err
 		}
-		if i >= len(s) || s[i] != '"' {
-			return nil, fmt.Errorf("invalid labels (missing '\"' for %q): %q", key, s)
-		}
-		i++ // opening '"'
+		i = next
 
-		// 닫는 따옴표까지 이스케이프가 포함된 값을 파싱함
-		var raw bytes.Buffer
-		for {
-			if i >= len(s) {
-				return nil, fmt.Errorf("invalid labels (unterminated value for %q): %q", key, s)
-			}
-			ch := s[i]
-			if ch == '"' {
-				i++ // 닫는 '"'
-				break
-			}
-			if ch == '\\' {
-				if i+1 >= len(s) {
-					return nil, fmt.Errorf("invalid escape at end for %q: %q", key, s)
-				}
-				raw.WriteByte('\\')
-				raw.WriteByte(s[i+1])
-				i += 2
-				continue
-			}
-			raw.WriteByte(ch)
-			i++
-		}
-
-		val, err := UnescapeLabelValue(raw.String())
+		val, err := UnescapeLabelValue(raw)
 		if err != nil {
 			return nil, fmt.Errorf("unescape label %q: %w", key, err)
 		}
 		labels[key] = val
-
-		// 후행 공백은 루프에서 처리됨
 	}
 	return labels, nil
+}
+
+func skipLabelDelims(s string, i int) int {
+	for i < len(s) && (s[i] == ' ' || s[i] == ',') {
+		i++
+	}
+	return i
+}
+
+func parseLabelKey(s string, i int) (string, int, error) {
+	start := i
+	for i < len(s) && s[i] != '=' {
+		i++
+	}
+	if i >= len(s) {
+		return "", i, fmt.Errorf("invalid labels (missing '='): %q", s)
+	}
+	key := strings.TrimSpace(s[start:i])
+	i++ // '='
+	return key, i, nil
+}
+
+func parseQuotedLabelValueRaw(s string, i int, key string) (string, int, error) {
+	for i < len(s) && s[i] == ' ' {
+		i++
+	}
+	if i >= len(s) || s[i] != '"' {
+		return "", i, fmt.Errorf("invalid labels (missing '\"' for %q): %q", key, s)
+	}
+	i++ // opening '"'
+
+	var raw bytes.Buffer
+	for {
+		if i >= len(s) {
+			return "", i, fmt.Errorf("invalid labels (unterminated value for %q): %q", key, s)
+		}
+		ch := s[i]
+		if ch == '"' {
+			i++ // 닫는 '"'
+			break
+		}
+		if ch == '\\' {
+			if i+1 >= len(s) {
+				return "", i, fmt.Errorf("invalid escape at end for %q: %q", key, s)
+			}
+			raw.WriteByte('\\')
+			raw.WriteByte(s[i+1])
+			i += 2
+			continue
+		}
+		raw.WriteByte(ch)
+		i++
+	}
+	return raw.String(), i, nil
 }
 
 // EscapeLabelValue는 Prometheus 텍스트 형식을 위해 레이블 값을 이스케이프함.

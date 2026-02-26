@@ -54,29 +54,7 @@ func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	tryOnce := func() (string, error) {
-		cmd := exec.Command("kubectl", "create", "--raw",
-			fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s/token", ns, sa),
-			"-f", "-",
-		)
-		cmd.Stdin = strings.NewReader(tokenRequestBody)
-		// ctx 반영, Closure 캡처
-		stdout, err := r.Run(ctx, logger, cmd)
-		if err != nil {
-			return "", fmt.Errorf("token request failed (ns=%s sa=%s): %w", ns, sa, err)
-		}
-
-		var tr tokenRequest
-		if err := json.Unmarshal([]byte(stdout), &tr); err != nil {
-			return "", fmt.Errorf("token response json parse failed: %w (body=%q)", err, stdout)
-		}
-		if tr.Status.Token == "" {
-			return "", fmt.Errorf("token is empty")
-		}
-		return tr.Status.Token, nil
-	}
-
-	if tok, err := tryOnce(); err == nil {
+	if tok, err := requestServiceAccountTokenOnce(ctx, r, logger, ns, sa); err == nil {
 		return tok, nil
 	} else {
 		lastErr = err
@@ -91,7 +69,7 @@ func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns
 			}
 			return "", lastErr
 		case <-ticker.C:
-			tok, err := tryOnce()
+			tok, err := requestServiceAccountTokenOnce(ctx, r, logger, ns, sa)
 			if err == nil {
 				return tok, nil
 			}
@@ -99,4 +77,26 @@ func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns
 			logger.Logf("token not ready yet: %v", err)
 		}
 	}
+}
+
+func requestServiceAccountTokenOnce(ctx context.Context, r CmdRunner, logger slo.Logger, ns, sa string) (string, error) {
+	cmd := exec.Command("kubectl", "create", "--raw",
+		fmt.Sprintf("/api/v1/namespaces/%s/serviceaccounts/%s/token", ns, sa),
+		"-f", "-",
+	)
+	cmd.Stdin = strings.NewReader(tokenRequestBody)
+
+	stdout, err := r.Run(ctx, logger, cmd)
+	if err != nil {
+		return "", fmt.Errorf("token request failed (ns=%s sa=%s): %w", ns, sa, err)
+	}
+
+	var tr tokenRequest
+	if err := json.Unmarshal([]byte(stdout), &tr); err != nil {
+		return "", fmt.Errorf("token response json parse failed: %w (body=%q)", err, stdout)
+	}
+	if tr.Status.Token == "" {
+		return "", fmt.Errorf("token is empty")
+	}
+	return tr.Status.Token, nil
 }

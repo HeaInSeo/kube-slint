@@ -7,8 +7,7 @@ import (
 )
 
 func TestDiscoverConfig_Disabled(t *testing.T) {
-	os.Setenv("SLINT_DISABLE_DISCOVERY", "1")
-	defer os.Unsetenv("SLINT_DISABLE_DISCOVERY")
+	t.Setenv("SLINT_DISABLE_DISCOVERY", "1")
 
 	_, source, err := DiscoverConfig("")
 	if err != nil {
@@ -25,10 +24,11 @@ func TestDiscoverConfig_Disabled(t *testing.T) {
 func TestDiscoverConfig_EnvPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "custom.yaml")
-	os.WriteFile(configPath, []byte("format: v4.4\n"), 0644)
+	if err := os.WriteFile(configPath, []byte("format: v4.4\n"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
-	os.Setenv("SLINT_CONFIG_PATH", configPath)
-	defer os.Unsetenv("SLINT_CONFIG_PATH")
+	t.Setenv("SLINT_CONFIG_PATH", configPath)
 
 	cfg, source, err := DiscoverConfig("")
 	if err != nil {
@@ -48,11 +48,13 @@ func TestDiscoverConfig_EnvPath(t *testing.T) {
 func TestDiscoverConfig_AutoDiscovery(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, ".slint.yaml")
-	os.WriteFile(configPath, []byte(`
+	if err := os.WriteFile(configPath, []byte(`
 format: v4.4
 strictness:
   mode: StrictCollection
-`), 0644)
+`), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	cfg, source, err := DiscoverConfig(tmpDir)
 	if err != nil {

@@ -52,25 +52,43 @@ func DiscoverConfig(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 		return nil, ConfigSource{Type: "injected", Disabled: true}, nil
 	}
 
-	// 1. 환경 변수 경로 확인
+	cfg, src, hasEnv, err := discoverConfigFromEnv()
+	if hasEnv {
+		return cfg, src, err
+	}
+
+	startDir, err = normalizeStartDir(startDir)
+	if err != nil {
+		return nil, ConfigSource{}, err
+	}
+
+	return discoverConfigByWalking(startDir)
+}
+
+func discoverConfigFromEnv() (*DiscoveredConfig, ConfigSource, bool, error) {
 	envPath := os.Getenv("SLINT_CONFIG_PATH")
-	if envPath != "" {
-		cfg, err := loadConfigFile(envPath)
-		if err != nil {
-			return nil, ConfigSource{}, fmt.Errorf("failed to load config from SLINT_CONFIG_PATH (%s): %w", envPath, err)
-		}
-		return cfg, ConfigSource{Type: "env", Path: envPath}, nil
+	if envPath == "" {
+		return nil, ConfigSource{}, false, nil
 	}
-
-	// 2. 자동 탐색
-	if startDir == "" {
-		var err error
-		startDir, err = os.Getwd()
-		if err != nil {
-			return nil, ConfigSource{}, fmt.Errorf("failed to get current working directory: %w", err)
-		}
+	cfg, err := loadConfigFile(envPath)
+	if err != nil {
+		return nil, ConfigSource{}, true, fmt.Errorf("failed to load config from SLINT_CONFIG_PATH (%s): %w", envPath, err)
 	}
+	return cfg, ConfigSource{Type: "env", Path: envPath}, true, nil
+}
 
+func normalizeStartDir(startDir string) (string, error) {
+	if startDir != "" {
+		return startDir, nil
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	return dir, nil
+}
+
+func discoverConfigByWalking(startDir string) (*DiscoveredConfig, ConfigSource, error) {
 	targetFiles := []string{".slint.yaml", "slint.config.yaml"}
 	currentDir := startDir
 
