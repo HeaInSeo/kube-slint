@@ -5,30 +5,30 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — T-3 SanitizeFilename Reinforcement
+## Current Status: Stage (Completed) — Cleanup Audit & Diagnostics
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* Phase A 문서/로그 미세보완 완료
-* Phase B (T-3) SanitizeFilename 엣지 케이스 단위 테스트 보강 완료
+* 저장소 파일/구조/테스트 신뢰성에 대한 진단(Audit) 완료
+* 증거 기반 정리(Cleanup) 대상 파악 및 우선순위가 제안된 보고서 작성 완료
 
 ### Definition of Done (DoD)
 
-* [x] 7.4항 Partial 설명 정밀도 보완
-* [x] PROGRESS_LOG.md 중복/Current 항목 정리
-* [x] 빈 값, 공백, 패스 구분자, 특수기호 케이스 커버 보완
-* [x] 릴리즈 전 모든 테스트/린트 통과
+* [x] 저장소 파일 정리 필요성 파악 (obsolete/legacy/keep 등)
+* [x] 코드 구조 및 책임 분리 진단
+* [x] 테스트 신뢰도 분석 및 구멍 발견
+* [x] 정리 계획이 담긴 리포트(`docs/notes/cleanup-audit-report-2026-02-27.md`) 생성
 
 ### Next command to run
 
-* (없음. 릴리즈 패키징 단계로 이동)
+* (User 리뷰 후 결정, 현재 없음)
 
 ### If blocked, fallback check
 
-* (완료됨)
+* (해당 없음)
 
 ---
 
@@ -66,6 +66,11 @@ Update this file at the **start and end** of every stage/task.
 * (Phase A) PROGRESS_LOG 릴리즈 항목 중복 제거 및 구버전 (Current) 꼬리표 정리 완료.
 * (Phase B) `test/e2e/harness/sanitize_test.go` 파일 구축. 빈 문자열(`""` -> `"unknown"`), 공백정리(`"  "` -> `"unknown"`), 경로구분자, 특수문자 치환 등 파일시스템 보호를 위한 10종 엣지케이스 Table-driven 테스트로 방어력 증명 완료 (기존 함수 수정 없이 통과).
 
+### Stage Cleanup Audit & Diagnostics
+
+* 저장소 구조/테스트 신뢰성에 대한 진단(Audit) 실시 및 `docs/notes/cleanup-audit-report-2026-02-27.md` 제출.
+* 발견 사항 요약: 루트 디렉토리의 임시 로그(`.log`, `e2e.test`) 방치, `test/e2e` 폴더 내의 Dummy Controller 배포 코드가 더 이상 유효하지 않은 Legacy 상태(Broken E2E), `pkg/kubeutil`의 YAML Sprintf 하드코딩 부채(`TODO(security)`), 그리고 `test/e2e/harness/session.go` 내의 Fetcher Adapter 결합 관찰.
+
 ---
 
 ## Pending Items
@@ -77,7 +82,13 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* (없음 — 현재 논의된 모든 T-3 엣지케이스 및 검증 완료)
+* [ ] Cleanup Execution (Phase 1, 2, 3)
+* 제안 내역:
+  1. (Quick Win) 루트 디렉토리의 의미 없는 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 정리
+  2. (Structure) 결합도를 높이는 `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 정리
+  3. (Testing) `kube-slint` 라이브러리에 적합하지 않게 망가져버린 순수 통신망 `test/e2e` 재편성
+* 이 중에서 어느 Phase부터 시작할지 논의 및 결정 필요.
+* 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
 
