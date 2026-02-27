@@ -5,25 +5,26 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — E2E Final Verification
+## Current Status: Stage (Completed) — T-3 SanitizeFilename Reinforcement
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* E2E 파이널 확인 완료
-* 문서 가이드와 하네스의 통합 안정성 점검 완료
+* Phase A 문서/로그 미세보완 완료
+* Phase B (T-3) SanitizeFilename 엣지 케이스 단위 테스트 보강 완료
 
 ### Definition of Done (DoD)
 
-* [x] 실제 E2E 테스트 환경에서의 동작이 철학과 맞는지 점검
-* [x] 누락된 엣지 케이스나 런타임 에러가 발생하지 않음
-* [x] 문서(가이드)에 나온 설정과 실제 하네스의 동작 정합성 일치
+* [x] 7.4항 Partial 설명 정밀도 보완
+* [x] PROGRESS_LOG.md 중복/Current 항목 정리
+* [x] 빈 값, 공백, 패스 구분자, 특수기호 케이스 커버 보완
+* [x] 릴리즈 전 모든 테스트/린트 통과
 
 ### Next command to run
 
-* (완료되어서 없음; 릴리즈 패키징 단계로 이동)
+* (없음. 릴리즈 패키징 단계로 이동)
 
 ### If blocked, fallback check
 
@@ -53,11 +54,17 @@ Update this file at the **start and end** of every stage/task.
 * (Docs) 초보자 가독성을 위한 상태 계층(Status Layers) 표 도입 및 JSON 예시 추가 조치 완료
 * (Docs) 마감용 리터치를 통한 7.3/7.4 상태 표현 계층 및 JSON 해석 문장의 용어 정밀화 완료
 
-### Stage E2E Final Verification (Current)
+### Stage E2E Final Verification
 
 * (Verification) `test/e2e` 매니저 컨트롤러 구버전 테스트 코드 발견 및 무시(repository가 library로 전환된 철학에 맞지 않음). `test/e2e/harness`의 시뮬레이터 및 Go JSON 정합성 테스트로 Fallback 수행.
 * (Verification) Gating/Strictness 실패 시 `harness.Attach` 에러 전파 흡수 여부 확인(테스트 실패시키지 않고 GinkgoWriter에 로그 남김 -> "테스트!=측정실패" 철학 준수).
 * (Docs Patch) 섹션 6.3에 `Attach` 훅의 로그-only 에러 삼킴 규칙을 소규모 명시 패치하여 Artifact 부재 경고 타당성 최종 확인.
+
+### Stage Phase A/B (T-3 SanitizeFilename 보강)
+
+* (Phase A) 문서 v1.2 가이드 7.4항 "Partial" 조건 설명 시 평가 스킵이 아닌 보조 지표 누락 가능성을 명확히 분리 서술.
+* (Phase A) PROGRESS_LOG 릴리즈 항목 중복 제거 및 구버전 (Current) 꼬리표 정리 완료.
+* (Phase B) `test/e2e/harness/sanitize_test.go` 파일 구축. 빈 문자열(`""` -> `"unknown"`), 공백정리(`"  "` -> `"unknown"`), 경로구분자, 특수문자 치환 등 파일시스템 보호를 위한 10종 엣지케이스 Table-driven 테스트로 방어력 증명 완료 (기존 함수 수정 없이 통과).
 
 ---
 
@@ -70,14 +77,11 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] SanitizeFilename 엣지 케이스 테스트 보강
-* 이유: T-2 라운드에서 의도적으로 후순위로 미룬 사항으로, E2E 파이널 확인 이후 파일 저장 관련 버그 방지를 위해 가벼운 T-3 패치로 편입할지 논의 필요.
-* 승인 필요: **Yes (user + ChatGPT)**
+* (없음 — 현재 논의된 모든 T-3 엣지케이스 및 검증 완료)
 
 ### Follow-up (deferred)
 
 * [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
-* [ ] 릴리즈 및 태그 작업 (버전 컷)
 
 ### Backlog (optional)
 

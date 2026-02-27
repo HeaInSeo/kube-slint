@@ -426,7 +426,7 @@ SLI 결과가 좋아 보여도:
 1. **`results[].status` 가 `Fail` 이 떴을 때**:
    - `reliability.evaluationStatus`가 `Complete`인지 먼저 확인합니다. Complete인데 Fail이 떴다면 **진짜 오퍼레이터 코드상 기능 회귀/성능 저하**일 확률이 높습니다. PR 머지를 보류합니다.
 2. **`results[].status` 가 `Skip` 이거나 `reliability.collectionStatus` 가 `Partial` 일 때**:
-   - 지표가 수집되지 않아 통과/실패 판단을 건너뛴 상태입니다. `CheckGating` 모드가 `fail` 수준이 아니라면 이 상태는 E2E 테스트 전체를 실패시키지 않습니다. PR 코드는 정상 기능한다고 보고 머지 결정을 내릴 수 있으나, 향후 계측 환경 정비 작업이 백로그에 쌓여야 합니다.
+   - 지표 수집이 불안정해 일부 보조 정보가 누락되었거나(`Partial`), 핵심 평가 자체가 보류(`Skip`)된 상태입니다. `CheckGating` 모드가 `fail` 수준이 아니라면 이 상태는 E2E 테스트 전체를 실패시키지 않습니다. 핵심 SLI가 정상 작동했다면 PR 코드는 정상 기능한다고 보고 머지 결정을 내릴 수 있으나, 향후 계측 환경 정비 작업이 백로그에 쌓여야 합니다.
 
 ---
 
