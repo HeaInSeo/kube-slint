@@ -5,26 +5,27 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Cleanup Audit & Diagnostics
+## Current Status: Stage (Completed) — Cleanup Execution (Phases 1 & 3)
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* 저장소 파일/구조/테스트 신뢰성에 대한 진단(Audit) 완료
-* 증거 기반 정리(Cleanup) 대상 파악 및 우선순위가 제안된 보고서 작성 완료
+* Phase 1 Cleanup (불필요/로그 파일 정리) 완료
+* Phase 3 Cleanup (Legacy E2E Quarantine) 처리 완료
+* 릴리즈 준비 상태 돌입
 
 ### Definition of Done (DoD)
 
-* [x] 저장소 파일 정리 필요성 파악 (obsolete/legacy/keep 등)
-* [x] 코드 구조 및 책임 분리 진단
-* [x] 테스트 신뢰도 분석 및 구멍 발견
-* [x] 정리 계획이 담긴 리포트(`docs/notes/cleanup-audit-report-2026-02-27.md`) 생성
+* [x] 저장소 루트에 산재된 로컬 테스트 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 영구 제거
+* [x] `test/e2e` 기본 통합 범위에서 제외 (Build Tag 부여로 격리)
+* [x] 격리된 Legacy E2E의 취지와 사용법을 문서(`test/e2e/README.md`)에 명시
+* [x] 상태를 "릴리즈 준비 가능(Ready for Release)"으로 갱신
 
 ### Next command to run
 
-* (User 리뷰 후 결정, 현재 없음)
+* (릴리즈 프로세스 시작 명령 등 사용자 판단)
 
 ### If blocked, fallback check
 
@@ -71,6 +72,12 @@ Update this file at the **start and end** of every stage/task.
 * 저장소 구조/테스트 신뢰성에 대한 진단(Audit) 실시 및 `docs/notes/cleanup-audit-report-2026-02-27.md` 제출.
 * 발견 사항 요약: 루트 디렉토리의 임시 로그(`.log`, `e2e.test`) 방치, `test/e2e` 폴더 내의 Dummy Controller 배포 코드가 더 이상 유효하지 않은 Legacy 상태(Broken E2E), `pkg/kubeutil`의 YAML Sprintf 하드코딩 부채(`TODO(security)`), 그리고 `test/e2e/harness/session.go` 내의 Fetcher Adapter 결합 관찰.
 
+### Stage Cleanup Execution (Phases 1 & 3)
+
+* (Phase 1) 루트 및 각종 디렉토리에 산재되어 있던 방치 파일(`TODO.md`, `code_review.md`, `test_full_v*.log`, `cover.out`, `e2e.test` 등) 삭제. 
+* (Phase 3) Library화로 인해 고장난 `test/e2e` 하위 레거시 테스트(`e2e_test.go`, `e2e_suite_test.go`)들에 `//go:build legacy_e2e` 빌드 태그를 부여하여 표준 `go test ./...` 및 CI 범위에서 100% 격리(Quarantine) 처리함. 
+* (Phase 3) `test/e2e/README.md`를 생성하여 해당 E2E 테스트가 왜 무시되는지, 만일 돌리려면어떻게 해야 하는지 이력 명시 및 `Makefile` `test` 커맨드 정상화(`grep -v /e2e` 꼼수 제거).
+
 ---
 
 ## Pending Items
@@ -82,16 +89,11 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] Cleanup Execution (Phase 1, 2, 3)
-* 제안 내역:
-  1. (Quick Win) 루트 디렉토리의 의미 없는 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 정리
-  2. (Structure) 결합도를 높이는 `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 정리
-  3. (Testing) `kube-slint` 라이브러리에 적합하지 않게 망가져버린 순수 통신망 `test/e2e` 재편성
-* 이 중에서 어느 Phase부터 시작할지 논의 및 결정 필요.
-* 승인 필요: **Yes (user + ChatGPT)**
+* (없음 — 릴리즈 전 필요한 검증/청소 모두 완료)
 
 ### Follow-up (deferred)
 
+* [ ] (Phase 2) `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 해소 (릴리즈 이후로 지연)
 * [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
 
 ### Backlog (optional)

@@ -59,7 +59,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet ## Run tests.
-	go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+	go test ./... -coverprofile cover.out
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
@@ -79,10 +79,10 @@ setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
 test-e2e: manifests generate fmt vet ## Run the e2e tests.
 ifndef USE_EXISTING_CLUSTER
 	$(MAKE) setup-test-e2e
-	KIND_CLUSTER=$(KIND_CLUSTER) go test ./test/e2e/ -v -ginkgo.v
+	KIND_CLUSTER=$(KIND_CLUSTER) go test -tags legacy_e2e ./test/e2e/ -v -ginkgo.v
 	$(MAKE) cleanup-test-e2e
 else
-	go test ./test/e2e/ -v -ginkgo.v
+	go test -tags legacy_e2e ./test/e2e/ -v -ginkgo.v
 endif
 
 .PHONY: cleanup-test-e2e
