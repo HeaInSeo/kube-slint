@@ -345,8 +345,8 @@ harness.Attach(func() harness.SessionConfig {
 - `testing.T` 사용 시: `Fatal()`/`FailNow()` 여부
 - 최종적으로 CI에서 **exit code != 0**로 관찰되는지
 
-> 구현 전/이행 중 상태라면, 이 섹션에 “현재는 로그만 남는다” 같은 상태를 명시적으로 적어야 한다. 모호하게 두면 안 된다.
-> 
+> **⚠️ 현재 구현 상태(v4.4 기준 이행 중) 주의 사항**:
+> 현재 `harness.Attach` 훅에서는 파이프라인 실패(IO 에러, Strictness 블록, GatingPolicy Fail 등) 발생 시 기본적으로 `GinkgoWriter`에 `SLO: End failed (skip): <에러내용>` 형태의 로그만 남기고 에러를 삼킵니다(`nil` 에러로 통과 처리). 따라서 파이프라인 자체의 정상적인 CI(통과) 흐름을 방해하지 않습니다. 테스트 실패로 승격(exit code != 0)시키려면 하네스 외부에서 추가적인 래퍼나 Assertion을 구성해야 합니다.  
 
 ## 6.4 Reliability 보조 지표 및 Skew 임계값 차단
 

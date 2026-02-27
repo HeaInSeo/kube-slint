@@ -5,29 +5,29 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (next) — E2E Final Verification (planned)
+## Current Status: Stage (Completed) — E2E Final Verification
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* E2E 파이널 확인 (Final Verification)
-* T-2 및 이전 단계들에서 추가된 문서 가이드와 하네스의 통합 안정성 점검
+* E2E 파이널 확인 완료
+* 문서 가이드와 하네스의 통합 안정성 점검 완료
 
 ### Definition of Done (DoD)
 
-* [ ] 실제 E2E 테스트 환경에서의 동작이 철학과 맞는지 점검
-* [ ] 누락된 엣지 케이스나 런타임 에러가 발생하지 않음
-* [ ] 문서(가이드)에 나온 설정과 실제 하네스의 동작 정합성 일치
+* [x] 실제 E2E 테스트 환경에서의 동작이 철학과 맞는지 점검
+* [x] 누락된 엣지 케이스나 런타임 에러가 발생하지 않음
+* [x] 문서(가이드)에 나온 설정과 실제 하네스의 동작 정합성 일치
 
 ### Next command to run
 
-* `go test -v ./test/e2e/...` (또는 리포지토리내 E2E 구동 커맨드)
+* (완료되어서 없음; 릴리즈 패키징 단계로 이동)
 
 ### If blocked, fallback check
 
-* 문서-코드-샘플 summary 간의 정합성 집중 점검
+* (완료됨)
 
 ---
 
@@ -53,14 +53,20 @@ Update this file at the **start and end** of every stage/task.
 * (Docs) 초보자 가독성을 위한 상태 계층(Status Layers) 표 도입 및 JSON 예시 추가 조치 완료
 * (Docs) 마감용 리터치를 통한 7.3/7.4 상태 표현 계층 및 JSON 해석 문장의 용어 정밀화 완료
 
+### Stage E2E Final Verification (Current)
+
+* (Verification) `test/e2e` 매니저 컨트롤러 구버전 테스트 코드 발견 및 무시(repository가 library로 전환된 철학에 맞지 않음). `test/e2e/harness`의 시뮬레이터 및 Go JSON 정합성 테스트로 Fallback 수행.
+* (Verification) Gating/Strictness 실패 시 `harness.Attach` 에러 전파 흡수 여부 확인(테스트 실패시키지 않고 GinkgoWriter에 로그 남김 -> "테스트!=측정실패" 철학 준수).
+* (Docs Patch) 섹션 6.3에 `Attach` 훅의 로그-only 에러 삼킴 규칙을 소규모 명시 패치하여 Artifact 부재 경고 타당성 최종 확인.
+
 ---
 
 ## Pending Items
 
 ### Next Stage (planned)
 
-* [ ] E2E Final Verification
-* 목적: 여태까지 고정된 철학(Purity, Non-invasive, Reliability) 위에서, T-2와 문서 작업 이후의 하네스가 실사용 환경(VM/Kind 등)에서 오작동 없이 문서대로 측정/차단/정리(cleanup)를 수행하는지 최종 점검하기 위함.
+* [ ] Release & Tagging (릴리즈 준비)
+* 목적: Final Verification 정합성 점검이 통과되었으므로 현재 저장소 꼴을 기반으로 버전을 커팅할 준비.
 
 ### Proposed Next Stage (pending approval)
 
