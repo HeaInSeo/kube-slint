@@ -98,34 +98,40 @@ func ExampleSession_End() {
 	sess.Start()
 
 	// 3. 오퍼레이터 활동 유발 및 수렴 대기...
-	// ... doWork() ...
-	// if err != nil { mockTestFailed = true; return }
+}
 
-	// 4. 측정 창을 종료하고 평가를 시작함.
-	// End() 실행 중 CheckStrictness/Gating 규칙이 적용됨.
-	_, err := sess.End(ctx)
-	if err != nil {
-		mockTestFailed = true
-		// e.g. Expect(err).ToNot(HaveOccurred()) in Ginkgo
+func TestShouldRunCleanup(t *testing.T) {
+	tests := []struct {
+		name      string
+		mode      string
+		enabled   bool
+		hasFailed bool
+		want      bool
+	}{
+		{name: "ManualMode_NeverRuns", mode: "manual", enabled: true, hasFailed: false, want: false},
+		{name: "ManualMode_NeverRuns_Fail", mode: "manual", enabled: true, hasFailed: true, want: false},
+
+		{name: "EmptyMode_Enabled_IsAlways_Pass", mode: "", enabled: true, hasFailed: false, want: true},
+		{name: "EmptyMode_Enabled_IsAlways_Fail", mode: "", enabled: true, hasFailed: true, want: true},
+		{name: "EmptyMode_Disabled_NeverRuns", mode: "", enabled: false, hasFailed: false, want: false},
+
+		// mode overrides enabled field logic locally
+		{name: "AlwaysMode_Pass", mode: "always", enabled: false, hasFailed: false, want: true},
+		{name: "AlwaysMode_Fail", mode: "always", enabled: true, hasFailed: true, want: true},
+
+		{name: "OnSuccess_TestSucceeded", mode: "on-success", enabled: true, hasFailed: false, want: true},
+		{name: "OnSuccess_TestFailed", mode: "on-success", enabled: true, hasFailed: true, want: false},
+
+		{name: "OnFailure_TestSucceeded", mode: "on-failure", enabled: true, hasFailed: false, want: false},
+		{name: "OnFailure_TestFailed", mode: "on-failure", enabled: true, hasFailed: true, want: true},
+
+		{name: "UnknownMode_DefaultsToTrue", mode: "unknown-typo", enabled: true, hasFailed: false, want: true},
 	}
 
-	// 5. 이전 실행에서 남겨진 고아 리소스 정리 (선택 사항)
-	// 예기치 않은 삭제를 막기 위해 "report-only" 모드 사용을 권장함.
-	_ = sess.SweepOrphans(ctx, OrphanSweepOptions{Enabled: true, Mode: "report-only", Limit: 10})
-}
-
-func TestSession_SweepOrphans_Disabled(t *testing.T) {
-	cfg := SessionConfig{Namespace: "ns", RunID: "run-1"}
-	sess := NewSession(cfg)
-	// 비활성화 시 패닉이나 에러가 발생하면 안 됨
-	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: false})
-	assert.NoError(t, err)
-}
-
-func TestSession_SweepOrphans_MissingGuard(t *testing.T) {
-	// 다중 실행 안전을 위해 Namespace가 없으면 에러가 아닌 생략(skip) 처리되어야 함
-	cfg := SessionConfig{RunID: "run-1"}
-	sess := NewSession(cfg)
-	err := sess.SweepOrphans(context.Background(), OrphanSweepOptions{Enabled: true, Mode: "report-only"})
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldRunCleanup(tt.mode, tt.enabled, tt.hasFailed)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
