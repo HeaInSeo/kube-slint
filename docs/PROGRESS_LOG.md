@@ -5,26 +5,26 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Consistency Patch
+## Current Status: Stage (Completed) — Global Cleanup Diagnostics Audit
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* 과장 표기 보정 및 이전 보존 파일 잔재(Git Tracked)의 완전한 Git 인덱스 제외 정리
-* 문서 표기와 실제 동작 환경 간의 정합성 1:1 매핑 (README 경로 수정 등)
+* 저장소 전역(repo-wide)에 걸친 정체불명 잔재(주석/레거시/구버전 코드) 및 구조/테스트 신뢰성 진단 완료
+* 보존/이동/삭제/복구/문서화를 위한 증거 수집 및 처리 정책 제안 보고서 완료
 
 ### Definition of Done (DoD)
 
-* [x] 저장소 루트에 산재된 로컬 테스트 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 정리 및 Git 트래킹 해제
-* [x] `test/e2e` 기본 통합 범위에서 제외 (Build Tag 부여로 격리)
-* [x] 격리된 Legacy E2E의 취지와 사용법을 문서(`test/e2e/README.md`)에 명시
-* [x] 상태를 정합성 완료 기준으로 갱신 (명시적 릴리즈 확정 문구 제거)
+* [x] 저장소 전체 범위의 “왜 남아있는지” 애매한 잔재 후보 전수 식별
+* [x] 진단 내역을 분류(Keep, Obsolete, Needs confirmation 등)하여 목록화
+* [x] 후보별 존재 이유 및 조치 제안을 포함한 계획 수립
+* [x] 전역 진단 보고서(`docs/notes/global-cleanup-diagnostics-2026-02-27.md`) 생성
 
 ### Next command to run
 
-* (사용자 판단 대기)
+* (사용자 정책/우선순위 결정 및 승인 대기)
 
 ### If blocked, fallback check
 
@@ -82,6 +82,13 @@ Update this file at the **start and end** of every stage/task.
 * (Correction) `test/e2e/README.md` 내에 기재된 `e2e_test.go`의 경로 누락(`test/e2e_test.go` -> `test/e2e/e2e_test.go`)을 실제 파일 시스템 구조와 맞게 정합성 수립.
 * (Correction) `PROGRESS_LOG.md` 내의 "100%", "영구 제거", "Ready for Release"와 같은 과장 표현 및 릴리즈 독단 판정 문구를 모두 객관적("격리", "정리", "상태 갱신")인 표현으로 배제함.
 
+### Stage Global Cleanup Diagnostics Audit
+
+* 저장소 전역(repo-wide)을 대상으로 정체불명 잔재(주석/레거시/구버전/TODO 등) 전수 조사 및 진단 보고서 `docs/notes/global-cleanup-diagnostics-2026-02-27.md` 제출.
+* 발견 사항 1: `presets/` 하위 함수들이 100% 주석(`// func`) 처리되어 방치됨 (과거 Registry 방식의 흔적, JSON 선언 방식으로 대체되어 `Likely obsolete`).
+* 발견 사항 2: `test/e2e/harness/session.go` 내의 `curlPodFetcher` 구조체가 하네스 핵심 오케스트레이션과 강하게 결합되어 책임 경계를 흐림 (`Keep but relocate` 대상).
+* 발견 사항 3: 라이브러리에 맞지 않는 구시대 쉘 스크립트(`scripts/check-slo-metrics.sh`) 발견 (`Needs confirmation`).
+
 ---
 
 ## Pending Items
@@ -93,7 +100,13 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* (없음 — 릴리즈 전 필요한 검증/청소 모두 완료)
+* [ ] Global Cleanup Execution (Phase 1, 2, 3)
+* 제안 내역 (보고서 기반):
+  1. (Phase 1: Quick Kills) `presets/` 폴더 완전 삭제 및 `scripts/check-slo-metrics.sh` 폐기. (의미 없는 과거 Draft 청소)
+  2. (Phase 2: Extract & Structure) `session.go`의 `curlPodFetcher`를 어댑터(`pkg/slo/fetch/curlpod`)로 분리.
+  3. (Phase 3: Modernize Test Assets) `legacy_e2e` 완전 철거 후 라이브러리 소비 관점(Consumer Mocking)의 단출한 파드 하나 띄우는 새로운 E2E 연동 테스트 구축.
+* 이 중에서 어느 Phase부터 시작할지 논의 및 결정 필요.
+* 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
 
