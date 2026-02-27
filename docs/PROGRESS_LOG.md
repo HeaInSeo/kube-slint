@@ -5,27 +5,26 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Cleanup Execution (Phases 1 & 3)
+## Current Status: Stage (Completed) — Consistency Patch
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* Phase 1 Cleanup (불필요/로그 파일 정리) 완료
-* Phase 3 Cleanup (Legacy E2E Quarantine) 처리 완료
-* 릴리즈 준비 상태 돌입
+* 과장 표기 보정 및 이전 보존 파일 잔재(Git Tracked)의 완전한 Git 인덱스 제외 정리
+* 문서 표기와 실제 동작 환경 간의 정합성 1:1 매핑 (README 경로 수정 등)
 
 ### Definition of Done (DoD)
 
-* [x] 저장소 루트에 산재된 로컬 테스트 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 영구 제거
+* [x] 저장소 루트에 산재된 로컬 테스트 아티팩트(`*.log`, `*.test`, `cover.out`, `TODO.md` 등) 정리 및 Git 트래킹 해제
 * [x] `test/e2e` 기본 통합 범위에서 제외 (Build Tag 부여로 격리)
 * [x] 격리된 Legacy E2E의 취지와 사용법을 문서(`test/e2e/README.md`)에 명시
-* [x] 상태를 "릴리즈 준비 가능(Ready for Release)"으로 갱신
+* [x] 상태를 정합성 완료 기준으로 갱신 (명시적 릴리즈 확정 문구 제거)
 
 ### Next command to run
 
-* (릴리즈 프로세스 시작 명령 등 사용자 판단)
+* (사용자 판단 대기)
 
 ### If blocked, fallback check
 
@@ -74,9 +73,14 @@ Update this file at the **start and end** of every stage/task.
 
 ### Stage Cleanup Execution (Phases 1 & 3)
 
-* (Phase 1) 루트 및 각종 디렉토리에 산재되어 있던 방치 파일(`TODO.md`, `code_review.md`, `test_full_v*.log`, `cover.out`, `e2e.test` 등) 삭제. 
-* (Phase 3) Library화로 인해 고장난 `test/e2e` 하위 레거시 테스트(`e2e_test.go`, `e2e_suite_test.go`)들에 `//go:build legacy_e2e` 빌드 태그를 부여하여 표준 `go test ./...` 및 CI 범위에서 100% 격리(Quarantine) 처리함. 
-* (Phase 3) `test/e2e/README.md`를 생성하여 해당 E2E 테스트가 왜 무시되는지, 만일 돌리려면어떻게 해야 하는지 이력 명시 및 `Makefile` `test` 커맨드 정상화(`grep -v /e2e` 꼼수 제거).
+* (Phase 1) 루트 및 각종 디렉토리에 산재되어 있던 방치 파일(`TODO.md`, `code_review.md`, `test_full_v*.log`, `cover.out`, `e2e.test` 등) 삭제 및 Git Tracked 로그 파일(`lint.log` 등)을 `git rm` 명령으로 저장소 인덱스에서 정리함. 
+* (Phase 3) Library화로 인해 동작하지 않는 `test/e2e` 하위 레거시 테스트(`e2e_test.go`, `e2e_suite_test.go`)들에 `//go:build legacy_e2e` 빌드 태그를 부여하여 표준 `go test ./...` 및 CI 범위에서 격리(Quarantine) 처리함. 
+* (Phase 3) `test/e2e/README.md`를 생성하여 해당 E2E 테스트가 제외된 이력을 명시하고, 파일 경로를 정확히 `test/e2e/...` 하위로 정정함. `Makefile` `test` 커맨드는 `grep -v /e2e` 방식 대신 기본 동작으로 정상화.
+### Stage Consistency Patch
+
+* (Correction) 이전에 지워지지 않고 Git에 임시로 Tracked되어 남아 있던 `lint.log`, `test_full.log` 등 4개 파일을 `git rm`하여 증거 기반으로 제거함.
+* (Correction) `test/e2e/README.md` 내에 기재된 `e2e_test.go`의 경로 누락(`test/e2e_test.go` -> `test/e2e/e2e_test.go`)을 실제 파일 시스템 구조와 맞게 정합성 수립.
+* (Correction) `PROGRESS_LOG.md` 내의 "100%", "영구 제거", "Ready for Release"와 같은 과장 표현 및 릴리즈 독단 판정 문구를 모두 객관적("격리", "정리", "상태 갱신")인 표현으로 배제함.
 
 ---
 

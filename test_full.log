@@ -1,3 +1,0 @@
-kind create cluster --name kube-slint-test-e2e
-ERROR: failed to create cluster: node(s) already exist for a cluster with the name "kube-slint-test-e2e"
-make: *** [Makefile:73: setup-test-e2e] Error 1
