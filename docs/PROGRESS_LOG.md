@@ -5,26 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Global Cleanup Diagnostics Audit
+## Current Status: Stage (Completed) — Cleanup Execution 2 (Phase 1-lite & Phase 3-prep)
 
 **Branch:** `main`
 **Last updated:** 2026-02-27
 
 ### Current Focus
 
-* 저장소 전역(repo-wide)에 걸친 정체불명 잔재(주석/레거시/구버전 코드) 및 구조/테스트 신뢰성 진단 완료
-* 보존/이동/삭제/복구/문서화를 위한 증거 수집 및 처리 정책 제안 보고서 완료
+* 과감한 삭제 전 보수적 접근 도입: 정책 수립 및 부분적 실행 완료
+* 명백한 잔해만 (로컬 임시 파일 등) 제한적 삭제 (Phase 1-lite) 완료
+* 애매한 폴더(`presets/`) 및 스크립트(`check-slo-metrics.sh`)의 처리 정책 결정용 자료 수집 보강 완료
+* 레거시 E2E 철거 전, 어떻게 소비자 관점의 새 E2E를 재건할지 E2E 현대화 준비 설계 초안 확립 (Phase 3-prep) 완료
 
 ### Definition of Done (DoD)
 
-* [x] 저장소 전체 범위의 “왜 남아있는지” 애매한 잔재 후보 전수 식별
-* [x] 진단 내역을 분류(Keep, Obsolete, Needs confirmation 등)하여 목록화
-* [x] 후보별 존재 이유 및 조치 제안을 포함한 계획 수립
-* [x] 전역 진단 보고서(`docs/notes/global-cleanup-diagnostics-2026-02-27.md`) 생성
+* [x] 저장소 루트/하위 등에서 명백한 임시 파일/잔해 부분 부분적 색출/삭제
+* [x] 정책 결정용 미니 보고서(`docs/notes/cleanup-policy-decision-input-2026-02-27.md`) 생성 (대안 및 추천안 포함)
+* [x] E2E 현대화 준비 설계 초안(`docs/notes/e2e-modernization-prep-2026-02-27.md`) 생성
+* [x] 작업 후 `PROGRESS_LOG.md` 갱신
 
 ### Next command to run
 
-* (사용자 정책/우선순위 결정 및 승인 대기)
+* (사용자 정책 승인 대기)
 
 ### If blocked, fallback check
 
@@ -82,6 +84,12 @@ Update this file at the **start and end** of every stage/task.
 * (Correction) `test/e2e/README.md` 내에 기재된 `e2e_test.go`의 경로 누락(`test/e2e_test.go` -> `test/e2e/e2e_test.go`)을 실제 파일 시스템 구조와 맞게 정합성 수립.
 * (Correction) `PROGRESS_LOG.md` 내의 "100%", "영구 제거", "Ready for Release"와 같은 과장 표현 및 릴리즈 독단 판정 문구를 모두 객관적("격리", "정리", "상태 갱신")인 표현으로 배제함.
 
+### Stage Cleanup Execution 2 (Phase 1-lite & Phase 3-prep)
+
+* 명백한 잔해로 판별된 최상위 `cover.out` 파일을 물리적으로 삭제 (코드 및 기타 아키텍처 비건드림, Read-only 철거)
+* 애매한 항목 삭제 대신 처리 정책 결정을 위해 `docs/notes/cleanup-policy-decision-input-2026-02-27.md` 문서 도출 (`presets/`, `scripts/check-slo-metrics.sh` 정책 비교 및 삭제/이관 추천안).
+* 소비자 단위로써의 테스트를 재건하기 위한 아키텍처 초안(`docs/notes/e2e-modernization-prep-2026-02-27.md`) 수립, E2E가 라이브러리를 어떻게 테스트할지(Mocking Strategy 등)를 선제안.
+
 ### Stage Global Cleanup Diagnostics Audit
 
 * 저장소 전역(repo-wide)을 대상으로 정체불명 잔재(주석/레거시/구버전/TODO 등) 전수 조사 및 진단 보고서 `docs/notes/global-cleanup-diagnostics-2026-02-27.md` 제출.
@@ -100,12 +108,9 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] Global Cleanup Execution (Phase 1, 2, 3)
-* 제안 내역 (보고서 기반):
-  1. (Phase 1: Quick Kills) `presets/` 폴더 완전 삭제 및 `scripts/check-slo-metrics.sh` 폐기. (의미 없는 과거 Draft 청소)
-  2. (Phase 2: Extract & Structure) `session.go`의 `curlPodFetcher`를 어댑터(`pkg/slo/fetch/curlpod`)로 분리.
-  3. (Phase 3: Modernize Test Assets) `legacy_e2e` 완전 철거 후 라이브러리 소비 관점(Consumer Mocking)의 단출한 파드 하나 띄우는 새로운 E2E 연동 테스트 구축.
-* 이 중에서 어느 Phase부터 시작할지 논의 및 결정 필요.
+* [ ] 승인 대기 단계 (실행 여부 결정):
+  1. 정책 결정 보고서 결과 반영: `presets/` 및 `scripts/check-slo-metrics.sh` 삭제(또는 문서화) 승인
+  2. 초안 기반의 Phase 3 실제 착수: 레거시 E2E 철거 및 `harness_integration_test.go` 신규 소비자 테스트(Mock 방식) 구축
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
