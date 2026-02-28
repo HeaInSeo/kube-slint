@@ -5,26 +5,29 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Active) — Stage A: Policy Checkpoint gates
+## Current Status: Stage (Completed) — Stage B: Phase 4-a Consumer Onboarding Probe (Go import)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Stage A) 단계별 실행(Stop-and-Report) 체제 진입.
-* 정책 문서(`cleanup-policy-decision-input-2026-02-28.md` 등)의 조건부 삭제 기준을 **실제 소비자 검증 자산 구축(Phase 4-a/b) 결과**와 명시적으로 동기화하는 정합성 패치 작업.
-* 이후 진행될 Stage B(Phase 4-a: Consumer Onboarding Probe)의 진입 조건(Execution Gate) 명문화.
+* (Stage B 완료) 라이브러리 소비자 UX 검증을 위한 최소 검증 자산 구축 완료.
+* `test/consumer-onboarding/kubebuilder-default-sli/` 하위에 최소 샘플 오퍼레이터(mock)를 구성하여 `envtest` 환경 내에서 `ctrl.NewManager` 구동 성공.
+* `kube-slint`를 Go import 기반(`go mod edit -replace`)으로 연동하여 `Session.Start()` 및 `Session.End()` 호출 성공. Default SLI 측정 최소 경로가 이상 없음을 입증함.
+* 실패/어려움 발생 요인을 분석하여 4분류(문서 UX, API, 구조 배치, 로깅)로 기록 확보 완료.
 
 ### Definition of Done (DoD)
 
-* [x] 정책 문서 간 용어 및 단계 명칭 정합성 확보 완료
-* [x] 삭제 조건이 Phase 4-a(라이브러리 소비) 성공 증거와 직접 연결되도록 정책 문서 보완
-* [x] Stage B 착수 기준(Execution Gate)이 `PROGRESS_LOG.md`에 문서화됨
+* [x] 소비자 관점의 'Default SLI 측정 최소 경로'를 시도하고 결과를 확인함
+* [x] 최소 1회 성공(통합 테스트 PASS) 및 명확한 막힘 지점(setup-envtest 바이너리, Session API 누락 필드 등) 극복 완료
+* [x] 막힘/어려움 포인트가 4분류로 구조화되어 기록됨
+* [x] Stage C 정책 재평가에 쓸 증거(특히 로깅 및 `presets/` 무관성) 획득
+* [x] `PROGRESS_LOG.md`에 Stage B 결과 갱신
 
 ### Next command to run
 
-* (Stage A 종료 보고 및 승인 대기 -> Stage B 진행 대기)
+* (사용자 보고 및 Stage C 진입 승인 대기)
 
 ### If blocked, fallback check
 
@@ -88,10 +91,21 @@ Update this file at the **start and end** of every stage/task.
 * 애매한 항목 삭제 대신 처리 정책 결정을 위해 `docs/notes/cleanup-policy-decision-input-2026-02-28.md` 문서 도출 (`presets/`, `scripts/check-slo-metrics.sh` 정책 비교 및 삭제/이관 추천안). 과감한 삭제 전 사용자 결정 요쳥.
 * 소비자 단위로써의 테스트를 재건하기 위한 아키텍처 초안(`docs/notes/e2e-modernization-prep-2026-02-28.md`) 수립, Mock Server 기반의 Harness Integration Test 전략 선제안 (대규모 삭제 전초 작업).
 
-### Stage A — Policy Checkpoint gates (Stop-and-Report 단계 진입)
+### Stage A — Policy Checkpoint gates (Stop-and-Report)
 
 * 증거 확보 전 삭제 금지 기조에 따라, `cleanup-policy-decision-input-2026-02-28.md` 내에 기재된 조건부 삭제 조항(`Delete (Conditional)`)을 단순히 '문서 예제 존재 확인'에서 **'Phase 4-a 소비자 검증 자산 성공 확보'**라는 구체적이고 물리적인 Execution Gate로 치환함.
-* `pkg/` 변경 금지 및 `test/consumer-onboarding/` 산출물 강제 정책 등을 Stage B의 가이드라인으로 본 문서에 공식화함.
+* `pkg/` 변경 금지 및 `test/consumer-onboarding/` 산출물 배치 준수 가이드라인 등을 공식화하여 문서 간 정합성을 일치시킴.
+* Stage B 시작 시점에 정책 체크박스 문구를 정밀화("Approve conditional delete policy (JSON examples + Phase 4-a success evidence)?")하는 Preflight 반영 완료.
+
+### Stage B — Phase 4-a: Consumer Onboarding Probe (Go import)
+
+* `test/consumer-onboarding/kubebuilder-default-sli/` 하위에 최소화된 빈 깡통 Reconciler 기반 샘플 구축.
+* `envtest`를 사용해 테스트 클러스터 메모리에 매니저를 띄우고 `kube-slint` Harness `NewSession` -> `Start()` -> `End()` 사이클 호출 확인 (PASS 증거 획득).
+* **관찰 결과 (4분류 분석)**:
+  1. **문서 UX 문제**: `harness` API 사용 시 필수 설정(`Namespace`, `MetricsServiceName` 등)이 무엇인지 컴파일러 레벨에서 직관적이지 않음 (추후 가이드라인 보강 필요 증거).
+  2. **API/인터페이스 문제**: 소비자 입장에서 `spec.PromMetric()` 보다 `spec.UnsafePromKey()`를 써야 하는 등 Spec 선언 과정의 구조체가 모호함.
+  3. **테스트 자산 배치/구조 문제**: `setup-envtest` 바이너리(`test-operator/bin/k8s`)가 상위 폴더에 의존하여 Consumer 측 복사(cp)가 필요했음 (단독 실행 배포 시 약점). 
+  4. **로깅/디버깅 문제**: `Session.Start()` 실행 시 Endpoint 스크랩 실패 등은 `kube-slint [discovery]:` 등 유의미한 표준 출력 정보가 다수 발생하어 쉘 스크립트(`check-slo-metrics.sh`) 없이도 로깅 수준이 충분함을 교차 검증함.
 
 ### Stage Global Cleanup Diagnostics Audit
 
@@ -111,9 +125,8 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] **Stage B — Phase 4-a: Consumer Onboarding Probe (Go import 기반)** 승인 대기.
-  - 실행 계획: `test/consumer-onboarding/kubebuilder-default-sli/` 하위에 최소 Kubebuilder 샘플 오퍼레이터 레이아웃을 구성하고, 외부 소비자 관점에서 `kube-slint` 라이브러리를 임포트하여 Default SLI 측정에 성공할 수 있는지 입증하는 Validation Asset 구성.
-  - 이 Asset이 통과해야만 그 결과를 토대로 `presets/` 와 `scripts` 파일들의 물리적 삭제(Stage C)를 재평가할 자격이 생김.
+* [ ] **Stage C — Stage B 결과 반영 및 정책 삭제 조건 재평가** 승인 대기.
+  - 실행 계획: Stage B에서 확보한 증거(특히 디버깅 로그 충분성)를 바탕으로 삭제 조건 충족/미충족 상태를 정책 문서에 갱신.
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)

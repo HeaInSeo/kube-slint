@@ -69,5 +69,5 @@ Before the V4 Harness (Session Engine) correctly polled and evaluated PromQL JSO
 
 ## 3. Approval Checkbox (For User + ChatGPT)
 
-- [ ] `presets/`: Approve recommended policy (Delete after confirming JSON examples)?
-- [ ] `check-slo-metrics.sh`: Approve recommended policy (Delete after confirming harness logging)?
+- [ ] `presets/`: Approve conditional delete policy (JSON examples + Phase 4-a success evidence)?
+- [ ] `check-slo-metrics.sh`: Approve conditional delete policy (harness debug sufficiency + Phase 4-a/4-b evidence)?
