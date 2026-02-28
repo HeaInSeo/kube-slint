@@ -80,7 +80,7 @@ Before the V4 Harness (Session Engine) correctly polled and evaluated PromQL JSO
 
 ## 3. Approval Checkbox (For User + ChatGPT)
 
-*(Note: The following checkboxes represent policy approval only. Execution will follow upon approval.)*
+*(Note: The following checkboxes represent historical policy approval. Execution was completed after approval.)*
 
 - [x] `presets/`: Approve conditional delete policy (JSON examples + Phase 4-a success evidence)?
   - -> **Stage E Judgment**: Execution completed on approved policy.

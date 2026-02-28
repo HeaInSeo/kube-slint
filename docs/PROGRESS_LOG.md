@@ -5,29 +5,33 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Stage E: Approved Cleanup Execution & Final Synthesis
+## Current Status: Stage (Active) — Release & Tagging Preparation
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Stage E 완료) 사용자 정책 승인에 따라 Phase 1-lite 및 Phase 3-prep으로 보류했던 대상들의 물리 삭제 전격 단행.
-* 삭제 완료 항목: `presets/` 전체 및 `scripts/check-slo-metrics.sh` 스크립트 삭제.
-* Stage A~D의 전체 검증 맥락을 종합하여, 로깅 충분성과 라이브러리 사용성(UX) 판정 완료.
-* Stage D에서 판별된 수많은 Kustomize 구조적 결함(하드코딩 레이블, placeholder 유지 문제 등)은 **삭제 판단과 무관한 인프라 템플릿 부채**로 명확히 분리하여 Backlog로 이관함.
+* (Release Prep) `v1.0.0-rc.1` 릴리즈를 위한 최종 검증 및 문서화 준비.
+* **검증 결과 (Baseline 재확인)**: 
+  - Git tree clean (`git status --short`)
+  - Go module integrity (`go mod tidy`, `git diff --exit-code`)
+  - Harness Unit/Integration (`go test ./test/e2e/harness/...`) 모두 정상 통과.
+* **문서 정합성**: `cleanup-policy-decision-input-2026-02-28.md` 문서를 "승인 대기"에서 "과거 실행 완료(Archive)" 톤으로 교정함.
+* **릴리즈 노트 초안**: `docs/RELEASE_NOTES_DRAFT.md` 작성 완료.
+* **태그 전략 수립**: `v1.0.0-rc.1` 제안 (사유명시, 실행 대기).
 
 ### Definition of Done (DoD)
 
-* [x] `presets/` 물리 삭제 완료
-* [x] `scripts/check-slo-metrics.sh` 물리 삭제 완료
-* [x] 현재 활성 경로 기준 오해 유발 참조 정리 (필요 시) 완료
-* [x] 정책 문서(`cleanup-policy-decision...`)에 실행 완료 상태(Execution completed) 반영
-* [x] `docs/PROGRESS_LOG.md` 결과 갱신 및 Stage D UX 부채 분리
+* [x] 정책 문서 하단 노트 문구(미래형 → 아카이브 톤) 정리 완료
+* [x] 릴리즈 준비 체크리스트 결과가 로그에 기록됨
+* [x] 릴리즈 노트 초안 작성 완료
+* [x] 태그 전략(권장 버전/근거/명령어) 정리 완료
+* [x] `PROGRESS_LOG.md` 갱신 및 실제 태그 생성 미실행 준수
 
 ### Next command to run
 
-* (Release & Tagging 릴리즈 준비 및 버전 커팅)
+* (사용자 보고 및 실제 Release / Tagging 단행 대기)
 
 ### If blocked, fallback check
 
@@ -130,14 +134,23 @@ Update this file at the **start and end** of every stage/task.
 * `docs/notes/cleanup-policy-decision-input-2026-02-28.md`를 갱신하여 Condition Met 상태를 Execution Completed 상태로 변경함.
 * **UX 부채 분리 (Stage D 파생)**: Kustomize 배포용 리소스(config/samples 등)가 `main` 브랜치에 그대로 남아있어 Remote Kustomize 접근 시 하드코딩 오류를 범하는 현상은 여전히 남아있음. 이는 삭제와는 별개의 문제이므로 Kustomize UX 부채로 라벨링하여 배포 구조 정립 과제(Backlog)로 격리함.
 
+### Release & Tagging Preparation
+
+* **태그 전략 (Tag Strategy)**: 제안 버전 `v1.0.0-rc.1`
+  * **근거**: 라이브러리 E2E Harness 코어 로직이 안정화되었고, 불필요한 레거시(Standalone 찌꺼기)가 모두 청소됨. Stage B(Go import) 검증은 통과했으나, Kustomize UX 개선 및 Phase 3(Mock E2E) 구현 등 Consumer 온보딩을 위한 비기능적 백로그가 남았으므로 정식 `v1.0.0` 이전에 Release Candidate 1 을 발행하는 것이 적절함.
+  * **명령어 (실행 대기용)**:
+    1. `git tag -a v1.0.0-rc.1 -m "Release v1.0.0-rc.1: Cleanup and Harness Stabilization"`
+    2. `git push origin v1.0.0-rc.1`
+* **릴리즈 노트 초안**: `docs/RELEASE_NOTES_DRAFT.md` 참조.
+
 ---
 
 ## Pending Items
 
 ### Next Stage (planned)
 
-* [ ] Release & Tagging (릴리즈 준비 / 정리 마무리)
-* 목적: 삭제 자산 처분 및 Consumer 검증이 완료되었으므로 최종 버전을 커팅할 준비.
+* [ ] Release & Tagging Execution (실제 커팅 실행)
+* 목적: 준비된 태그 전략에 맞추어 실제 버전을 퍼블리시하고 GitHub Release 페이지를 구성함.
 
 ### Proposed Next Stage (pending approval)
 
