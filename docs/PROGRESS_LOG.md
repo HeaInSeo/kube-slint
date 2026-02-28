@@ -5,29 +5,29 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Stage D: Phase 4-b Kustomize Consumer UX Probe (Remote Resource)
+## Current Status: Stage (Completed) — Stage E: Approved Cleanup Execution & Final Synthesis
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Stage D 완료) Kustomize 기반 소비자 UX 검증용 validation asset 작동 테스트 완료.
-* `test/consumer-onboarding/kustomize-remote-consumer/` 하위에 Remote Resource(`?ref=...`) 기반의 최소 `kustomization.yaml` 구성 완료.
-* Kustomize 빌드 시 발생하는 오류/UX 한계를 4분류(문서 UX, Kustomize/Ref 경로 문제, 구조 문제, 로깅/오류해석)를 기준으로 정리함.
-* **관찰 요약**: `?ref=<SHA>` 핀 고정과 `//` 경로 지정은 기술적으로 작동하나, `config/default`가 빈 ConfigMap만 반환하며 `config/samples/prometheus`는 `kube-slint` 레이블 하드코딩으로 인해 원격 리소스 수입 시 오히려 수동 조절(Local overrides)이 강제되어 Remote UX 메리트가 상실됨.
+* (Stage E 완료) 사용자 정책 승인에 따라 Phase 1-lite 및 Phase 3-prep으로 보류했던 대상들의 물리 삭제 전격 단행.
+* 삭제 완료 항목: `presets/` 전체 및 `scripts/check-slo-metrics.sh` 스크립트 삭제.
+* Stage A~D의 전체 검증 맥락을 종합하여, 로깅 충분성과 라이브러리 사용성(UX) 판정 완료.
+* Stage D에서 판별된 수많은 Kustomize 구조적 결함(하드코딩 레이블, placeholder 유지 문제 등)은 **삭제 판단과 무관한 인프라 템플릿 부채**로 명확히 분리하여 Backlog로 이관함.
 
 ### Definition of Done (DoD)
 
-* [x] `test/consumer-onboarding/...` 아래 Kustomize remote consumer validation asset 생성 완료
-* [x] remote kustomize 소비 경로를 실제로 시도함 (`?ref=` 핀 고정 포함)
-* [x] 성공/실패와 무관하게 UX 이슈가 구조적으로 기록됨
-* [x] `docs/PROGRESS_LOG.md` 시작/종료 로그 갱신
-* [x] 물리 삭제 실행은 하지 않음
+* [x] `presets/` 물리 삭제 완료
+* [x] `scripts/check-slo-metrics.sh` 물리 삭제 완료
+* [x] 현재 활성 경로 기준 오해 유발 참조 정리 (필요 시) 완료
+* [x] 정책 문서(`cleanup-policy-decision...`)에 실행 완료 상태(Execution completed) 반영
+* [x] `docs/PROGRESS_LOG.md` 결과 갱신 및 Stage D UX 부채 분리
 
 ### Next command to run
 
-* (사용자 보고 및 물리 삭제 실행 단행 / Stage E 진입 대기)
+* (Release & Tagging 릴리즈 준비 및 버전 커팅)
 
 ### If blocked, fallback check
 
@@ -124,6 +124,12 @@ Update this file at the **start and end** of every stage/task.
   3. **배치/구조 문제**: Standalone 파편이 남아있어, 실 사용(`config/samples/prometheus`) 시 리소스의 `matchLabels`가 라이브러리를 쓰는 타겟 Operator가 아니라 `kube-slint` 이름으로 하드코딩되어 있음. 유동적인 `nameReference`나 변수화 없이 Remote 가져오기는 불가능함(오류 없는 사일런트 실패 유발).
   4. **오류 메시지/디버깅 UX 문제**: Kustomize 빌드-어플라이는 에러 없이 통과해버리기 때문에, 사용자는 왜 자기 Metrics가 수집되지 않는지 Kubernetes 내부를 한참 뜯어봐야 하는 심각한 로깅/침묵의 UX를 가짐.
 
+### Stage E — Approved Cleanup Execution & Final Synthesis
+
+* 사용자 승인(User Approval)에 따라 확보된 정책 판단을 바탕으로, `presets/` 전체 디렉토리와 `scripts/check-slo-metrics.sh`를 소스 코드 트랙에서 영구 삭제(git rm) 함.
+* `docs/notes/cleanup-policy-decision-input-2026-02-28.md`를 갱신하여 Condition Met 상태를 Execution Completed 상태로 변경함.
+* **UX 부채 분리 (Stage D 파생)**: Kustomize 배포용 리소스(config/samples 등)가 `main` 브랜치에 그대로 남아있어 Remote Kustomize 접근 시 하드코딩 오류를 범하는 현상은 여전히 남아있음. 이는 삭제와는 별개의 문제이므로 Kustomize UX 부채로 라벨링하여 배포 구조 정립 과제(Backlog)로 격리함.
+
 ---
 
 ## Pending Items
@@ -131,12 +137,13 @@ Update this file at the **start and end** of every stage/task.
 ### Next Stage (planned)
 
 * [ ] Release & Tagging (릴리즈 준비 / 정리 마무리)
-* 목적: Final Verification 정합성 점검 및 정책 평가가 통과되었으므로 삭제 대기 자산(presets, .sh 등)을 처분하고, 릴리즈를 준비함.
+* 목적: 삭제 자산 처분 및 Consumer 검증이 완료되었으므로 최종 버전을 커팅할 준비.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] **Execution Phase — Storage Clean up & Stage E** 승인 대기.
-  - 조건 충족된 `presets/` 및 `scripts/check-slo-metrics.sh` 물리 삭제 전격 단행.
+* [ ] **Phase 3 실제 구현 (Legacy E2E 대체)** 승인 대기.
+  - 실행 계획: `e2e-modernization-prep` 문서를 바탕으로 Mock Operator 및 Harness 동작 테스트를 구축.
+* [ ] (Optional) Kustomize Parameterization 구조 개편 착수.
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)

@@ -34,10 +34,10 @@ Early in the project (v1-v3), `kube-slint` may have planned a "Registry" model w
 **Delete (Conditional)**. Since `kube-slint` is configured entirely by `SessionConfig.Specs` (JSON array) and PromQL metrics, offering "hardcoded Go SLIs" directly contradicts the new design philosophy. 
 **Deletion Condition**: Confirm that equivalent JSON payload examples exist in `docs/current/...` (Custom SLI Tutorial covers this). **AND** successfully complete **Phase 4-a (Consumer Onboarding Probe)** to prove that a library consumer can perform default SLI measurement without relying on any code from `presets/`. Once this Phase 4-a evidence is secured, it is safe to delete.
 
-### Stage B Reevaluation (Evidence-based Judgment)
-**Status: Ready for deletion execution (pending user approval)**
+### Stage E Execution (Final Outcome)
+**Status: Execution completed on approved policy**
 - **Evidence**: In Phase 4-a (Stage B), a minimal Kubebuilder dummy operator (`test/consumer-onboarding/kubebuilder-default-sli`) was able to successfully import the `kube-slint` library and measure the `up` metric (Default SLI) using pure JSON-equivalent strings (e.g., `spec.UnsafePromKey("up")`). 
-- **Conclusion**: The Go code in `presets/` is completely detached and unnecessary for consumer onboarding. The deletion condition is met.
+- **Action Taken**: The `presets/` directory was permanently removed from the repository.
 
 ---
 
@@ -70,11 +70,11 @@ Before the V4 Harness (Session Engine) correctly polled and evaluated PromQL JSO
 **Delete (Conditional)**. Since it undermines the E2E verification cycle (which now fully wraps curl behavior inside its adapter engine), maintaining it provides zero value and promotes manual intervention over automated `sli-summary.json` generation.
 **Deletion Condition**: Verify that the harness logging `curlPodFetcher` is verbose enough to debug metric fetching failures. **AND** successfully complete **Phase 4-a / 4-b (Consumer Onboarding / UX Probe)** to prove that the automated E2E testing pathway provides sufficient telemetry without needing a manual bash script. If the Phase 4 probes log adequately on failure, the script is fully obsolete.
 
-### Stage B Reevaluation (Evidence-based Judgment / Condition Interpretation)
-**Status: Condition met by Stage B; deletion execution deferred until approval**
+### Stage E Execution (Final Outcome)
+**Status: Execution completed on approved policy**
 - **Condition Interpretation (OR vs AND)**: Interpreted as **OR (Phase 4-a is sufficient for log evaluation)**. The primary question was whether the *automated test logs* are sufficient to debug metric failure. Phase 4-a provided exactly an automated test environment via `go test`.
 - **Evidence**: During Phase 4-a, deliberate structural errors (like setup-envtest binary missing or incorrect struct fields) triggered the `harness.Session`. The standard output cleanly emitted `kube-slint [discovery]:` traces and fetcher errors, clearly showing where metric scraping failed. There was zero need to drop into a bash shell to manually hit `check-slo-metrics.sh`.
-- **Conclusion**: The logging sufficiency requirement is met. While Phase 4-b (Kustomize UX) is still needed for *deployment* validation, it is not strictly required to prove the *logging adequacy* of the Go harness. The script is obsolete.
+- **Action Taken**: The `scripts/check-slo-metrics.sh` script was permanently removed from the repository.
 
 ---
 
@@ -82,7 +82,7 @@ Before the V4 Harness (Session Engine) correctly polled and evaluated PromQL JSO
 
 *(Note: The following checkboxes represent policy approval only. Execution will follow upon approval.)*
 
-- [ ] `presets/`: Approve conditional delete policy (JSON examples + Phase 4-a success evidence)?
-  - -> **Stage C Judgment**: Condition Met (Ready for deletion)
-- [ ] `check-slo-metrics.sh`: Approve conditional delete policy (harness debug sufficiency + Phase 4-a/4-b evidence)?
-  - -> **Stage C Judgment**: Condition Met via Phase 4-a logic (Execution deferred)
+- [x] `presets/`: Approve conditional delete policy (JSON examples + Phase 4-a success evidence)?
+  - -> **Stage E Judgment**: Execution completed on approved policy.
+- [x] `check-slo-metrics.sh`: Approve conditional delete policy (harness debug sufficiency + Phase 4-a/4-b evidence)?
+  - -> **Stage E Judgment**: Execution completed on approved policy.
