@@ -1,32 +1,59 @@
-# Kustomize Consumer UX Probe (Phase 4-b)
+# Kustomize Direct Remote Consumption (Explicit Local Override Tutorial)
 
-## Purpose
-This directory contains a minimal validation asset to verify the User Experience (UX) of an external operator consuming `kube-slint`'s observability stack via Kustomize Remote Resources.
+## Context
+You can consume `kube-slint`'s observability layer directly via Kustomize remote resource fetching (`github.com/HeaInSeo/kube-slint//config/samples/prometheus?ref=<SHA>`).
 
-## Validated Paths
-1. `github.com/HeaInSeo/kube-slint//config/default?ref=<SHA>`
-2. `github.com/HeaInSeo/kube-slint//config/samples/prometheus?ref=<SHA>`
+However, the upstream `ServiceMonitor` contains a **hardcoded label** (`app.kubernetes.io/name: kube-slint`). If you simply fetch it as a drop-in without overrides, Prometheus will experience a **Silent Failure** — it won't scrape your operator because the labels won't match. 
 
-## Kustomize UX Findings (4 Categories)
+To solve this, you must apply an **Explicit Local Override (Kustomize Patch)**.
+*(Note: This is a short-term UX mitigation. Long-term structural parameterization of the base manifests is currently deferred.)*
 
-### 1. Document UX
-The main `README.md` correctly identifies the need for `//` (double slash) to separate the repo URL from the subdirectory, and explicitly warns against using `?ref=main` to enforce reproducible pinning. However, the README then instructs the user to "copy/adapt" files from `config/samples/` because `config/default` is an empty placeholder. This creates cognitive dissonance: why use Remote Kustomize if the consumer has to manually copy the files locally anyway?
+## Tutorial: How to Patch for your Operator
 
-### 2. Ref Pinning & Path Validity
-The exact string `github.com/HeaInSeo/kube-slint//config/default?ref=...` works flawlessly at the tool level (`kubectl kustomize`). Kustomize correctly clones the repo at that SHA and injects the overlay's `namespace`.
+You need two files in your deployment Kustomize directory.
 
-### 3. Asset Placement / Structural Issues
-Because this project pivoted from a Standalone Operator to a Library, the `config/` directory is in an awkward transitional state.
-- `config/default` only yields a `kube-slint-observability-placeholder` ConfigMap.
-- `config/samples/prometheus` yields a valid `ServiceMonitor`, but it is hardcoded to `app.kubernetes.io/name: kube-slint`.
-If a consumer imports this remotely, their Prometheus will scrape nothing because their operator's label is different. To be a true "Remote Base", Kustomize components need to be parameterized (e.g., using vars, nameReferences, or Helm charts) rather than hardcoded.
+### 1. The Patch File (`patch-monitor.yaml`)
+Create this file to inject your operator's specific name into the `matchLabels` selector.
 
-### 4. Debugging & Error UX (P4-1 MVP UX Fix Applied)
-If a novice user ignores the text and blindly runs `kustomize build` on the remote resource, they will not get any build errors. The manifests will deploy successfully across the cluster, but no metrics will be scraped. The failure is silent (at the infrastructure level) due to label mismatching.
+**Before (Upstream Base):** `app.kubernetes.io/name: kube-slint`  
+**After (Your Overridden Target):** `app.kubernetes.io/name: my-custom-operator`
 
-**P4-1 Solution (Mock Drop-In UX):**
-To mitigate this UX debt without completely rebuilding `config/samples/` into a Helm chart, we enforce the **Option 1 (Explicit Local Override)** strategy in this consumer testing harness.
-By specifying `patch-monitor.yaml` via standard Kustomize `patchesStrategicMerge`, the consumer overrides the hardcoded `app.kubernetes.io/name` labels with their own operator labels (`my-custom-operator`). This acts as the official templated pattern for parameterization.
+```yaml
+# patch-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controller-manager-metrics-monitor
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: my-custom-operator
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: my-custom-operator
+```
 
-## Conclusion
-The technical mechanism of Kustomize Remote Resources works. The silent failure caused by structural hardcoding is now explicitly circumvented via provided override patterns. In the medium-to-long term, more advanced `replacements` or `helm` strategies may be adopted, but this MVP guarantees functionally sound consumption today.
+### 2. The `kustomization.yaml`
+Import the remote resource and explicitly apply your patch file using the `patches:` block.
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: your-target-namespace
+
+resources:
+# IMPORTANT: ALWAYS pin a specific SHA or tag. Do not use ?ref=main
+- github.com/HeaInSeo/kube-slint//config/samples/prometheus?ref=0f48feb356823dfa12cef8f0500236983b291953
+
+patches:
+- path: patch-monitor.yaml
+```
+
+### 3. Verification
+Render the manifests to confirm your `my-custom-operator` label has successfully mutated the upstream `ServiceMonitor`:
+
+```bash
+kubectl kustomize .
+```

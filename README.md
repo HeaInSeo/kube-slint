@@ -50,7 +50,10 @@ resources:
   - github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>
 ```
 
-> **Note on ServiceMonitors & NetworkPolicies:** Base manifests contain labels specific to individual operators. We have moved the `kube-slint` specific legacy components into `config/samples/`. You MUST copy/adapt these samples to match your target operator's metrics service and labels.
+> **Note on ServiceMonitors (Explicit Local Override Strategy):** Remote Kustomize fetch (`github.com/...`) works technically, but the `config/samples/prometheus` resources still contain hardcoded labels (e.g., `app.kubernetes.io/name: kube-slint`). If used as a direct drop-in, it will cause a **silent failure** because Prometheus will not scrape your operator's pods.
+> 
+> As a short-term recommended mitigation, you must use an **Explicit Local Override (Kustomize Strategic Merge Patch)** in your repository to inject your target operator's name into `spec.selector.matchLabels`. 
+> *(For a full tutorial and patch examples, see [`test/consumer-onboarding/kustomize-remote-consumer/`](test/consumer-onboarding/kustomize-remote-consumer/README.md))*
 
 ---
 

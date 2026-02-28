@@ -50,7 +50,10 @@ resources:
   - github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>
 ```
 
-> **ServiceMonitor 및 NetworkPolicy 관련 안내:** 베이스 리소스 파일에는 각 오퍼레이터에 맞는 특화 라벨이 포함되어 있습니다. 과도하게 종속성을 갖던 기존 레거시 컴포넌트들은 `config/samples/` 아래로 격리되었습니다. 사용자는 본인 오퍼레이터 환경의 메트릭 서비스 라벨에 맞춰 이 샘플들을 복사하고 수정해서 사용해야 합니다.
+> **ServiceMonitors 주의사항 (명시적 패치 오버라이드 전략):** 리소스 원격 가져오기(`github.com/...`) 문법 자체는 정상 동작합니다. 하지만 현재 `config/samples/prometheus` 리소스에는 `kube-slint` 특정 라벨(`app.kubernetes.io/name: kube-slint`)이 하드코딩되어 있습니다. 이를 그대로 사용하면 프로메테우스가 여러분의 오퍼레이터를 스크랩하지 못하는 **조용한 장애(Silent Failure)** 가 발생합니다.
+> 
+> 단기 권장 완화책으로서, 소비자 저장소 측에서 **명시적 로컬 오버라이드(Kustomize Patch)** 를 통해 `spec.selector.matchLabels`를 여러분의 오퍼레이터 이름으로 덮어씌워야 합니다. (이 구조적 한계의 근본적 개선은 당분간 보류(Deferred) 상태로 남습니다.)
+> *(공식 튜토리얼과 패치 파일 예시는 [`test/consumer-onboarding/kustomize-remote-consumer/`](test/consumer-onboarding/kustomize-remote-consumer/README.md)를 참고하십시오.)*
 
 ---
 

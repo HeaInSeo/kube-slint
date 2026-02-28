@@ -5,28 +5,25 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Active) — Phase 4 UX Debt Resolution Part 1 (Kustomize Design & MVP)
+## Current Status: Stage (Completed) — Phase 4 UX Debt Resolution (Documented & Deferred)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (P4-1 완료) Stage D에서 확인된 Kustomize Remote Consumer 소비 UX 문제(하드코딩 라벨에 의한 silent failure)를 구조적으로 분해함.
-* **설계 매트릭스 도출**: `docs/notes/kustomize-parameterization-options-2026-02-28.md` 작성. Helm 전환 대신, 기존 Kustomize의 문서식 Explicit Local Override (Option 1) 전략을 단기 MVP로 채택.
-* **MVP 검증 자산 적용 (small diff)**: `test/consumer-onboarding/kustomize-remote-consumer` 자산에 `patches: patch-monitor.yaml` 을 주입하여 작동 증명. Lint/Test/Kustomize 렌더링 검증 모두 통과함.
+* (P4-2 완료) P4-1에서 도출한 **Option 1 (Explicit Local Override)** 패치 전략을 공식 문서(`README.md`, `README(kor).md`, `test/consumer-onboarding/kustomize-remote-consumer/README.md`)에 단기 완화책으로 반영함.
+* **Phase 4 종결**: Remote Kustomize 소비 시 발생하는 UX 부채(하드코딩 라벨 문제)를 문서 가이드를 통해 단기 해소하였으며, 완벽한 Parameterization 구조 개편안(Helm 전환 등)은 장기 과제(Deferred)로 이관하며 본 Phase를 종결함.
 
 ### Definition of Done (DoD)
 
-* [x] Stage D UX 부채 원인 분석 (문제 분해)
-* [x] Parameterization 옵션 매트릭스 문서 작성 완료
-* [x] P4-1 최소 개선안(Option 1 - Explicit Patch) 도출 및 검증 환경 생성
-* [x] Lint, E2E Test, kubectl kustomize Validation PASS
-* [x] `docs/PROGRESS_LOG.md` 갱신
+* [x] 루트 `README.md` 및 한글 가이드에 Kustomize Patch 설명 추가
+* [x] Remote Consumer 테스트 디렉토리 README를 튜토리얼 톤으로 개편
+* [x] `docs/PROGRESS_LOG.md` 갱신 (P4 종결 및 장기개편안 Deferred 반영)
 
 ### Next command to run
 
-* (P4-2 승인 대기 / Kustomize UX 개선안 확대 도입 혹은 Phase 4 종결 선언)
+* (정규 작업 종료 - 다음 단계 승인 대기)
 
 ### If blocked, fallback check
 
@@ -172,27 +169,21 @@ Update this file at the **start and end** of every stage/task.
 
 ## Pending Items
 
-### Legacy E2E Removal Gate Definition (삭제 게이트 완수 목록)
-
 * [x] Happy path (single pass) 검증 완료
 * [x] Missing metric behavior 엣지 케이스 검증 완료
 * [x] Fetch error behavior 엣지 케이스 검증 완료
 * [x] Delta path/state change 계산 검증 완료
 * [x] New mock E2E path passes stably in repeated local runs (0.01초 이내 PASS)
 * [x] `test/e2e/README.md` 업데이트 (대체 경로 안내 및 기존 안내 정돈)
-* [x] `legacy_e2e` 디렉토리 전체 물리 삭제(git rm) 및 GitHub PR 반영
-
-### Next Stage (planned)
-
-* [x] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
+* [x] `legacy_e2e` 격리 자산 집합 전체 물리 삭제(git rm) 및 GitHub PR 반영
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결).
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
 
+* [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
 * [ ] (Phase 2) `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 해소 (릴리즈 이후로 지연)
 * [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
 
