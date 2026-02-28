@@ -5,25 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Release & Tagging (v1.0.0-rc.1)
+## Current Status: Stage (Active) — Phase 4 UX Debt Resolution Part 1 (Kustomize Design & MVP)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Release 완수) 제공해주신 `v1.0.0-rc.1` Release Notes를 `docs/RELEASE_NOTES_DRAFT.md`에 성공적으로 반영했습니다.
-* **마일스톤 종결**: `legacy_e2e` 제거 및 대체 경로 입증이라는 Phase 3 대장정과 함께, `kube-slint`의 Library화 구조 개편이 RC 버전으로 세상에 나오게 되었습니다.
+* (P4-1 완료) Stage D에서 확인된 Kustomize Remote Consumer 소비 UX 문제(하드코딩 라벨에 의한 silent failure)를 구조적으로 분해함.
+* **설계 매트릭스 도출**: `docs/notes/kustomize-parameterization-options-2026-02-28.md` 작성. Helm 전환 대신, 기존 Kustomize의 문서식 Explicit Local Override (Option 1) 전략을 단기 MVP로 채택.
+* **MVP 검증 자산 적용 (small diff)**: `test/consumer-onboarding/kustomize-remote-consumer` 자산에 `patches: patch-monitor.yaml` 을 주입하여 작동 증명. Lint/Test/Kustomize 렌더링 검증 모두 통과함.
 
 ### Definition of Done (DoD)
 
-* [x] `docs/RELEASE_NOTES_DRAFT.md` 갱신 
-* [x] GitHub Release 기록 완료
-* [x] `docs/PROGRESS_LOG.md` 갱신 (RC 릴리즈 공식 종결)
+* [x] Stage D UX 부채 원인 분석 (문제 분해)
+* [x] Parameterization 옵션 매트릭스 문서 작성 완료
+* [x] P4-1 최소 개선안(Option 1 - Explicit Patch) 도출 및 검증 환경 생성
+* [x] Lint, E2E Test, kubectl kustomize Validation PASS
+* [x] `docs/PROGRESS_LOG.md` 갱신
 
 ### Next command to run
 
-* (Kustomize Parameterization 구조 개편 착수 대기)
+* (P4-2 승인 대기 / Kustomize UX 개선안 확대 도입 혹은 Phase 4 종결 선언)
 
 ### If blocked, fallback check
 

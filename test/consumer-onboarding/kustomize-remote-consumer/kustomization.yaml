@@ -6,3 +6,6 @@ namespace: kube-slint-system
 
 resources:
 - github.com/HeaInSeo/kube-slint//config/samples/prometheus?ref=0f48feb356823dfa12cef8f0500236983b291953
+
+patches:
+- path: patch-monitor.yaml

@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controller-manager-metrics-monitor
+  # Overriding the upstream 'kube-slint' hardcoded labels
+  # to match the consumer's specific operator deployment labels.
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: my-custom-operator
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: my-custom-operator
