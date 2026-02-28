@@ -5,28 +5,25 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Phase 3 Actualization (Legacy E2E Replacement & Removal)
+## Current Status: Stage (Completed) — Release & Tagging (v1.0.0-rc.1)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (P3-3 종료) P3-1 MVP와 P3-2 Table-Driven 고도화로 확보한 E2E 대체재를 공식화함.
-* **공식화 실행**: `test/e2e/README.md`를 Mock 기반 Integration Testing 중심으로 전면 개편.
-* **레거시 제거 실행**: `test/e2e/legacy_e2e` 폴더는 존재하지 않았으나, `test/e2e/e2e_suite_test.go`, `test/e2e/e2e_test.go`, `manifests/`, `e2eutil/` 등 사실상 격리되어 있던 레거시 자산을 `git rm` 으로 완전 소각함.
-* **잔여 참조 정돈**: `Makefile`에서 사용되던 `test-e2e` 타겟을 Mock E2E 실행(`go test ./test/e2e/ -run TestHarnessIntegration_TableDriven`)으로 단순화하고 Kind 클러스터 프로비저닝 로직 삭제.
+* (Release 완수) 제공해주신 `v1.0.0-rc.1` Release Notes를 `docs/RELEASE_NOTES_DRAFT.md`에 성공적으로 반영했습니다.
+* **마일스톤 종결**: `legacy_e2e` 제거 및 대체 경로 입증이라는 Phase 3 대장정과 함께, `kube-slint`의 Library화 구조 개편이 RC 버전으로 세상에 나오게 되었습니다.
 
 ### Definition of Done (DoD)
 
-* [x] `test/e2e/README.md` 공식 대체 경로 문서 갱신
-* [x] `legacy_e2e` 격리 파일들(`e2e_test.go` 등) 실제 `git rm` 단행
-* [x] Makefile 내 `test-e2e` 타겟 및 관련 레거시 의존성 소각
-* [x] `docs/PROGRESS_LOG.md` 갱신 (Phase 3 공식 종결)
+* [x] `docs/RELEASE_NOTES_DRAFT.md` 갱신 
+* [x] GitHub Release 기록 완료
+* [x] `docs/PROGRESS_LOG.md` 갱신 (RC 릴리즈 공식 종결)
 
 ### Next command to run
 
-* (Phase 4-a/b Kustomize 구조 개선 승인 대기 또는 GitHub Release 마감)
+* (Kustomize Parameterization 구조 개편 착수 대기)
 
 ### If blocked, fallback check
 
@@ -184,7 +181,7 @@ Update this file at the **start and end** of every stage/task.
 
 ### Next Stage (planned)
 
-* [ ] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
+* [x] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
 
 ### Proposed Next Stage (pending approval)
 
