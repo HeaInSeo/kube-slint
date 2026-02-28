@@ -5,28 +5,27 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Active) — Phase 3 Actualization Part 1 (Legacy E2E Replacement MVP)
+## Current Status: Stage (Active) — Phase 3 Actualization Part 2 (Mock E2E Hardening & Removal Gate)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (P3-1 시작) `legacy_e2e` 제거를 위한 첫 단추로 대체 가능한 소비자 관점 통합 테스트 MVP(Mock Server)를 구축.
-* **설계 선택**: 플레이키니스(Flakiness) 최소화 및 CI 안정성을 위해 무거운 프로세스 대신 `httptest.Server`를 띄우고 `SessionConfig.Fetcher`를 오버라이드하여 `curlPodFetcher` 로직을 우회 검증함. (`pkg` 수정 0건)
-* **검증 결과**: `go test -v ./test/e2e/harness_integration_test.go` 경로 전체 PASS 달성.
-* `legacy_e2e` 폴더는 안전하게 기존 격리 상태를 유지 중.
+* (P3-2 시작) P3-1 MVP를 테이블 기반(Table-Driven) 통합 검증 구조로 고도화.
+* **검증 케이스 확장 완료**: Happy Path, Missing Metric, Network Fetch Error, Delta-ish Scenario, Multi-metric Mixed Result 5가지 시나리오가 100% In-memory 파이프라인(httptest)만으로 통과됨을 입증.
+* **Legacy 사형 게이트 확립**: `legacy_e2e` 폴더를 실제로 삭제하기 위한 정식 조건표(Removal Gate) 초안을 본 문서에 기재함. (이번 단계에서는 물리 삭제 미실행 원칙 준수)
 
 ### Definition of Done (DoD)
 
-* [x] `test/e2e/harness_integration_test.go` 대체 테스트 MVP 추가 완료
-* [x] 새 테스트를 실제 실행 시도하고 PASS 확보
-* [x] `legacy_e2e` 보존 및 P3-2 진입 조건 확보
-* [x] `docs/PROGRESS_LOG.md` 갱신
+* [x] `harness_integration_test.go` 확장 (테이블 기반 시나리오 구성완료)
+* [x] 결함 주입/엣지 케이스 포함 (Missing, Error, Delta)
+* [x] `legacy_e2e` 폴더 보존 밑 제거 게이트 정의
+* [x] `docs/PROGRESS_LOG.md` 갱신 (현재 상태)
 
 ### Next command to run
 
-* (P3-2 진행 승인 대기 / Mock 테스트 고도화 또는 Kustomize UX 부채 해결)
+* (P3-3 진행 승인 대기 / legacy_e2e 폴더 최종 삭제 단행)
 
 ### If blocked, fallback check
 
@@ -148,17 +147,35 @@ Update this file at the **start and end** of every stage/task.
 * **테스트 구조 정합성**: `harness.Session`을 감싸는 단순하고 확실한 mock 테스트 경로 확보. `legacy_e2e`의 무거운 바이너리 파이프라인/배포 로직을 대체할 뼈대가 됨.
 * **API 사용성 검증**: `SessionConfig.Fetcher` 확장이 외부 패키지에서도 완벽하게 열려 있음을 증명함.
 * **안정성 (httptest)**: K8s 의존성이 전혀 없는 100% In-memory 파이프라인이므로 flakiness zero(0.01초 소요).
-* **Legacy 사형 선고 접근**: P3-2에서 다양한 SLI 엣지케이스(Missing Input, Start/End 스냅샷 타임라인)만 추가로 테스트하면 `legacy_e2e` 폴더 전체를 미련 없이 날릴 수 있음.
+
+### Phase 3 Actualization Part 2 (Mock E2E Hardening & Legacy Removal Gate)
+
+* **테스트 커버리지 고도화 완료**: P3-1 MVP를 기반으로 `test/e2e/harness_integration_test.go`를 Table-Driven 형식으로 재구축.
+* **케이스별 실제 관찰 결과 보증**: 
+  - **Missing Metric**: 응답에 Metric 정보가 없으면 Session 엔진이 `Skip` 판정 및 "missing input metrics" 사유를 뿜어냄을 인증.
+  - **Fetch Error**: HTTP 500 에러 주입 시 Session이 뻗지 않고 Panic 없이 `Block/Skip` 상태 반환 및 신뢰도 지표 `Failed/Partial` 구조를 발송하는 것을 검증.
+  - **Delta Path**: 카운터가 증가하는 시나리오(`ComputeDelta`)에서 `Start` (10.0), `End` (25.0) 를 모방하여 정상적으로 Delta 산출치(15.0)가 판정됨을 입증함.
+* **안정성 및 CI 편입도**: `test/e2e/README.md`에 설명된 기존 E2E의 Flakiness 고질병(Pod 재시작, 클러스터 타임아웃 등)이 해당 테스트에선 HTTP Mock 통신으로 처리되므로 완벽히 없음을 확인.
 
 ---
 
 ## Pending Items
 
+### Legacy E2E Removal Gate Definition (삭제 게이트 초안)
+
+* [x] Happy path (single pass) 검증 완료
+* [x] Missing metric behavior 엣지 케이스 검증 완료
+* [x] Fetch error behavior 엣지 케이스 검증 완료
+* [x] Delta path/state change 계산 검증 완료
+* [x] New mock E2E path passes stably in repeated local runs (0.01초 이내 PASS)
+* [ ] `test/e2e/README.md` 업데이트 (대체 경로 안내 및 기존 안내 정돈)
+* [ ] `legacy_e2e` 디렉토리 전체 물리 삭제(git rm) 및 GitHub PR 반영
+
 ### Next Stage (planned)
 
 * [ ] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
-* [ ] **Phase 3 실제 구현 (P3-2)** 승인 대기.
-  - 목표: P3-1의 MVP를 확장하여 `legacy_e2e`에 있던 모든 검증 로직을 커버하고 실제 `legacy_e2e` 폴더를 삭제함.
+* [ ] **Phase 3 실제 구현 (P3-3)** 승인 대기.
+  - 목표: Removal Gate의 잔여 조건(문서 갱신 및 legacy_e2e 물리 삭제)을 실행하고 Phase 3 대장정을 공식 종결함.
 
 ### Proposed Next Stage (pending approval)
 
