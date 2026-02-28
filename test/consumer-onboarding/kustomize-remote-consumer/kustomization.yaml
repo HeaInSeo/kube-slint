@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Creating a complete validation structure mirroring the README
+namespace: kube-slint-system
+
+resources:
+- github.com/HeaInSeo/kube-slint//config/samples/prometheus?ref=0f48feb356823dfa12cef8f0500236983b291953

@@ -5,28 +5,29 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Stage C: Policy Reevaluation (Evidence-based Judgment)
+## Current Status: Stage (Completed) — Stage D: Phase 4-b Kustomize Consumer UX Probe (Remote Resource)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Stage C 완료) Stage B의 4분류 증거를 바탕으로 정책 문서의 삭제 조건 달성 여부 판정 완료.
-* **물리 삭제 진행 금지** 원칙에 따라, `cleanup-policy-decision-input-2026-02-28.md` 문서에 "오퍼레이터가 `presets/` 없이 연동 가능하고, 디버깅 로그(`check-slo-metrics.sh` 불필요)가 충분하다"는 결론을 문서로만 기입함.
-* Kustomize 배포 관점의 별도 Consumer UX 검증(Stage D)의 필요성 분류 완료.
+* (Stage D 완료) Kustomize 기반 소비자 UX 검증용 validation asset 작동 테스트 완료.
+* `test/consumer-onboarding/kustomize-remote-consumer/` 하위에 Remote Resource(`?ref=...`) 기반의 최소 `kustomization.yaml` 구성 완료.
+* Kustomize 빌드 시 발생하는 오류/UX 한계를 4분류(문서 UX, Kustomize/Ref 경로 문제, 구조 문제, 로깅/오류해석)를 기준으로 정리함.
+* **관찰 요약**: `?ref=<SHA>` 핀 고정과 `//` 경로 지정은 기술적으로 작동하나, `config/default`가 빈 ConfigMap만 반환하며 `config/samples/prometheus`는 `kube-slint` 레이블 하드코딩으로 인해 원격 리소스 수입 시 오히려 수동 조절(Local overrides)이 강제되어 Remote UX 메리트가 상실됨.
 
 ### Definition of Done (DoD)
 
-* [x] 정책 문서에 Stage B 증거 반영됨
-* [x] `presets/` 삭제 조건 충족/미충족 상태 객관적 기록 완료 (충족됨)
-* [x] `scripts/check-slo-metrics.sh` 삭제 조건 충족 상태 기록 완료 (충족됨, Phase 4-a / 4-b는 OR 조건으로 해석)
-* [x] Stage D(Phase 4-b) Kustomize UX 검증의 필요성/목적 정리 완료
-* [x] `PROGRESS_LOG.md` 내역 갱신 및 **물리 삭제 미수행** 준수
+* [x] `test/consumer-onboarding/...` 아래 Kustomize remote consumer validation asset 생성 완료
+* [x] remote kustomize 소비 경로를 실제로 시도함 (`?ref=` 핀 고정 포함)
+* [x] 성공/실패와 무관하게 UX 이슈가 구조적으로 기록됨
+* [x] `docs/PROGRESS_LOG.md` 시작/종료 로그 갱신
+* [x] 물리 삭제 실행은 하지 않음
 
 ### Next command to run
 
-* (사용자 보고 및 Stage D 진입 승인 대기)
+* (사용자 보고 및 물리 삭제 실행 단행 / Stage E 진입 대기)
 
 ### If blocked, fallback check
 
@@ -113,20 +114,29 @@ Update this file at the **start and end** of every stage/task.
 * **`scripts/check-slo-metrics.sh` 판정**: Stage B 구동 시 자동화된 파이프라인(Session Engine)이 뿜어내는 수많은 scrape 에러/로그가 디버깅에 충분하다고 판단됨. Phase 4-a / 4-b 필수 조건은 OR 조건(하나면 충분)으로 해석됨. 조건 충족(Condition Met via Phase 4-a).
 * **Stage D와의 연결**: Stage B는 "라이브러리를 임포트하는 Go 소비자"의 입장을 대변함. 쿠버네티스 환경에 인프라(Kustomize Base/Overlays 등)를 심는 "운영/배포 소비자"의 입장은 별개의 검증이 필요함. 따라서 `check-slo-metrics.sh`의 삭제 근거는 확보되었으나, Kustomize Consumer UX를 다루는 Stage D(Phase 4-b)는 인프라 프로비저닝 구조 정합성 확인을 위해 독립적으로 수행되어야 함.
 
+### Stage D — Phase 4-b: Kustomize Consumer UX Probe (Remote Resource)
+
+* Kustomize 환경에서 `kube-slint` 인프라를 소비하는 외부 오퍼레이터의 UX 검증을 위해 `test/consumer-onboarding/kustomize-remote-consumer` 자산을 구축.
+* 테스트 경로: `github.com/HeaInSeo/kube-slint//config/default?ref=0f48f...` 및 `//config/samples/prometheus?ref=0f48f...`
+* **관찰 결과 (4분류 분석)**:
+  1. **문서 UX 문제**: `README.md`는 Remote 핀 고정의 중요성을 잘 명시하나, `config/default`가 빈 껍데기임을 은연중에 인정하며 "로컬 복사 후 변형"을 권유함. 이는 원격 Kustomize 수입을 사실상 사용 불능하게 만드는 모순된 지시사항임.
+  2. **Kustomize 경로/참조(ref pinning) 문제**: 문법적인 Kustomize Remote Fetch(`//`와 `?ref=`)는 정상 동작함. 툴링/경로상의 블로커는 없었음.
+  3. **배치/구조 문제**: Standalone 파편이 남아있어, 실 사용(`config/samples/prometheus`) 시 리소스의 `matchLabels`가 라이브러리를 쓰는 타겟 Operator가 아니라 `kube-slint` 이름으로 하드코딩되어 있음. 유동적인 `nameReference`나 변수화 없이 Remote 가져오기는 불가능함(오류 없는 사일런트 실패 유발).
+  4. **오류 메시지/디버깅 UX 문제**: Kustomize 빌드-어플라이는 에러 없이 통과해버리기 때문에, 사용자는 왜 자기 Metrics가 수집되지 않는지 Kubernetes 내부를 한참 뜯어봐야 하는 심각한 로깅/침묵의 UX를 가짐.
+
 ---
 
 ## Pending Items
 
 ### Next Stage (planned)
 
-* [ ] Release & Tagging (릴리즈 준비)
-* 목적: Final Verification 정합성 점검이 통과되었으므로 현재 저장소 꼴을 기반으로 버전을 커팅할 준비.
+* [ ] Release & Tagging (릴리즈 준비 / 정리 마무리)
+* 목적: Final Verification 정합성 점검 및 정책 평가가 통과되었으므로 삭제 대기 자산(presets, .sh 등)을 처분하고, 릴리즈를 준비함.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] **Stage D — Phase 4-b: Kustomize Consumer UX Probe (Remote Resource)** 승인 대기.
-  - 실행 계획: Go 코드가 아닌, Kustomize를 통해 GitHub Remote Resource(`?ref=main` 금지 등 확인) 형태로 `kube-slint` 인프라를 자신의 클러스터에 배포하는 소비자 환경 검증 자산 구축.
-* [ ] (Optional) Execution Phase: 승인된 `presets/` 및 `scripts/` 물리적 삭제 전격 단행.
+* [ ] **Execution Phase — Storage Clean up & Stage E** 승인 대기.
+  - 조건 충족된 `presets/` 및 `scripts/check-slo-metrics.sh` 물리 삭제 전격 단행.
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
