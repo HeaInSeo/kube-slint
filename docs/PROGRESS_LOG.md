@@ -5,33 +5,29 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Active) — Release & Tagging Preparation
+## Current Status: Stage (Completed) — Release & Tagging Execution
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Release Prep) `v1.0.0-rc.1` 릴리즈를 위한 최종 검증 및 문서화 준비.
-* **검증 결과 (Baseline 재확인)**: 
-  - Git tree clean (`git status --short`)
-  - Go module integrity (`go mod tidy`, `git diff --exit-code`)
-  - Harness Unit/Integration (`go test ./test/e2e/harness/...`) 모두 정상 통과.
-* **문서 정합성**: `cleanup-policy-decision-input-2026-02-28.md` 문서를 "승인 대기"에서 "과거 실행 완료(Archive)" 톤으로 교정함.
-* **릴리즈 노트 초안**: `docs/RELEASE_NOTES_DRAFT.md` 작성 완료.
-* **태그 전략 수립**: `v1.0.0-rc.1` 제안 (사유명시, 실행 대기).
+* (Release Executed) `v1.0.0-rc.1` 태그 생성 및 푸시 완료.
+* **사전 검증**: 워킹 트리 Clean, 기존 태그 부재 확인, `main` 브랜치 확인 후 진행.
+* **실행 내역**:
+  - Annotated tag `v1.0.0-rc.1` 생성 성공.
+  - `origin v1.0.0-rc.1` 원격 푸시 성공.
 
 ### Definition of Done (DoD)
 
-* [x] 정책 문서 하단 노트 문구(미래형 → 아카이브 톤) 정리 완료
-* [x] 릴리즈 준비 체크리스트 결과가 로그에 기록됨
-* [x] 릴리즈 노트 초안 작성 완료
-* [x] 태그 전략(권장 버전/근거/명령어) 정리 완료
-* [x] `PROGRESS_LOG.md` 갱신 및 실제 태그 생성 미실행 준수
+* [x] 워킹 트리 상태, 기존 태그 체크라인 사전 점검 완수
+* [x] `v1.0.0-rc.1` 태그 로컬 생성 
+* [x] `v1.0.0-rc.1` 태그 원격 푸시 
+* [x] 성공 후 `PROGRESS_LOG.md` 결과 갱신
 
 ### Next command to run
 
-* (사용자 보고 및 실제 Release / Tagging 단행 대기)
+* (GitHub Release 페이지 웹 편집 및 다음 개발 Phase 진입 대기)
 
 ### If blocked, fallback check
 
@@ -143,20 +139,24 @@ Update this file at the **start and end** of every stage/task.
     2. `git push origin v1.0.0-rc.1`
 * **릴리즈 노트 초안**: `docs/RELEASE_NOTES_DRAFT.md` 참조.
 
+### Release & Tagging Execution
+
+* 정리된 태그 전략에 따라 `v1.0.0-rc.1` annotated tag 생성 및 `origin` 푸시 완료.
+* (진단용 레거시/정리 상태 종결 및 정식 마일스톤 도달)
+
 ---
 
 ## Pending Items
 
 ### Next Stage (planned)
 
-* [ ] Release & Tagging Execution (실제 커팅 실행)
-* 목적: 준비된 태그 전략에 맞추어 실제 버전을 퍼블리시하고 GitHub Release 페이지를 구성함.
+* [ ] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
+* [ ] **Phase 3 실제 구현 (Legacy E2E 대체)** 승인 대기.
+  - 실행 계획: `e2e-modernization-prep` 문서를 바탕으로 Mock Operator 및 Harness 동작 테스트를 구축.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] **Phase 3 실제 구현 (Legacy E2E 대체)** 승인 대기.
-  - 실행 계획: `e2e-modernization-prep` 문서를 바탕으로 Mock Operator 및 Harness 동작 테스트를 구축.
-* [ ] (Optional) Kustomize Parameterization 구조 개편 착수.
+* [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결).
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
