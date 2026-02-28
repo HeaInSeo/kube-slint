@@ -5,29 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Release & Tagging Execution
+## Current Status: Stage (Active) — Phase 3 Actualization Part 1 (Legacy E2E Replacement MVP)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Release Executed) `v1.0.0-rc.1` 태그 생성 및 푸시 완료.
-* **사전 검증**: 워킹 트리 Clean, 기존 태그 부재 확인, `main` 브랜치 확인 후 진행.
-* **실행 내역**:
-  - Annotated tag `v1.0.0-rc.1` 생성 성공.
-  - `origin v1.0.0-rc.1` 원격 푸시 성공.
+* (P3-1 시작) `legacy_e2e` 제거를 위한 첫 단추로 대체 가능한 소비자 관점 통합 테스트 MVP(Mock Server)를 구축.
+* **설계 선택**: 플레이키니스(Flakiness) 최소화 및 CI 안정성을 위해 무거운 프로세스 대신 `httptest.Server`를 띄우고 `SessionConfig.Fetcher`를 오버라이드하여 `curlPodFetcher` 로직을 우회 검증함. (`pkg` 수정 0건)
+* **검증 결과**: `go test -v ./test/e2e/harness_integration_test.go` 경로 전체 PASS 달성.
+* `legacy_e2e` 폴더는 안전하게 기존 격리 상태를 유지 중.
 
 ### Definition of Done (DoD)
 
-* [x] 워킹 트리 상태, 기존 태그 체크라인 사전 점검 완수
-* [x] `v1.0.0-rc.1` 태그 로컬 생성 
-* [x] `v1.0.0-rc.1` 태그 원격 푸시 
-* [x] 성공 후 `PROGRESS_LOG.md` 결과 갱신
+* [x] `test/e2e/harness_integration_test.go` 대체 테스트 MVP 추가 완료
+* [x] 새 테스트를 실제 실행 시도하고 PASS 확보
+* [x] `legacy_e2e` 보존 및 P3-2 진입 조건 확보
+* [x] `docs/PROGRESS_LOG.md` 갱신
 
 ### Next command to run
 
-* (GitHub Release 페이지 웹 편집 및 다음 개발 Phase 진입 대기)
+* (P3-2 진행 승인 대기 / Mock 테스트 고도화 또는 Kustomize UX 부채 해결)
 
 ### If blocked, fallback check
 
@@ -144,6 +143,13 @@ Update this file at the **start and end** of every stage/task.
 * 정리된 태그 전략에 따라 `v1.0.0-rc.1` annotated tag 생성 및 `origin` 푸시 완료.
 * (진단용 레거시/정리 상태 종결 및 정식 마일스톤 도달)
 
+### Phase 3 Actualization Part 1 (Legacy E2E Replacement MVP)
+
+* **테스트 구조 정합성**: `harness.Session`을 감싸는 단순하고 확실한 mock 테스트 경로 확보. `legacy_e2e`의 무거운 바이너리 파이프라인/배포 로직을 대체할 뼈대가 됨.
+* **API 사용성 검증**: `SessionConfig.Fetcher` 확장이 외부 패키지에서도 완벽하게 열려 있음을 증명함.
+* **안정성 (httptest)**: K8s 의존성이 전혀 없는 100% In-memory 파이프라인이므로 flakiness zero(0.01초 소요).
+* **Legacy 사형 선고 접근**: P3-2에서 다양한 SLI 엣지케이스(Missing Input, Start/End 스냅샷 타임라인)만 추가로 테스트하면 `legacy_e2e` 폴더 전체를 미련 없이 날릴 수 있음.
+
 ---
 
 ## Pending Items
@@ -151,8 +157,8 @@ Update this file at the **start and end** of every stage/task.
 ### Next Stage (planned)
 
 * [ ] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
-* [ ] **Phase 3 실제 구현 (Legacy E2E 대체)** 승인 대기.
-  - 실행 계획: `e2e-modernization-prep` 문서를 바탕으로 Mock Operator 및 Harness 동작 테스트를 구축.
+* [ ] **Phase 3 실제 구현 (P3-2)** 승인 대기.
+  - 목표: P3-1의 MVP를 확장하여 `legacy_e2e`에 있던 모든 검증 로직을 커버하고 실제 `legacy_e2e` 폴더를 삭제함.
 
 ### Proposed Next Stage (pending approval)
 
