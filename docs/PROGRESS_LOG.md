@@ -5,29 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Stage B: Phase 4-a Consumer Onboarding Probe (Go import)
+## Current Status: Stage (Completed) — Stage C: Policy Reevaluation (Evidence-based Judgment)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (Stage B 완료) 라이브러리 소비자 UX 검증을 위한 최소 검증 자산 구축 완료.
-* `test/consumer-onboarding/kubebuilder-default-sli/` 하위에 최소 샘플 오퍼레이터(mock)를 구성하여 `envtest` 환경 내에서 `ctrl.NewManager` 구동 성공.
-* `kube-slint`를 Go import 기반(`go mod edit -replace`)으로 연동하여 `Session.Start()` 및 `Session.End()` 호출 성공. Default SLI 측정 최소 경로가 이상 없음을 입증함.
-* 실패/어려움 발생 요인을 분석하여 4분류(문서 UX, API, 구조 배치, 로깅)로 기록 확보 완료.
+* (Stage C 완료) Stage B의 4분류 증거를 바탕으로 정책 문서의 삭제 조건 달성 여부 판정 완료.
+* **물리 삭제 진행 금지** 원칙에 따라, `cleanup-policy-decision-input-2026-02-28.md` 문서에 "오퍼레이터가 `presets/` 없이 연동 가능하고, 디버깅 로그(`check-slo-metrics.sh` 불필요)가 충분하다"는 결론을 문서로만 기입함.
+* Kustomize 배포 관점의 별도 Consumer UX 검증(Stage D)의 필요성 분류 완료.
 
 ### Definition of Done (DoD)
 
-* [x] 소비자 관점의 'Default SLI 측정 최소 경로'를 시도하고 결과를 확인함
-* [x] 최소 1회 성공(통합 테스트 PASS) 및 명확한 막힘 지점(setup-envtest 바이너리, Session API 누락 필드 등) 극복 완료
-* [x] 막힘/어려움 포인트가 4분류로 구조화되어 기록됨
-* [x] Stage C 정책 재평가에 쓸 증거(특히 로깅 및 `presets/` 무관성) 획득
-* [x] `PROGRESS_LOG.md`에 Stage B 결과 갱신
+* [x] 정책 문서에 Stage B 증거 반영됨
+* [x] `presets/` 삭제 조건 충족/미충족 상태 객관적 기록 완료 (충족됨)
+* [x] `scripts/check-slo-metrics.sh` 삭제 조건 충족 상태 기록 완료 (충족됨, Phase 4-a / 4-b는 OR 조건으로 해석)
+* [x] Stage D(Phase 4-b) Kustomize UX 검증의 필요성/목적 정리 완료
+* [x] `PROGRESS_LOG.md` 내역 갱신 및 **물리 삭제 미수행** 준수
 
 ### Next command to run
 
-* (사용자 보고 및 Stage C 진입 승인 대기)
+* (사용자 보고 및 Stage D 진입 승인 대기)
 
 ### If blocked, fallback check
 
@@ -107,12 +106,12 @@ Update this file at the **start and end** of every stage/task.
   3. **테스트 자산 배치/구조 문제**: `setup-envtest` 바이너리(`test-operator/bin/k8s`)가 상위 폴더에 의존하여 Consumer 측 복사(cp)가 필요했음 (단독 실행 배포 시 약점). 
   4. **로깅/디버깅 문제**: `Session.Start()` 실행 시 Endpoint 스크랩 실패 등은 `kube-slint [discovery]:` 등 유의미한 표준 출력 정보가 다수 발생하어 쉘 스크립트(`check-slo-metrics.sh`) 없이도 로깅 수준이 충분함을 교차 검증함.
 
-### Stage Global Cleanup Diagnostics Audit
+### Stage C — 정책 삭제 조건 재평가 (Evidence-based Judgment)
 
-* 저장소 전역(repo-wide)을 대상으로 정체불명 잔재(주석/레거시/구버전/TODO 등) 전수 조사 및 진단 보고서 `docs/notes/global-cleanup-diagnostics-2026-02-27.md` 제출.
-* 발견 사항 1: `presets/` 하위 함수들이 100% 주석(`// func`) 처리되어 방치됨 (과거 Registry 방식의 흔적, JSON 선언 방식으로 대체되어 `Likely obsolete`).
-* 발견 사항 2: `test/e2e/harness/session.go` 내의 `curlPodFetcher` 구조체가 하네스 핵심 오케스트레이션과 강하게 결합되어 책임 경계를 흐림 (`Keep but relocate` 대상).
-* 발견 사항 3: 라이브러리에 맞지 않는 구시대 쉘 스크립트(`scripts/check-slo-metrics.sh`) 발견 (`Needs confirmation`).
+* Stage B의 결과를 파악하여 `cleanup-policy-decision-input-2026-02-28.md`의 조건부 삭제 조항 달성 여부를 판정함 (물리 삭제 절대 금지 원칙 준수).
+* **`presets/` 판정**: Stage B 통합 테스트에서 패키지 없이 순수 JSON-string 형태로 정상 작동함을 증명. 조건 충족(Condition Met).
+* **`scripts/check-slo-metrics.sh` 판정**: Stage B 구동 시 자동화된 파이프라인(Session Engine)이 뿜어내는 수많은 scrape 에러/로그가 디버깅에 충분하다고 판단됨. Phase 4-a / 4-b 필수 조건은 OR 조건(하나면 충분)으로 해석됨. 조건 충족(Condition Met via Phase 4-a).
+* **Stage D와의 연결**: Stage B는 "라이브러리를 임포트하는 Go 소비자"의 입장을 대변함. 쿠버네티스 환경에 인프라(Kustomize Base/Overlays 등)를 심는 "운영/배포 소비자"의 입장은 별개의 검증이 필요함. 따라서 `check-slo-metrics.sh`의 삭제 근거는 확보되었으나, Kustomize Consumer UX를 다루는 Stage D(Phase 4-b)는 인프라 프로비저닝 구조 정합성 확인을 위해 독립적으로 수행되어야 함.
 
 ---
 
@@ -125,8 +124,9 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] **Stage C — Stage B 결과 반영 및 정책 삭제 조건 재평가** 승인 대기.
-  - 실행 계획: Stage B에서 확보한 증거(특히 디버깅 로그 충분성)를 바탕으로 삭제 조건 충족/미충족 상태를 정책 문서에 갱신.
+* [ ] **Stage D — Phase 4-b: Kustomize Consumer UX Probe (Remote Resource)** 승인 대기.
+  - 실행 계획: Go 코드가 아닌, Kustomize를 통해 GitHub Remote Resource(`?ref=main` 금지 등 확인) 형태로 `kube-slint` 인프라를 자신의 클러스터에 배포하는 소비자 환경 검증 자산 구축.
+* [ ] (Optional) Execution Phase: 승인된 `presets/` 및 `scripts/` 물리적 삭제 전격 단행.
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
