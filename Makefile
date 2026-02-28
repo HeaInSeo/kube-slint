@@ -67,27 +67,9 @@ test: manifests generate fmt vet ## Run tests.
 # - CERT_MANAGER_INSTALL_SKIP=true
 KIND_CLUSTER ?= kube-slint-test-e2e
 
-.PHONY: setup-test-e2e
-setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
-	@command -v $(KIND) >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
-		exit 1; \
-	}
-	$(KIND) create cluster --name $(KIND_CLUSTER)
-
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet ## Run the e2e tests.
-ifndef USE_EXISTING_CLUSTER
-	$(MAKE) setup-test-e2e
-	KIND_CLUSTER=$(KIND_CLUSTER) go test -tags legacy_e2e ./test/e2e/ -v -ginkgo.v
-	$(MAKE) cleanup-test-e2e
-else
-	go test -tags legacy_e2e ./test/e2e/ -v -ginkgo.v
-endif
-
-.PHONY: cleanup-test-e2e
-cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
-	@$(KIND) delete cluster --name $(KIND_CLUSTER)
+test-e2e: manifests generate fmt vet ## Run the modern, mock-based integration tests.
+	go test ./test/e2e/ -run TestHarnessIntegration_TableDriven -v
 
 # Prefer repo-pinned golangci-lint (v2) if present.
 GOLANGCI_LINT ?= ./bin/golangci-lint

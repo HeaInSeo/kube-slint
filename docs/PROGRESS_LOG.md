@@ -5,27 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Active) — Phase 3 Actualization Part 2 (Mock E2E Hardening & Removal Gate)
+## Current Status: Stage (Completed) — Phase 3 Actualization (Legacy E2E Replacement & Removal)
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* (P3-2 시작) P3-1 MVP를 테이블 기반(Table-Driven) 통합 검증 구조로 고도화.
-* **검증 케이스 확장 완료**: Happy Path, Missing Metric, Network Fetch Error, Delta-ish Scenario, Multi-metric Mixed Result 5가지 시나리오가 100% In-memory 파이프라인(httptest)만으로 통과됨을 입증.
-* **Legacy 사형 게이트 확립**: `legacy_e2e` 폴더를 실제로 삭제하기 위한 정식 조건표(Removal Gate) 초안을 본 문서에 기재함. (이번 단계에서는 물리 삭제 미실행 원칙 준수)
+* (P3-3 종료) P3-1 MVP와 P3-2 Table-Driven 고도화로 확보한 E2E 대체재를 공식화함.
+* **공식화 실행**: `test/e2e/README.md`를 Mock 기반 Integration Testing 중심으로 전면 개편.
+* **레거시 제거 실행**: `test/e2e/legacy_e2e` 폴더는 존재하지 않았으나, `test/e2e/e2e_suite_test.go`, `test/e2e/e2e_test.go`, `manifests/`, `e2eutil/` 등 사실상 격리되어 있던 레거시 자산을 `git rm` 으로 완전 소각함.
+* **잔여 참조 정돈**: `Makefile`에서 사용되던 `test-e2e` 타겟을 Mock E2E 실행(`go test ./test/e2e/ -run TestHarnessIntegration_TableDriven`)으로 단순화하고 Kind 클러스터 프로비저닝 로직 삭제.
 
 ### Definition of Done (DoD)
 
-* [x] `harness_integration_test.go` 확장 (테이블 기반 시나리오 구성완료)
-* [x] 결함 주입/엣지 케이스 포함 (Missing, Error, Delta)
-* [x] `legacy_e2e` 폴더 보존 밑 제거 게이트 정의
-* [x] `docs/PROGRESS_LOG.md` 갱신 (현재 상태)
+* [x] `test/e2e/README.md` 공식 대체 경로 문서 갱신
+* [x] `legacy_e2e` 격리 파일들(`e2e_test.go` 등) 실제 `git rm` 단행
+* [x] Makefile 내 `test-e2e` 타겟 및 관련 레거시 의존성 소각
+* [x] `docs/PROGRESS_LOG.md` 갱신 (Phase 3 공식 종결)
 
 ### Next command to run
 
-* (P3-3 진행 승인 대기 / legacy_e2e 폴더 최종 삭제 단행)
+* (Phase 4-a/b Kustomize 구조 개선 승인 대기 또는 GitHub Release 마감)
 
 ### If blocked, fallback check
 
@@ -161,21 +162,29 @@ Update this file at the **start and end** of every stage/task.
 
 ## Pending Items
 
-### Legacy E2E Removal Gate Definition (삭제 게이트 초안)
+### Phase 3 Actualization Part 3 (Final Removal Execution)
+
+* **테스트 전략 문서화**: `test/e2e/README.md`를 갱신하여 현재 레포지토리의 공식 통합 테스트가 Mock 기반 In-memory 테스트임을 명시.
+* **레거시 자산 영구 삭제 완료**: `e2e_test.go`, `e2e_suite_test.go`, `manifests/`, `e2eutil/` 등 기존 `//go:build legacy_e2e`로 봉인되어 있던 파일과 디렉토리를 `git rm` 으로 소각.
+* **결합 끊기**: `Makefile`에서 불필요하게 Kind 클러스터를 띄우고 지우던 고비용 `test-e2e` 스크립트를 깔끔하게 1줄 테스트(`go test ... -run TestHarnessIntegration_TableDriven`)로 대체. K8s 의존성이 테스트 스위트에서 영원히 제거됨.
+
+---
+
+## Pending Items
+
+### Legacy E2E Removal Gate Definition (삭제 게이트 완수 목록)
 
 * [x] Happy path (single pass) 검증 완료
 * [x] Missing metric behavior 엣지 케이스 검증 완료
 * [x] Fetch error behavior 엣지 케이스 검증 완료
 * [x] Delta path/state change 계산 검증 완료
 * [x] New mock E2E path passes stably in repeated local runs (0.01초 이내 PASS)
-* [ ] `test/e2e/README.md` 업데이트 (대체 경로 안내 및 기존 안내 정돈)
-* [ ] `legacy_e2e` 디렉토리 전체 물리 삭제(git rm) 및 GitHub PR 반영
+* [x] `test/e2e/README.md` 업데이트 (대체 경로 안내 및 기존 안내 정돈)
+* [x] `legacy_e2e` 디렉토리 전체 물리 삭제(git rm) 및 GitHub PR 반영
 
 ### Next Stage (planned)
 
 * [ ] GitHub 웹 UI 접속 및 `docs/RELEASE_NOTES_DRAFT.md` 본문 복사하여 정식 Release 기록
-* [ ] **Phase 3 실제 구현 (P3-3)** 승인 대기.
-  - 목표: Removal Gate의 잔여 조건(문서 갱신 및 legacy_e2e 물리 삭제)을 실행하고 Phase 3 대장정을 공식 종결함.
 
 ### Proposed Next Stage (pending approval)
 
