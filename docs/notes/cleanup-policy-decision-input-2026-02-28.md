@@ -32,7 +32,7 @@ Early in the project (v1-v3), `kube-slint` may have planned a "Registry" model w
 
 ### Recommendation (Current Policy)
 **Delete (Conditional)**. Since `kube-slint` is configured entirely by `SessionConfig.Specs` (JSON array) and PromQL metrics, offering "hardcoded Go SLIs" directly contradicts the new design philosophy. 
-**Deletion Condition**: Confirm that equivalent JSON payload examples exist in `docs/current/...` (Custom SLI Tutorial covers this). Once confirmed, safe to delete.
+**Deletion Condition**: Confirm that equivalent JSON payload examples exist in `docs/current/...` (Custom SLI Tutorial covers this). **AND** successfully complete **Phase 4-a (Consumer Onboarding Probe)** to prove that a library consumer can perform default SLI measurement without relying on any code from `presets/`. Once this Phase 4-a evidence is secured, it is safe to delete.
 
 ---
 
@@ -63,7 +63,7 @@ Before the V4 Harness (Session Engine) correctly polled and evaluated PromQL JSO
 
 ### Recommendation (Current Policy)
 **Delete (Conditional)**. Since it undermines the E2E verification cycle (which now fully wraps curl behavior inside its adapter engine), maintaining it provides zero value and promotes manual intervention over automated `sli-summary.json` generation.
-**Deletion Condition**: Verify that the harness logging `curlPodFetcher` is verbose enough to debug metric fetching failures. If it logs adequately on failure, the script is fully obsolete.
+**Deletion Condition**: Verify that the harness logging `curlPodFetcher` is verbose enough to debug metric fetching failures. **AND** successfully complete **Phase 4-a / 4-b (Consumer Onboarding / UX Probe)** to prove that the automated E2E testing pathway provides sufficient telemetry without needing a manual bash script. If the Phase 4 probes log adequately on failure, the script is fully obsolete.
 
 ---
 

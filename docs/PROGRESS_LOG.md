@@ -5,28 +5,26 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Cleanup Execution Phase 1-lite & 3-prep (Policy First, Small Diff)
+## Current Status: Stage (Active) — Stage A: Policy Checkpoint gates
 
 **Branch:** `main`
 **Last updated:** 2026-02-28
 
 ### Current Focus
 
-* 과감한 삭제 전 보수적 접근 도입: 정책 수립 및 부분적 실행 완료
-* 명백한 잔해만 (로컬 임시 파일 등) 제한적 삭제 (Phase 1-lite) 완료 (`cover.out` 등)
-* 애매한 폴더(`presets/`) 및 스크립트(`check-slo-metrics.sh`)의 처리 정책 결정용 자료 수집 보강 완료
-* 레거시 E2E 철거 전, 어떻게 소비자 관점의 새 E2E를 재건할지 E2E 현대화 준비 설계 초안 확립 (Phase 3-prep) 완료
+* (Stage A) 단계별 실행(Stop-and-Report) 체제 진입.
+* 정책 문서(`cleanup-policy-decision-input-2026-02-28.md` 등)의 조건부 삭제 기준을 **실제 소비자 검증 자산 구축(Phase 4-a/b) 결과**와 명시적으로 동기화하는 정합성 패치 작업.
+* 이후 진행될 Stage B(Phase 4-a: Consumer Onboarding Probe)의 진입 조건(Execution Gate) 명문화.
 
 ### Definition of Done (DoD)
 
-* [x] 저장소 루트/하위 등에서 명백한 임시 파일/잔해 부분 부분적 색출/삭제 (`.gitignore`에 `bin/` 추가 통제)
-* [x] 정책 결정용 미니 보고서(`docs/notes/cleanup-policy-decision-input-2026-02-28.md`) 생성 (대안 및 추천안 포함)
-* [x] E2E 현대화 준비 설계 초안(`docs/notes/e2e-modernization-prep-2026-02-28.md`) 생성
-* [x] 작업 후 `PROGRESS_LOG.md` 갱신
+* [x] 정책 문서 간 용어 및 단계 명칭 정합성 확보 완료
+* [x] 삭제 조건이 Phase 4-a(라이브러리 소비) 성공 증거와 직접 연결되도록 정책 문서 보완
+* [x] Stage B 착수 기준(Execution Gate)이 `PROGRESS_LOG.md`에 문서화됨
 
 ### Next command to run
 
-* (사용자 정책 승인 대기)
+* (Stage A 종료 보고 및 승인 대기 -> Stage B 진행 대기)
 
 ### If blocked, fallback check
 
@@ -90,6 +88,11 @@ Update this file at the **start and end** of every stage/task.
 * 애매한 항목 삭제 대신 처리 정책 결정을 위해 `docs/notes/cleanup-policy-decision-input-2026-02-28.md` 문서 도출 (`presets/`, `scripts/check-slo-metrics.sh` 정책 비교 및 삭제/이관 추천안). 과감한 삭제 전 사용자 결정 요쳥.
 * 소비자 단위로써의 테스트를 재건하기 위한 아키텍처 초안(`docs/notes/e2e-modernization-prep-2026-02-28.md`) 수립, Mock Server 기반의 Harness Integration Test 전략 선제안 (대규모 삭제 전초 작업).
 
+### Stage A — Policy Checkpoint gates (Stop-and-Report 단계 진입)
+
+* 증거 확보 전 삭제 금지 기조에 따라, `cleanup-policy-decision-input-2026-02-28.md` 내에 기재된 조건부 삭제 조항(`Delete (Conditional)`)을 단순히 '문서 예제 존재 확인'에서 **'Phase 4-a 소비자 검증 자산 성공 확보'**라는 구체적이고 물리적인 Execution Gate로 치환함.
+* `pkg/` 변경 금지 및 `test/consumer-onboarding/` 산출물 강제 정책 등을 Stage B의 가이드라인으로 본 문서에 공식화함.
+
 ### Stage Global Cleanup Diagnostics Audit
 
 * 저장소 전역(repo-wide)을 대상으로 정체불명 잔재(주석/레거시/구버전/TODO 등) 전수 조사 및 진단 보고서 `docs/notes/global-cleanup-diagnostics-2026-02-27.md` 제출.
@@ -108,9 +111,9 @@ Update this file at the **start and end** of every stage/task.
 
 ### Proposed Next Stage (pending approval)
 
-* [ ] 승인 대기 단계 (선택 사항 실행):
-  1. (Policy Approval) 정책 결정 보고서 결과 반영: `presets/` 및 `scripts/check-slo-metrics.sh` 조건부 완전 삭제 승인.
-  2. (Execution 3) 초안 기반의 Phase 3 실제 착수: 단일 `mock_server.go` 및 `harness_integration_test.go` 작성 후 `legacy_e2e` 완파.
+* [ ] **Stage B — Phase 4-a: Consumer Onboarding Probe (Go import 기반)** 승인 대기.
+  - 실행 계획: `test/consumer-onboarding/kubebuilder-default-sli/` 하위에 최소 Kubebuilder 샘플 오퍼레이터 레이아웃을 구성하고, 외부 소비자 관점에서 `kube-slint` 라이브러리를 임포트하여 Default SLI 측정에 성공할 수 있는지 입증하는 Validation Asset 구성.
+  - 이 Asset이 통과해야만 그 결과를 토대로 `presets/` 와 `scripts` 파일들의 물리적 삭제(Stage C)를 재평가할 자격이 생김.
 * 승인 필요: **Yes (user + ChatGPT)**
 
 ### Follow-up (deferred)
