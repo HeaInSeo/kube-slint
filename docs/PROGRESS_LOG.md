@@ -26,7 +26,7 @@ Update this file at the **start and end** of every stage/task.
 
 ### Next command to run
 
-* (정규 작업 종료 - 다음 단계 승인 대기)
+* (정규 작업 종료 - Phase 6 혹은 Deferred 백로그 우선순위 작업 대기)
 
 ### If blocked, fallback check
 
@@ -160,35 +160,24 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Pending Items
-
-### Phase 3 Actualization Part 3 (Final Removal Execution)
+### Stage Phase 3 Actualization Part 3 (Final Removal Execution)
 
 * **테스트 전략 문서화**: `test/e2e/README.md`를 갱신하여 현재 레포지토리의 공식 통합 테스트가 Mock 기반 In-memory 테스트임을 명시.
 * **레거시 자산 영구 삭제 완료**: `e2e_test.go`, `e2e_suite_test.go`, `manifests/`, `e2eutil/` 등 기존 `//go:build legacy_e2e`로 봉인되어 있던 파일과 디렉토리를 `git rm` 으로 소각.
 * **결합 끊기**: `Makefile`에서 불필요하게 Kind 클러스터를 띄우고 지우던 고비용 `test-e2e` 스크립트를 깔끔하게 1줄 테스트(`go test ... -run TestHarnessIntegration_TableDriven`)로 대체. K8s 의존성이 테스트 스위트에서 영원히 제거됨.
+* **삭제 게이트 완수 증명**: Happy path, Missing metric, Fetch error, Delta path 안정성 보증 및 `test/e2e/README.md` 대체 경로 안내 갱신 완료.
 
 ---
 
 ## Pending Items
 
-* [x] Happy path (single pass) 검증 완료
-* [x] Missing metric behavior 엣지 케이스 검증 완료
-* [x] Fetch error behavior 엣지 케이스 검증 완료
-* [x] Delta path/state change 계산 검증 완료
-* [x] New mock E2E path passes stably in repeated local runs (0.01초 이내 PASS)
-* [x] `test/e2e/README.md` 업데이트 (대체 경로 안내 및 기존 안내 정돈)
-* [x] `legacy_e2e` 격리 자산 집합 전체 물리 삭제(git rm) 및 GitHub PR 반영
-
-### Proposed Next Stage (pending approval)
-
-* 승인 필요: **Yes (user + ChatGPT)**
-
 ### Follow-up (deferred)
 
-* [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
-* [ ] (Phase 2) `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 해소 (릴리즈 이후로 지연)
-* [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
+우선순위에 따른 장기/단기 기술 부채:
+
+1. [ ] (Phase 2 대상) `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 해소 (테스트 코드의 K8s 의존성 분리)
+2. [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
+3. [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
 
 ### Backlog (optional)
 
@@ -198,10 +187,10 @@ Update this file at the **start and end** of every stage/task.
 
 ## Recent Validation Baseline
 
-* `golangci-lint ./...` — PASS (2026-02-27)
-* `go test ./test/e2e/harness/...` — PASS (2026-02-27, harness scope)
-* `go mod tidy` — PASS (2026-02-27)
-* `git diff --exit-code go.mod go.sum` — PASS (2026-02-27)
+* `golangci-lint ./...` — PASS (2026-03-02)
+* `go test ./test/e2e/harness/...` — PASS (2026-03-02)
+* `make test-e2e` — PASS (2026-03-02)
+* `kubectl kustomize test/consumer-onboarding/external-onboarding-validation/kustomize` — PASS (2026-03-02)
 
 ---
 
