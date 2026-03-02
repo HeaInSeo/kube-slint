@@ -25,6 +25,25 @@
 go get github.com/HeaInSeo/kube-slint@latest
 ```
 
+**실클러스터 연동 옵션 (Real-cluster Integration):**
+단순 로컬 테스트가 아닌 **실제 클러스터** 환경에 통합할 때는 자체 서명(Self-signed) 인증서 에러를 무시하거나, 프라이빗 curl 이미지를 바라보도록 `SessionConfig`를 다듬어 줄 수 있습니다.
+
+```go
+sess := harness.NewSession(harness.SessionConfig{
+    Namespace: "my-operator-system",
+    MetricsServiceName: "my-operator-metrics",
+    Specs: mySpecs,
+    
+    // -- 실클러스터 연동 옵션 (Real-cluster Integration Knobs) --
+    // 자체 서명 인증서 무시 (x509: certificate signed by unknown authority 방지)
+    TLSInsecureSkipVerify: true, 
+    // 프록시/프라이빗 이미지 레지스트리 (Docker-hub rate-limit 대비)
+    CurlImage: "my-private-registry.com/curlimages/curl:latest",
+})
+```
+
+> **RBAC 등 권한 주의:** `kube-slint`의 메트릭 수집기(Fetcher)는 메트릭을 긁어오기 위해 일회용 파드를 생성합니다. 따라서 이 라이브러리를 실행하는 매니저의 `ServiceAccount`에는 타겟 네임스페이스 내에 `pods`를 `create` 할 수 있는 RBAC 롤이 반드시 부여되어 있어야 합니다.
+
 > **참고:** `kube-slint`의 Go 코드는 메트릭을 **계산하고, 평가하여 JSON 결과를 리포팅**하는 역할을 담당합니다. 그 메트릭들을 시각화하거나 수집하도록 돕는 인프라 프로비저닝은 하단 Kustomize 스택의 몫입니다.
 
 ### 2. 관측성 스택 배포 (Kustomize)

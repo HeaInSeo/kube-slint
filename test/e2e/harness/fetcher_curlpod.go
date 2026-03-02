@@ -22,6 +22,8 @@ func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
 	client := curlpod.New(nil, nil)
 	// 필요한 안전 레이블을 추가함
 	client.LabelSelector = fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", impl.RunID)
+	// Apply TLS integration knob
+	client.TLSInsecureSkipVerify = impl.TLSInsecureSkipVerify
 
 	return &curlPodFetcher{
 		impl: impl,

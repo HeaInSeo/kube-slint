@@ -167,11 +167,11 @@ Update this file at the **start and end** of every stage/task.
 * **결합 끊기**: `Makefile`에서 불필요하게 Kind 클러스터를 띄우고 지우던 고비용 `test-e2e` 스크립트를 깔끔하게 1줄 테스트(`go test ... -run TestHarnessIntegration_TableDriven`)로 대체. K8s 의존성이 테스트 스위트에서 영원히 제거됨.
 * **삭제 게이트 완수 증명**: Happy path, Missing metric, Fetch error, Delta path 안정성 보증 및 `test/e2e/README.md` 대체 경로 안내 갱신 완료.
 
-### Stage Phase 2 Extraction (Deferred Refactor)
+### Stage Phase 6-a (P0 DX Unblock)
 
-* **Fetcher 분리 완수**: `test/e2e/harness/session.go` 파일 하단에 강결합 형태로 방치되어 있던 `curlPodFetcher` 임시 기본 구현체를 동작 변경 없이(No behavior change) 순수하게 분리 추출(`fetcher_curlpod.go`)하여 단일 책임 원칙(SRP)을 복구함.
-* **영향 범위**: `pkg/...` 내부나 `harness` 패키지의 외부 공개 API 서명(signature) 변화 없음. 단순 내부 모듈 쪼개기 증거 확보.
-* 참고: `kubeutil` 내부 `TODO(security)` 항목은 구조 개편 범위가 크므로 이번 작업(small refactor)에서 제외하고 백로그에 잔류시킴.
+* **실클러스터 통합 옵션(Knobs) 지원**: `SessionConfig`에 `CurlImage`와 `TLSInsecureSkipVerify` (자체 서명 인증서 무시) 옵션을 추가하고 `fetcher_curlpod`에 전달하여, 방화벽 내부 프라이빗 환경이나 외부 프로메테우스 연동 시 발생하는 Block 요소를 해소.
+* **기본 동작 유지(No Regression)**: 기본 `curl` 이미지 태그 유지 및 TLS 검증(Verify) On 상태를 기본 동작으로 고수.
+* **통합 가이드 반영**: `README.md` 및 `README(Kor).md`에 설정(`sess := harness.NewSession(...)`) 예시 및 RBAC(`create pods`) 관련 최소 주의사항 기재.
 
 ---
 
@@ -181,9 +181,10 @@ Update this file at the **start and end** of every stage/task.
 
 우선순위에 따른 장기/단기 기술 부채:
 
-1. [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
-2. [ ] (Phase 2 후속) `kubeutil` 내 YAML Sprintf 하드코딩 부채(`TODO(security)`/`TODO(refactor)`) 해소
-3. [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
+1. [ ] RBAC 템플릿 및 실클러스터 배포 가이드라인 전면 표준화 (이번 문서 패링 외 본격적인 manifest 제공)
+2. [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
+3. [ ] `kubeutil` 내 YAML Sprintf 하드코딩 부채(`TODO(security)`/`TODO(refactor)`) 해소
+4. [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
 
 ### Backlog (optional)
 

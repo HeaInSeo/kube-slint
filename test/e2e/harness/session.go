@@ -40,6 +40,10 @@ type SessionConfig struct {
 	Fetcher fetch.MetricsFetcher
 	Writer  summary.Writer
 
+	// Real-cluster Integration Knobs
+	CurlImage             string // overrides default curl image
+	TLSInsecureSkipVerify bool   // true to skip self-signed cert verification (pass -k to curl)
+
 	// Internal metadata
 	ConfigSourceType string
 	ConfigSourcePath string
@@ -58,8 +62,9 @@ type sessionImpl struct {
 	Config SessionConfig
 
 	// Tunables (defaults are set in NewSession)
-	ServiceURLFormat string
-	CurlImage        string
+	ServiceURLFormat      string
+	CurlImage             string
+	TLSInsecureSkipVerify bool
 
 	ScrapeTimeout      time.Duration
 	WaitPodDoneTimeout time.Duration
@@ -122,6 +127,11 @@ func NewSession(cfg SessionConfig) *Session {
 		fetcher: cfg.Fetcher,
 		writer:  w,
 	}
+
+	if cfg.CurlImage != "" {
+		impl.CurlImage = cfg.CurlImage
+	}
+	impl.TLSInsecureSkipVerify = cfg.TLSInsecureSkipVerify
 
 	return &Session{impl: impl}
 }

@@ -21,10 +21,11 @@ type Client struct {
 	Runner kubeutil.CmdRunner
 
 	// 옵션 조정 가능 항목
-	Image            string
-	LabelSelector    string
-	PodNamePrefix    string
-	ServiceURLFormat string // e.g. "https://%s.%s.svc:8443/metrics"
+	Image                 string
+	LabelSelector         string
+	PodNamePrefix         string
+	ServiceURLFormat      string // e.g. "https://%s.%s.svc:8443/metrics"
+	TLSInsecureSkipVerify bool   // if true, adds -k to curl
 }
 
 // New 는 안전한 기본값으로 클라이언트를 생성함.
@@ -34,12 +35,13 @@ func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 		r = kubeutil.DefaultRunner{}
 	}
 	return &Client{
-		Logger:           slo.NewLogger(logger),
-		Runner:           r,
-		Image:            "curlimages/curl:latest",
-		LabelSelector:    PodLabelSelector,
-		PodNamePrefix:    "curl-metrics",
-		ServiceURLFormat: "https://%s.%s.svc:8443/metrics",
+		Logger:                slo.NewLogger(logger),
+		Runner:                r,
+		Image:                 "curlimages/curl:latest",
+		LabelSelector:         PodLabelSelector,
+		PodNamePrefix:         "curl-metrics",
+		ServiceURLFormat:      "https://%s.%s.svc:8443/metrics",
+		TLSInsecureSkipVerify: true, // Defaulting to true for backward compatibility with E2E suite
 	}
 }
 
@@ -58,9 +60,13 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	podName := fmt.Sprintf("%s-%d", c.PodNamePrefix, time.Now().UnixNano())
 	metricsURL := fmt.Sprintf(c.ServiceURLFormat, metricsSvcName, ns)
 
-	// 테스트 환경의 자체 서명 인증서를 위해 -k 유지, 출력 깔끔하게 유지 (-v 없음)
+	insecureFlag := ""
+	if c.TLSInsecureSkipVerify {
+		insecureFlag = "-k"
+	}
+
 	curlCmd := fmt.Sprintf(`set -euo pipefail;
-curl -ksS --fail-with-body -H "Authorization: Bearer %s" "%s";`, token, metricsURL)
+curl %s -sS --fail-with-body -H "Authorization: Bearer %s" "%s";`, insecureFlag, token, metricsURL)
 
 	cmd := exec.Command(
 		"kubectl", "run", podName,

@@ -25,6 +25,25 @@ Use the `pkg/slo` library in your own Operator code to calculate Churn Rate, Con
 go get github.com/HeaInSeo/kube-slint@latest
 ```
 
+**Real-cluster Integration Options:**
+When embedding `kube-slint` in a real-cluster environment (outside of local tests), you may need to bypass self-signed metrics TLS certificates or use a private registry for the `curl` image. You can configure these overrides via the `SessionConfig`:
+
+```go
+sess := harness.NewSession(harness.SessionConfig{
+    Namespace: "my-operator-system",
+    MetricsServiceName: "my-operator-metrics",
+    Specs: mySpecs,
+    
+    // -- Real-cluster Integration Knobs --
+    // Bypass x509: certificate signed by unknown authority
+    TLSInsecureSkipVerify: true, 
+    // Proxy/Private registry pull rate-limits
+    CurlImage: "my-private-registry.com/curlimages/curl:latest",
+})
+```
+
+> **Note on RBAC:** The `kube-slint` curl fetcher runs a temporary pod to scrape metrics. Make sure your controller's `ServiceAccount` has RBAC permissions to `create pods` in the target namespace.
+
 > **Note:** `kube-slint` (the Go code) is responsible for *calculating, evaluating, and reporting* SLI JSON outputs inside the cluster harness. The Kustomize stack is entirely responsible for *deploying* the observability targets.
 
 ### 2. Deploying the Observability Stack (Kustomize)
