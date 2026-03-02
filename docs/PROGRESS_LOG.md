@@ -167,6 +167,12 @@ Update this file at the **start and end** of every stage/task.
 * **결합 끊기**: `Makefile`에서 불필요하게 Kind 클러스터를 띄우고 지우던 고비용 `test-e2e` 스크립트를 깔끔하게 1줄 테스트(`go test ... -run TestHarnessIntegration_TableDriven`)로 대체. K8s 의존성이 테스트 스위트에서 영원히 제거됨.
 * **삭제 게이트 완수 증명**: Happy path, Missing metric, Fetch error, Delta path 안정성 보증 및 `test/e2e/README.md` 대체 경로 안내 갱신 완료.
 
+### Stage Phase 2 Extraction (Deferred Refactor)
+
+* **Fetcher 분리 완수**: `test/e2e/harness/session.go` 파일 하단에 강결합 형태로 방치되어 있던 `curlPodFetcher` 임시 기본 구현체를 동작 변경 없이(No behavior change) 순수하게 분리 추출(`fetcher_curlpod.go`)하여 단일 책임 원칙(SRP)을 복구함.
+* **영향 범위**: `pkg/...` 내부나 `harness` 패키지의 외부 공개 API 서명(signature) 변화 없음. 단순 내부 모듈 쪼개기 증거 확보.
+* 참고: `kubeutil` 내부 `TODO(security)` 항목은 구조 개편 범위가 크므로 이번 작업(small refactor)에서 제외하고 백로그에 잔류시킴.
+
 ---
 
 ## Pending Items
@@ -175,8 +181,8 @@ Update this file at the **start and end** of every stage/task.
 
 우선순위에 따른 장기/단기 기술 부채:
 
-1. [ ] (Phase 2 대상) `session.go`에서 `curlPodFetcher` 모듈 분리 및 `kubeutil` 내 `TODO(security)`/`TODO(refactor)` 해소 (테스트 코드의 K8s 의존성 분리)
-2. [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
+1. [ ] Kustomize Parameterization 구조 개편 착수 (Stage D UX 부채 해결을 위한 근본적 분리, Helm 등 장기 옵션 고려).
+2. [ ] (Phase 2 후속) `kubeutil` 내 YAML Sprintf 하드코딩 부채(`TODO(security)`/`TODO(refactor)`) 해소
 3. [ ] `sli-summary.json` CLI Console Output 요약 기능 지원
 
 ### Backlog (optional)
