@@ -5,21 +5,24 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Phase 4 UX Debt Resolution (Documented & Deferred)
+## Current Status: Stage (Completed) — Phase 5-a External Consumer Onboarding Validation
 
 **Branch:** `main`
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-02
 
 ### Current Focus
 
-* (P4-2 완료) P4-1에서 도출한 **Option 1 (Explicit Local Override)** 패치 전략을 공식 문서(`README.md`, `README(kor).md`, `test/consumer-onboarding/kustomize-remote-consumer/README.md`)에 단기 완화책으로 반영함.
-* **Phase 4 종결**: Remote Kustomize 소비 시 발생하는 UX 부채(하드코딩 라벨 문제)를 문서 가이드를 통해 단기 해소하였으며, 완벽한 Parameterization 구조 개편안(Helm 전환 등)은 장기 과제(Deferred)로 이관하며 본 Phase를 종결함.
+* (P5-a 완료) 순수 외부 소비자 시점(External Consumer POV)에서 `kube-slint` Go API 연동 및 Kustomize Observability Stack 원격 수입(Explicit Local Override) 전체 사이클을 검증함.
+* **증거 생성**: `test/consumer-onboarding/external-onboarding-validation` 디렉토리를 별도 Go 모듈(`consumer-validation`)로 구성하여 제품 코드 수정 없이 온보딩 성공 증명.
+* **UX 마찰 요소(Friction) 기록**: 구조적 대공사를 제한하는 대신, 단기/장기적으로 소비자가 겪을 수 있는 문서/API/Kustomize 렌더링 측면의 허들(UX Friction)을 `docs/notes/external-onboarding-validation-2026-03-02.md` 에 기록 완료함.
 
 ### Definition of Done (DoD)
 
-* [x] 루트 `README.md` 및 한글 가이드에 Kustomize Patch 설명 추가
-* [x] Remote Consumer 테스트 디렉토리 README를 튜토리얼 톤으로 개편
-* [x] `docs/PROGRESS_LOG.md` 갱신 (P4 종결 및 장기개편안 Deferred 반영)
+* [x] 외부 소비자 형태의 최소 검증 환경 준비 (`main.go`, `go.mod`, `kustomization.yaml`)
+* [x] Kustomize Explicit Local Override 패치 동작 입증 (P4 연계 검증)
+* [x] Validation 통과 확보 (go build, make lint, make test-e2e, kubectl kustomize)
+* [x] 소비자 관점의 튜토리얼 문서 및 UX 마찰 분석 리포트 작성
+* [x] `docs/PROGRESS_LOG.md` 갱신 (P5-a 직후 상태)
 
 ### Next command to run
 
