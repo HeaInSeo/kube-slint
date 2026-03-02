@@ -202,7 +202,8 @@ Update this file at the **start and end** of every stage/task.
 
 ## Working Guardrails (Do not regress)
 
-* Non-invasive instrumentation (no production operator code instrumentation changes)
+* GitHub Actions CI (Build/Test/Lint) must always pass (절대 실패 금지, 발생 즉시 해결)
+* Non-invasive instrumentation (no production operator code instrumentation)
 * E2E Hook-based measurement
 * Measurement failure != test failure (best-effort / warn / skip)
 * Raw metrics (`/metrics`) vs summarized output (`sli-summary.json`) separation
