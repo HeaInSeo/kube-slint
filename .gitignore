@@ -26,3 +26,7 @@ go.work
 *.swo
 *~
 bin/
+
+# AI assistant local config (not for version control)
+.agent/
+.claude/

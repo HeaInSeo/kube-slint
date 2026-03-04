@@ -1,0 +1,65 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+    # TODO: 자동 트리거 옵션 (현재는 수동 실행만 지원)
+    # - schedule: "0 2 * * 1"  # 매주 월요일 새벽 2시 (야간 배치 기준선 갱신)
+    # - PR label 기반: types: [labeled], label: run-bench
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # 현재 기준 벤치마크 실행 (-count=3: 통계 안정성, benchmem: 메모리 포함)
+      # 벤치마크가 없는 패키지는 "no benchmarks" 출력 후 정상 종료됨
+      - name: Run benchmarks
+        run: |
+          go test -bench=. -benchmem -count=3 ./... 2>&1 | tee bench-current.txt || true
+
+      # 이전 기준선(baseline) artifact 다운로드 (없으면 비교 스텝 skip)
+      - name: Download baseline (if available)
+        id: dl-baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: bench-baseline
+          path: bench-baseline/
+        continue-on-error: true
+
+      # benchstat으로 기준선 대비 성능 비교
+      # 기준선이 없으면 이 스텝은 skip됨
+      - name: Compare with baseline
+        if: steps.dl-baseline.outcome == 'success'
+        run: |
+          if ! command -v benchstat &>/dev/null; then
+            go install golang.org/x/perf/cmd/benchstat@latest
+          fi
+          benchstat bench-baseline/bench-baseline.txt bench-current.txt
+          # TODO: benchstat 출력에서 임계값(예: +10% 이상 성능 저하) 초과 시 exit 1로 실패 처리
+          # 예시: benchstat ... | grep -E '\+[0-9]{2,}%' && echo "PERF_REGRESSION: check output" && exit 1
+
+      # 현재 결과를 artifact로 저장 (30일 보관)
+      # 기준선 갱신은 별도 수동 작업: bench-current.txt → bench-baseline.txt로 rename 후 업로드
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-current
+          path: bench-current.txt
+          retention-days: 30
+
+      # TODO: main 브랜치 push 시 기준선 자동 갱신 전략
+      # - 옵션 A: 별도 job에서 bench-current.txt를 bench-baseline artifact로 저장
+      # - 옵션 B: git branch (e.g., bench-baseline)에 파일 커밋
+      # - 옵션 C: 외부 저장소(S3, GCS) 활용

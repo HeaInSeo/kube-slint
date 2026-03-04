@@ -12,10 +12,18 @@ on:
       - "LICENSE*"
       - ".github/**/*.md"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
@@ -25,8 +33,10 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Running Tests
+      - name: Verify go mod tidy
         run: |
           go mod tidy
-          git diff --exit-code
-          make test
+          git diff --exit-code go.mod go.sum
+
+      - name: Run tests
+        run: make test

@@ -331,6 +331,13 @@ func runCleanupActions(ctx context.Context, ns, runID string) {
 
 // Start begins measurement.
 // Start는 측정을 시작함.
+//
+// fetcher가 fetch.SnapshotFetcher를 구현하는 경우(예: curlPodFetcher),
+// 시작 시점 스냅샷을 미리 캡처한다. 이를 통해 engine.Execute()가 End() 내부에서
+// Fetch()를 두 번 호출할 때 첫 번째 호출이 workload 실행 전 상태를 반환하도록 보장함.
+//
+// 주의: SnapshotFetcher.PreFetch()가 구현된 경우 Start()는 curlpod 실행 시간만큼 블로킹됨.
+// 실패 시 경고를 출력하고 계속 진행함 (non-fatal, kube-slint safety-first 원칙).
 func (s *Session) Start() {
 	if s == nil || s.impl == nil {
 		return
@@ -346,6 +353,22 @@ func (s *Session) Start() {
 		t = time.Now()
 	}
 	s.impl.started = t
+
+	// fetcher가 nil이면(기본 curlpod 경로) 지금 생성하여 End()와 같은 인스턴스를 공유.
+	// startCache는 인스턴스에 저장되므로 동일 인스턴스여야 PreFetch 결과가 Fetch()에서 사용됨.
+	if s.impl.fetcher == nil {
+		s.impl.fetcher = newCurlPodFetcher(s.impl)
+	}
+
+	// fetcher가 SnapshotFetcher를 구현하면 시작 스냅샷을 미리 캡처함 (Gap G 해소).
+	// 구현하지 않는 fetcher(Mock, httptest 등)는 그대로 동작하며 영향을 받지 않음.
+	if sf, ok := s.impl.fetcher.(fetch.SnapshotFetcher); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), s.impl.ScrapeTimeout)
+		defer cancel()
+		if err := sf.PreFetch(ctx); err != nil {
+			fmt.Printf("kube-slint [prefetch]: warning - start snapshot failed: %v\n", err)
+		}
+	}
 }
 
 // End는 측정을 완료함.

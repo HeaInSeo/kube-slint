@@ -4,10 +4,14 @@ on:
   workflow_dispatch:
     # 현재 라이브러리 중심 구조로 변경 중이며, 기존 e2e 스크립트가 맞지 않아 의도적으로 수동 실행(workflow_dispatch)만 허용함.
 
+permissions:
+  contents: read
+
 jobs:
   test-e2e:
     name: Run SLO & E2E Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       # 1. 코드 체크아웃
       - name: Clone the code
@@ -48,15 +52,18 @@ jobs:
           kubectl get pods -n my-operator-system
 
       # 8. 권한 부여 (SLO 검증용)
+      # TODO: cluster-admin은 테스트 편의상 부여. 추후 metrics-reader 수준으로 최소화 필요.
       - name: Grant RBAC Permissions
         run: |
           kubectl create clusterrolebinding default-admin --clusterrole=cluster-admin --serviceaccount=default:default
 
-      # 9. 포트 포워딩
+      # 9. 포트 포워딩 (PID 저장 → cleanup 스텝에서 종료)
       - name: Port Forward Metrics
         run: |
           kubectl port-forward -n my-operator-system deployment/my-operator-controller-manager 8443:8443 &
+          echo "PORT_FWD_PID=$!" >> "$GITHUB_ENV"
           sleep 5
+          curl -sk https://localhost:8443/healthz && echo "metrics endpoint reachable" || echo "WARNING: metrics endpoint not yet responding (continuing)"
 
       # 10. 샘플 CR 생성 (트래픽 발생)
       - name: Create Sample CR
@@ -69,7 +76,7 @@ jobs:
             namespace: default
           spec:
             replicas: 1
-            image: nginx:latest
+            image: nginx:1.27  # latest 태그 지양: 재현성 확보를 위해 구체 버전 사용
             port: 80
           EOF
           sleep 10
@@ -80,3 +87,22 @@ jobs:
         run: |
           chmod +x scripts/check-slo-metrics.sh
           ./scripts/check-slo-metrics.sh
+
+      # 12. 포트 포워딩 종료 (항상 실행)
+      - name: Kill Port Forward
+        if: always()
+        run: |
+          [ -n "$PORT_FWD_PID" ] && kill "$PORT_FWD_PID" 2>/dev/null || true
+
+      # 13. 디버깅 정보 수집 (실패/성공 무관하게 항상 실행)
+      - name: Collect Debug Info
+        if: always()
+        run: |
+          echo "=== Pods (all namespaces) ==="
+          kubectl get pods -A || true
+          echo "=== Events (sorted by time) ==="
+          kubectl get events -A --sort-by='.lastTimestamp' || true
+          echo "=== Controller Manager Logs (last 100 lines) ==="
+          kubectl logs -n my-operator-system -l control-plane=controller-manager --tail=100 || true
+          echo "=== Describe Deployment ==="
+          kubectl describe deployment -n my-operator-system || true

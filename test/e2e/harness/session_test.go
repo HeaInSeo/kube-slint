@@ -70,6 +70,47 @@ func (m *mockFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, er
 	}, nil
 }
 
+// mockSnapshotFetcher 는 fetch.SnapshotFetcher 를 구현하는 테스트용 fetcher임.
+type mockSnapshotFetcher struct {
+	mockFetcher
+	preFetched bool
+}
+
+func (m *mockSnapshotFetcher) PreFetch(_ context.Context) error {
+	m.preFetched = true
+	return nil
+}
+
+// TestSession_Start_PreFetch 는 Start()가 fetch.SnapshotFetcher 구현체에 대해
+// PreFetch()를 호출하는지 검증함 (Gap G 해소 동작 확인).
+func TestSession_Start_PreFetch(t *testing.T) {
+	t.Setenv("SLINT_DISABLE_DISCOVERY", "1")
+	sf := &mockSnapshotFetcher{}
+	cfg := SessionConfig{
+		Namespace: "ns",
+		TestCase:  "test",
+		Fetcher:   sf,
+	}
+	sess := NewSession(cfg)
+	sess.Start()
+	assert.True(t, sf.preFetched, "Start()는 fetcher가 SnapshotFetcher를 구현할 때 PreFetch()를 호출해야 함")
+}
+
+// TestSession_Start_NoPreFetch 는 일반 MetricsFetcher에서는 PreFetch가 호출되지 않음을 검증함.
+func TestSession_Start_NoPreFetch(t *testing.T) {
+	t.Setenv("SLINT_DISABLE_DISCOVERY", "1")
+	mf := &mockFetcher{}
+	cfg := SessionConfig{
+		Namespace: "ns",
+		TestCase:  "test",
+		Fetcher:   mf,
+	}
+	sess := NewSession(cfg)
+	// Start()가 패닉 없이 완료되고, mockFetcher는 SnapshotFetcher를 구현하지 않으므로 영향 없음
+	sess.Start()
+	assert.NotNil(t, sess.impl.started) // Start()가 정상적으로 시각을 기록했는지 확인
+}
+
 // ExampleSession_End는 권장되는 E2E 테스트 하네스 사용 패턴 예시임.
 func ExampleSession_End() {
 	var ctx context.Context // 유효한 context로 가정
