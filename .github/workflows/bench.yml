@@ -54,12 +54,14 @@ jobs:
 
       # 현재 결과를 artifact로 저장 (30일 보관)
       # 기준선 갱신은 별도 수동 작업: bench-current.txt → bench-baseline.txt로 rename 후 업로드
+      # overwrite: true → 동일 이름 artifact가 이미 존재해도 재실행 시 덮어씀.
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: bench-current
           path: bench-current.txt
           retention-days: 30
+          overwrite: true
 
       # TODO: main 브랜치 push 시 기준선 자동 갱신 전략
       # - 옵션 A: 별도 job에서 bench-current.txt를 bench-baseline artifact로 저장

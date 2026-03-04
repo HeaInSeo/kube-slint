@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 	"github.com/stretchr/testify/assert"
 )
@@ -124,6 +125,59 @@ func TestEngine_ConfidenceScore(t *testing.T) {
 			// Using float math exact matching for these simple increments
 			assert.InDelta(t, tt.expectedScore, *tt.relIn.ConfidenceScore, 0.001)
 		})
+	}
+}
+
+// mockStaticFetcher 는 항상 고정된 메트릭 값을 반환함 (대기 없음).
+type mockStaticFetcher struct {
+	values map[string]float64
+}
+
+func (m *mockStaticFetcher) Fetch(_ context.Context, at time.Time) (fetch.Sample, error) {
+	return fetch.Sample{At: at, Values: m.values}, nil
+}
+
+// BenchmarkEngine_Execute 는 SLI 평가 파이프라인 전체(2회 fetch + evalSLI)를 벤치마킹함.
+func BenchmarkEngine_Execute(b *testing.B) {
+	values := map[string]float64{
+		`controller_runtime_reconcile_total{controller="hello",result="success"}`: 100,
+		`controller_runtime_reconcile_total{controller="hello",result="error"}`:   5,
+	}
+	fetcher := &mockStaticFetcher{values: values}
+	writer := &mockWriter{}
+	eng := New(fetcher, writer, nil)
+
+	specs := []spec.SLISpec{
+		{
+			ID:    "reconcile_success",
+			Title: "Reconcile Success Count",
+			Inputs: []spec.MetricRef{
+				{Key: `controller_runtime_reconcile_total{controller="hello",result="success"}`},
+			},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+			Judge: &spec.JudgeSpec{
+				Rules: []spec.Rule{{Op: spec.OpGE, Target: 1, Level: spec.LevelFail}},
+			},
+		},
+	}
+
+	req := ExecuteRequest{
+		Config: RunConfig{
+			RunID:      "bench-run",
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs:       specs,
+		Reliability: &summary.Reliability{},
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := eng.Execute(context.Background(), req)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
