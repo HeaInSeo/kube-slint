@@ -23,11 +23,13 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # 현재 기준 벤치마크 실행 (-count=3: 통계 안정성, benchmem: 메모리 포함)
-      # 벤치마크가 없는 패키지는 "no benchmarks" 출력 후 정상 종료됨
+      # 벤치마크만 실행 (-run=^$: 일반 테스트 제외, -count=3: 통계 안정성, -benchmem: 메모리 포함)
+      # 빌드/컴파일 실패는 정상적으로 CI 실패로 전파된다.
+      # 벤치마크가 없는 패키지는 "no benchmarks" 출력 후 exit 0 반환 (정상).
+      # TODO: benchstat의 @latest는 재현성이 낮다. go.mod tool 의존성 또는 버전 핀 권장.
       - name: Run benchmarks
         run: |
-          go test -bench=. -benchmem -count=3 ./... 2>&1 | tee bench-current.txt || true
+          go test -bench=. -run=^$ -benchmem -count=3 ./... | tee bench-current.txt
 
       # 이전 기준선(baseline) artifact 다운로드 (없으면 비교 스텝 skip)
       - name: Download baseline (if available)
