@@ -8,7 +8,7 @@ Update this file at the **start and end** of every stage/task.
 ## Current Status: Stage (In Progress) — Phase 6-b Shift-left Guardrail Alignment
 
 **Branch:** `main`
-**Last updated:** 2026-03-07
+**Last updated:** 2026-03-07 (Phase 6-c spec prep)
 
 ### Current Focus
 
@@ -28,12 +28,13 @@ Update this file at the **start and end** of every stage/task.
 * [x] Phase 6-b ~ Phase 7-a + Release Gate(guardrail RC) 로드맵 초안 반영
 * [x] GitHub Actions 계획 메모(`slint-gate`, `roadmap-status`, `baseline-update`) 문서화
 * [x] README 후속 수정 포인트를 notes로 기록 (코드 변경 없음)
+* [x] `slint-gate` 입력/출력 계약 및 regression gate 판정 초안 문서화 (`docs/notes/slint-gate-spec-2026-03-07.md`)
 
 ### Next command to run
 
 * `gh workflow list` (현재 CI 워크플로우 인벤토리 확인)
-* `gh workflow view <existing-ci-workflow>` (slint-gate/roadmap-status/baseline-update 매핑 대상 확인)
-* `rg -n "correctness|guardrail|lint-style|measurement failure" README.md README\\(Kor\\).md docs/current/*`
+* `gh workflow view roadmap-status` (status visibility workflow 기준 확인)
+* `cat docs/notes/slint-gate-spec-2026-03-07.md` (Phase 6-c 구현 입력 계약 고정본 검토)
 
 ### If blocked, fallback check
 

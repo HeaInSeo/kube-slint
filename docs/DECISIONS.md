@@ -75,3 +75,23 @@ This file records architecture/product-direction decisions that define the proje
   - prose 문서(`docs/PROGRESS_LOG.md` 등) 파싱은 자동화 입력으로 사용하지 않는다.
 - Rationale:
   - 마크다운 서술 문서는 사람용 맥락 기록에 최적화되어 있고, 자동화 안정성은 고정 스키마 YAML에서 보장하는 편이 안전하다.
+
+## D-008: slint-gate is a separate policy evaluation layer over measurement outputs
+
+- Date: 2026-03-07
+- Status: Accepted
+- Decision:
+  - `slint-gate`는 correctness test를 대체하지 않으며, 계측 결과물 위에서 정책을 평가하는 별도 레이어로 둔다.
+  - gate 판정은 `PASS | WARN | FAIL | NO_GRADE`를 기본 enum으로 사용한다.
+- Rationale:
+  - measurement failure와 policy violation을 분리하여, 비침투/best-effort 철학과 CI 품질 게이트를 동시에 유지하기 위함.
+
+## D-009: Baseline comparison is optional on first-run, first-class when baseline exists
+
+- Date: 2026-03-07
+- Status: Accepted
+- Decision:
+  - baseline이 없는 first-run에서는 regression 비교를 강제하지 않는다.
+  - baseline이 존재하면 regression 비교를 1급 gate 축으로 평가한다.
+- Rationale:
+  - 초기 도입 마찰을 낮추되, baseline 확보 이후에는 회귀 차단을 핵심 gate로 운영하기 위함.
