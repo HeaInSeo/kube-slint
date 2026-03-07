@@ -1,14 +1,56 @@
 # kube-slint
 
-`kube-slint` is a pure Go framework, E2E test harness, and observability stack for tracking Operational SLIs (Service Level Indicators) in Kubernetes Operators.
+`kube-slint` is a shift-left operational quality guardrail for Kubernetes Operators.
 
 > **IMPORTANT:** This repository has transitioned from a standalone operator to a library/observability framework. The `operator runtime` (e.g., `cmd/main.go`, `controller-runtime` manager loops) has been removed.
 
-## Features
+## Identity and Scope
 
-- **SLI Declarative Specifications (`pkg/slo/spec`)**: Create and enforce metrics definitions like Churn Rate, Convergence Time, etc.
-- **Test Harness (`test/e2e/harness`)**: An embeddable E2E testing framework that executes inside Kubernetes clusters, evaluates SLIs over time, and generates strictly formatted JSON reports (`summary.json`) using configurable reliability and strictness scoring.
-- **Orphan Sweeper**: Ensures robust cleanup of test infrastructure across runs using `report-only` and `delete` modes.
+`kube-slint` is **not** an operator correctness test framework.
+
+It provides a guardrail layer that applies operational SLIs during operator development so teams can detect reliability/performance regressions earlier.
+
+### What kube-slint does
+
+- Defines/evaluates operational SLI specs (`pkg/slo/spec`, `pkg/slo/engine`)
+- Produces structured summary output (`sli-summary.json`) with reliability signals
+- Supports multiple measurement modes as first-class options
+- Provides policy-oriented gating direction for CI (absolute threshold + regression)
+
+### What kube-slint does not do
+
+- It does not replace correctness tests (`go test`, lint, unit/integration tests)
+- It does not require production reconcile-path instrumentation (non-invasive principle)
+- It does not treat every measurement failure as a test failure by default
+
+## Core Contracts
+
+1. Measurement failure is not equivalent to test failure.
+2. Policy violation (absolute threshold miss or regression vs baseline) may fail CI.
+3. Guardrail evaluation is separate from correctness testing.
+
+## Measurement Modes (First-class)
+
+- `InsideSnapshot` (default)
+- `InsideAnnotation` (precise / semantic-boundary)
+- `OutsideSnapshot` (environment-specific)
+
+## Gate Model
+
+- Absolute threshold gate: supported through current SLI judgment rules.
+- Regression comparison gate: **in progress** (`Phase 6-c Regression Gate Model`).
+- CI visibility for guardrail stages/gates: **in progress** (`Phase 6-d GitHub Actions visibility`).
+
+## Relationship to Tests and CI
+
+- Correctness path: lint/unit/mock-e2e validate implementation behavior.
+- Guardrail path: `slint-gate` (planned) evaluates policy outcomes and may fail CI on policy violation.
+- This separation keeps measurement reliability issues distinct from correctness failures.
+
+## Canonical Consumer DX Validation
+
+- `hello-operator` is the canonical consumer DX validation repository for kube-slint adoption flows.
+- ko+tilt inner-loop validation for this path is **planned/in progress** (`Phase 7-a`).
 
 ## How to Use
 

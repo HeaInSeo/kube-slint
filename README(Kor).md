@@ -1,14 +1,56 @@
 # kube-slint
 
-`kube-slint`는 쿠버네티스 오퍼레이터의 오퍼레이셔널 SLI(Service Level Indicator, 서비스 수준 지수)를 추적하고 신뢰성을 검증하기 위한 순수 Go 프레임워크이자 관측성(Observability) 스택입니다.
+`kube-slint`는 쿠버네티스 오퍼레이터를 위한 shift-left operational quality guardrail입니다.
 
 > **중요:** 이 저장소는 독립적으로 실행되는 오퍼레이터(Standalone Operator)에서 **라이브러리 및 테스트 하네스 프레임워크**로 전환되었습니다. 기존의 `cmd/main.go` 및 `controller-runtime` 매니저 실행 구조는 완전히 제거되었습니다.
 
-## 핵심 기능
+## 정체성과 범위
 
-- **SLI 선언적 스펙 정의 (`pkg/slo/spec`)**: Churn Rate(변동률), Convergence Time(수렴 시간) 등의 메트릭을 정의하고 강제할 수 있습니다.
-- **E2E 테스트 하네스 (`test/e2e/harness`)**: 쿠버네티스 클러스터 내부에서 실행되는 통합 테스트 환경입니다. 시간에 따른 SLI를 평가하고, 신뢰성/엄격성 점수를 반영하여 정밀하게 포맷팅된 JSON 보고서(`summary.json`)를 생성합니다.
-- **Orphan Sweeper (고아 리소스 정리)**: 테스트 인프라 환경에서 이전 런(run-id)의 자원들을 정리할 수 있도록 `report-only` 모드와 안전한 `delete` 모드를 제공하여 상태 오염을 방지합니다.
+`kube-slint`는 **operator correctness test framework 자체가 아닙니다.**
+
+이 도구는 오퍼레이터 개발 단계에서 operational SLI를 lint-style로 적용하여 성능/신뢰성/회귀 문제를 조기에 차단하는 가드레일 역할을 수행합니다.
+
+### kube-slint가 하는 것
+
+- operational SLI 스펙 정의/평가 (`pkg/slo/spec`, `pkg/slo/engine`)
+- 신뢰도 상태를 포함한 구조화 결과물(`sli-summary.json`) 생성
+- 계측 모드(측정 경계/방법)를 1급 개념으로 제공
+- CI 정책 게이트(절대 임계치 + 회귀 비교) 방향 제공
+
+### kube-slint가 하지 않는 것
+
+- `go test`/lint/기능 테스트를 대체하지 않음
+- 프로덕션 reconcile 경로에 계측 코드 삽입을 요구하지 않음(비침투 원칙)
+- 모든 계측 실패를 기본적으로 테스트 실패로 취급하지 않음
+
+## 핵심 계약
+
+1. Measurement failure != test failure
+2. Policy violation (absolute threshold miss / regression vs baseline) may fail CI
+3. Guardrail 평가와 correctness testing은 분리됨
+
+## Measurement Modes (1급 분류)
+
+- `InsideSnapshot` (default)
+- `InsideAnnotation` (precise / semantic-boundary)
+- `OutsideSnapshot` (environment-specific)
+
+## Gate 모델
+
+- 절대 임계치(absolute threshold) 게이트: 현재 SLI 판정 규칙 기반으로 지원
+- 회귀 비교(regression vs baseline) 게이트: **진행 중** (`Phase 6-c Regression Gate Model`)
+- GitHub Actions 가시화(guardrail stage/gate): **진행 중** (`Phase 6-d`)
+
+## 테스트/CI와의 관계
+
+- correctness 경로: lint/unit/mock-e2e가 구현 정합성을 검증
+- guardrail 경로: `slint-gate`(계획)에서 정책 위반을 별도로 판단하고 CI 실패로 승격 가능
+- 이 분리를 통해 계측 신뢰도 이슈와 기능 정합성 이슈를 혼동하지 않음
+
+## Canonical Consumer DX Validation
+
+- `hello-operator`를 kube-slint 소비자 DX 검증의 canonical 저장소로 사용
+- ko+tilt inner-loop 검증 트랙은 **계획/진행 중** (`Phase 7-a`)
 
 ## 사용 방법
 

@@ -55,3 +55,13 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - 소비자 관점 검증 기준점이 단일화되어야 온보딩/회귀/문서 검증의 신뢰도가 높아진다.
 
+## D-006: Guardrail evaluation is separate from correctness testing
+
+- Date: 2026-03-07
+- Status: Accepted
+- Decision:
+  - `test/lint/mock-e2e`와 `slint-gate`는 역할이 다르다.
+  - correctness testing은 구현 정합성을 검증하고,
+  - guardrail evaluation은 정책 위반(절대 임계치 미달, baseline 대비 회귀)을 별도 gate job에서 판정한다.
+- Rationale:
+  - measurement failure와 policy failure를 분리해야 비침투/best-effort 철학을 유지하면서도 CI 품질 게이트를 명확히 운영할 수 있다.

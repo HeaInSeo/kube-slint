@@ -1,0 +1,10 @@
+current_stage: "Phase 6-b Shift-left Guardrail Alignment"
+roadmap_percent: 55
+current_focus: "Align identity, contracts, and gate semantics across README/docs and machine-readable status"
+next_milestone: "Phase 6-c Regression Gate Model"
+capabilities:
+  identity_aligned: true
+  decision_log_added: true
+  regression_gate_spec: "in_progress"
+  github_actions_visibility: "in_progress"
+  hello_operator_validation: "planned_phase_7a"
