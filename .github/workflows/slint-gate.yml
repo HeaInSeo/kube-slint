@@ -16,6 +16,13 @@ on:
         required: false
         default: ".slint/policy.yaml"
   pull_request:
+    paths:
+      - ".github/workflows/slint-gate.yml"
+      - "hack/slint_gate.py"
+      - ".slint/**"
+      - "docs/notes/slint-gate-*.md"
+      - "docs/DECISIONS.md"
+      - "docs/PROGRESS_LOG.md"
   push:
     paths:
       - ".github/workflows/slint-gate.yml"
