@@ -1,0 +1,140 @@
+name: Roadmap Status
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "docs/project-status.yaml"
+      - "docs/DECISIONS.md"
+      - "docs/PROGRESS_LOG.md"
+      - "README.md"
+      - "README(Kor).md"
+      - "docs/notes/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roadmap-status-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  roadmap-status:
+    name: Render roadmap status summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install YAML parser
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Validate status schema and render summary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          import yaml
+
+          status_path = Path("docs/project-status.yaml")
+          if not status_path.exists():
+              print("ERROR: missing docs/project-status.yaml", file=sys.stderr)
+              sys.exit(1)
+
+          with status_path.open("r", encoding="utf-8") as f:
+              data = yaml.safe_load(f)
+
+          if not isinstance(data, dict):
+              print("ERROR: project-status.yaml must be a YAML mapping at root", file=sys.stderr)
+              sys.exit(1)
+
+          required_fields = [
+              "current_stage",
+              "roadmap_percent",
+              "roadmap_status",
+              "current_focus",
+              "next_milestone",
+              "capabilities",
+          ]
+          missing = [k for k in required_fields if k not in data]
+          if missing:
+              print(f"ERROR: missing required fields: {', '.join(missing)}", file=sys.stderr)
+              sys.exit(1)
+
+          current_stage = data["current_stage"]
+          roadmap_percent = data["roadmap_percent"]
+          roadmap_status = data["roadmap_status"]
+          current_focus = data["current_focus"]
+          next_milestone = data["next_milestone"]
+          capabilities = data["capabilities"]
+
+          if not isinstance(current_stage, str) or not current_stage.strip():
+              print("ERROR: current_stage must be a non-empty string", file=sys.stderr)
+              sys.exit(1)
+          if not isinstance(roadmap_percent, int):
+              print("ERROR: roadmap_percent must be an integer", file=sys.stderr)
+              sys.exit(1)
+          if roadmap_percent < 0 or roadmap_percent > 100:
+              print("ERROR: roadmap_percent must be in [0, 100]", file=sys.stderr)
+              sys.exit(1)
+          if not isinstance(roadmap_status, str) or not roadmap_status.strip():
+              print("ERROR: roadmap_status must be a non-empty string", file=sys.stderr)
+              sys.exit(1)
+          if not isinstance(current_focus, list) or not current_focus:
+              print("ERROR: current_focus must be a non-empty list", file=sys.stderr)
+              sys.exit(1)
+          if not all(isinstance(x, str) and x.strip() for x in current_focus):
+              print("ERROR: current_focus entries must be non-empty strings", file=sys.stderr)
+              sys.exit(1)
+          if not isinstance(next_milestone, str) or not next_milestone.strip():
+              print("ERROR: next_milestone must be a non-empty string", file=sys.stderr)
+              sys.exit(1)
+          if not isinstance(capabilities, dict):
+              print("ERROR: capabilities must be a mapping", file=sys.stderr)
+              sys.exit(1)
+
+          expected_caps = [
+              "identity_aligned",
+              "decision_log_added",
+              "regression_gate_spec",
+              "github_actions_visibility",
+              "hello_operator_validation",
+          ]
+          cap_missing = [k for k in expected_caps if k not in capabilities]
+          if cap_missing:
+              print(f"ERROR: capabilities missing keys: {', '.join(cap_missing)}", file=sys.stderr)
+              sys.exit(1)
+
+          allowed_status = {"done", "in_progress", "planned"}
+          for key in expected_caps:
+              value = capabilities[key]
+              if not isinstance(value, str):
+                  print(f"ERROR: capabilities.{key} must be a string enum", file=sys.stderr)
+                  sys.exit(1)
+              if value not in allowed_status:
+                  print(
+                      f"ERROR: capabilities.{key} must be one of {sorted(allowed_status)} "
+                      f"(got: {value})",
+                      file=sys.stderr,
+                  )
+                  sys.exit(1)
+
+          summary_path = Path(__import__("os").environ["GITHUB_STEP_SUMMARY"])
+          with summary_path.open("a", encoding="utf-8") as out:
+              out.write("# Roadmap Status\n\n")
+              out.write(f"- **Current Stage:** {current_stage}\n")
+              out.write(f"- **Progress:** {roadmap_percent}% ({roadmap_status})\n")
+              out.write(f"- **Next Milestone:** {next_milestone}\n\n")
+              out.write("## Current Focus\n")
+              for item in current_focus:
+                  out.write(f"- {item}\n")
+              out.write("\n## Capabilities\n")
+              for key in expected_caps:
+                  out.write(f"- `{key}`: `{capabilities[key]}`\n")
+          PY
