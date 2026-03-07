@@ -95,3 +95,23 @@ This file records architecture/product-direction decisions that define the proje
   - baseline이 존재하면 regression 비교를 1급 gate 축으로 평가한다.
 - Rationale:
   - 초기 도입 마찰을 낮추되, baseline 확보 이후에는 회귀 차단을 핵심 gate로 운영하기 위함.
+
+## D-010: Primary policy input path recommendation is .slint/policy.yaml (proposed)
+
+- Date: 2026-03-07
+- Status: Accepted (proposed contract)
+- Decision:
+  - `slint-gate` 정책 파일 기본 경로 권장안은 `.slint/policy.yaml`로 둔다.
+  - 대체 경로(`config/slint/policy.yaml`, `test/e2e/slint/policy.yaml`)는 호환 가능한 옵션으로 유지한다.
+- Rationale:
+  - 자동화 입력 소스와 사람용 문서를 분리하고, consumer repo에서도 동일한 패턴으로 재사용하기 쉽다.
+
+## D-011: slint-gate-summary.json is the machine-readable output contract for gate evaluation
+
+- Date: 2026-03-07
+- Status: Accepted (draft schema)
+- Decision:
+  - gate 결과의 machine-readable 출력 계약은 `slint-gate-summary.json`으로 정의한다.
+  - 최소 필드(`gate_result`, `evaluation_status`, `measurement_status`, `baseline_status`, `policy_status`, `checks` 등)를 유지한다.
+- Rationale:
+  - Actions summary, PR 코멘트, 후속 리포팅 경로가 동일한 gate 결과 구조를 재사용할 수 있다.

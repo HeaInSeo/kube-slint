@@ -8,7 +8,7 @@ Update this file at the **start and end** of every stage/task.
 ## Current Status: Stage (In Progress) — Phase 6-b Shift-left Guardrail Alignment
 
 **Branch:** `main`
-**Last updated:** 2026-03-07 (Phase 6-c spec prep)
+**Last updated:** 2026-03-07 (Phase 6-c I/O contract prep)
 
 ### Current Focus
 
@@ -19,7 +19,7 @@ Update this file at the **start and end** of every stage/task.
   2. measurement failure vs policy violation 분리 메시지/계약 가시성 부족
   3. GitHub Actions 상에서 guardrail 단계/상태 가시성 부족
   4. hello-operator 기준의 ko+tilt inner-loop 검증 트랙 미고정
-  5. 결정 로그(Decision Log) 부재
+  5. `slint-gate` policy input 경로/스키마 및 gate output(`slint-gate-summary.json`) 계약 미고정
 
 ### Definition of Done (DoD)
 
@@ -29,12 +29,13 @@ Update this file at the **start and end** of every stage/task.
 * [x] GitHub Actions 계획 메모(`slint-gate`, `roadmap-status`, `baseline-update`) 문서화
 * [x] README 후속 수정 포인트를 notes로 기록 (코드 변경 없음)
 * [x] `slint-gate` 입력/출력 계약 및 regression gate 판정 초안 문서화 (`docs/notes/slint-gate-spec-2026-03-07.md`)
+* [x] policy 파일 경로/최소 스키마 + `slint-gate-summary.json` 최소 출력 계약 초안 문서화 (`docs/notes/slint-gate-io-contract-2026-03-07.md`)
 
 ### Next command to run
 
 * `gh workflow list` (현재 CI 워크플로우 인벤토리 확인)
 * `gh workflow view roadmap-status` (status visibility workflow 기준 확인)
-* `cat docs/notes/slint-gate-spec-2026-03-07.md` (Phase 6-c 구현 입력 계약 고정본 검토)
+* `cat docs/notes/slint-gate-io-contract-2026-03-07.md` (Phase 6-c 구현 입력/출력 계약 고정본 검토)
 
 ### If blocked, fallback check
 
