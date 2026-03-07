@@ -1,0 +1,125 @@
+name: slint-gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      measurement_summary_path:
+        description: "Path to measurement summary JSON"
+        required: false
+        default: "artifacts/sli-summary.json"
+      baseline_path:
+        description: "Optional path to baseline summary JSON"
+        required: false
+        default: ""
+      policy_path:
+        description: "Path to policy YAML"
+        required: false
+        default: ".slint/policy.yaml"
+  pull_request:
+  push:
+    paths:
+      - ".github/workflows/slint-gate.yml"
+      - "hack/slint_gate.py"
+      - ".slint/**"
+      - "docs/notes/slint-gate-*.md"
+      - "docs/DECISIONS.md"
+      - "docs/PROGRESS_LOG.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slint-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  slint-gate:
+    name: Evaluate slint policy gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MEASUREMENT_SUMMARY_PATH: ${{ github.event.inputs.measurement_summary_path || 'artifacts/sli-summary.json' }}
+      BASELINE_PATH: ${{ github.event.inputs.baseline_path || '' }}
+      POLICY_PATH: ${{ github.event.inputs.policy_path || '.slint/policy.yaml' }}
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Run slint-gate evaluator
+        run: |
+          python hack/slint_gate.py \
+            --measurement-summary "${MEASUREMENT_SUMMARY_PATH}" \
+            --policy "${POLICY_PATH}" \
+            --baseline "${BASELINE_PATH}" \
+            --output "slint-gate-summary.json"
+
+      - name: Render gate summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import os
+          p = Path("slint-gate-summary.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          checks = data.get("checks", [])
+
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          with summary.open("a", encoding="utf-8") as out:
+              out.write("# slint-gate Result\n\n")
+              out.write(f"- **Gate Result:** {data.get('gate_result')}\n")
+              out.write(f"- **Evaluation Status:** {data.get('evaluation_status')}\n")
+              out.write(f"- **Measurement Status:** {data.get('measurement_status')}\n")
+              out.write(f"- **Baseline Status:** {data.get('baseline_status')}\n")
+              out.write(f"- **Policy Status:** {data.get('policy_status')}\n")
+              out.write(f"- **Overall Message:** {data.get('overall_message')}\n\n")
+
+              reasons = data.get("reasons", [])
+              out.write("## Reasons\n")
+              if reasons:
+                  for r in reasons:
+                      out.write(f"- `{r}`\n")
+              else:
+                  out.write("- (none)\n")
+
+              out.write("\n## Checks\n")
+              if checks:
+                  out.write("| Name | Category | Status | Metric | Observed | Expected | Message |\n")
+                  out.write("|---|---|---|---|---|---|---|\n")
+                  for c in checks:
+                      out.write(
+                          f"| {c.get('name','')} | {c.get('category','')} | {c.get('status','')} | "
+                          f"{c.get('metric','')} | {c.get('observed','')} | {c.get('expected','')} | {c.get('message','')} |\n"
+                      )
+              else:
+                  out.write("- (no checks)\n")
+          PY
+
+      - name: Upload slint-gate summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slint-gate-summary
+          path: slint-gate-summary.json
+          retention-days: 30
+          overwrite: true
+
+      - name: Fail job on policy violation
+        run: |
+          python - <<'PY'
+          import json, sys
+          with open("slint-gate-summary.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+          gate = data.get("gate_result")
+          print(f"gate_result={gate}")
+          if gate == "FAIL":
+              print("slint-gate detected policy violation; failing job.")
+              sys.exit(1)
+          print("slint-gate non-fail result; job succeeds.")
+          PY
