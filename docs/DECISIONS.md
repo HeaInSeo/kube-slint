@@ -65,3 +65,13 @@ This file records architecture/product-direction decisions that define the proje
   - guardrail evaluation은 정책 위반(절대 임계치 미달, baseline 대비 회귀)을 별도 gate job에서 판정한다.
 - Rationale:
   - measurement failure와 policy failure를 분리해야 비침투/best-effort 철학을 유지하면서도 CI 품질 게이트를 명확히 운영할 수 있다.
+
+## D-007: Automation status source is docs/project-status.yaml
+
+- Date: 2026-03-07
+- Status: Accepted
+- Decision:
+  - 자동화(workflow/summary job)가 읽는 machine-readable 상태 소스는 `docs/project-status.yaml` 단일 경로로 고정한다.
+  - prose 문서(`docs/PROGRESS_LOG.md` 등) 파싱은 자동화 입력으로 사용하지 않는다.
+- Rationale:
+  - 마크다운 서술 문서는 사람용 맥락 기록에 최적화되어 있고, 자동화 안정성은 고정 스키마 YAML에서 보장하는 편이 안전하다.
