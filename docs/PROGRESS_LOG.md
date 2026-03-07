@@ -5,32 +5,39 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Completed) — Phase 5-a External Consumer Onboarding Validation
+## Current Status: Stage (In Progress) — Phase 6-b Shift-left Guardrail Alignment
 
 **Branch:** `main`
-**Last updated:** 2026-03-02
+**Last updated:** 2026-03-07
 
 ### Current Focus
 
-* (P5-a 완료) 순수 외부 소비자 시점(External Consumer POV)에서 `kube-slint` Go API 연동 및 Kustomize Observability Stack 원격 수입(Explicit Local Override) 전체 사이클을 검증함.
-* **증거 생성**: `test/consumer-onboarding/external-onboarding-validation` 디렉토리를 별도 Go 모듈(`consumer-validation`)로 구성하여 제품 코드 수정 없이 온보딩 성공 증명.
-* **UX 마찰 요소(Friction) 기록**: 구조적 대공사를 제한하는 대신, 단기/장기적으로 소비자가 겪을 수 있는 문서/API/Kustomize 렌더링 측면의 허들(UX Friction)을 `docs/notes/external-onboarding-validation-2026-03-02.md` 에 기록 완료함.
+* kube-slint 정체성을 "operator correctness test framework" 중심이 아니라, **operator 개발 단계에서 operational SLI를 lint-style로 적용하는 shift-left quality guardrail**로 공식 정렬 중.
+* 현재 저장소 상태는 라이브러리/하네스 기반이 안정적이나, 최종 guardrail 목표 대비 **약 50~60% 수준**으로 평가함.
+* 이번 단계의 핵심 갭:
+  1. regression comparison first-class gate 부재
+  2. measurement failure vs policy violation 분리 메시지/계약 가시성 부족
+  3. GitHub Actions 상에서 guardrail 단계/상태 가시성 부족
+  4. hello-operator 기준의 ko+tilt inner-loop 검증 트랙 미고정
+  5. 결정 로그(Decision Log) 부재
 
 ### Definition of Done (DoD)
 
-* [x] 외부 소비자 형태의 최소 검증 환경 준비 (`main.go`, `go.mod`, `kustomization.yaml`)
-* [x] Kustomize Explicit Local Override 패치 동작 입증 (P4 연계 검증)
-* [x] Validation 통과 확보 (go build, make lint, make test-e2e, kubectl kustomize)
-* [x] 소비자 관점의 튜토리얼 문서 및 UX 마찰 분석 리포트 작성
-* [x] `docs/PROGRESS_LOG.md` 갱신 (P5-a 직후 상태)
+* [x] Stage 상태를 `Phase 6-b Shift-left Guardrail Alignment`로 전환
+* [x] 정체성/계약/모드/회귀게이트/소비자 기준 저장소에 대한 Decision Log 신설
+* [x] Phase 6-b ~ Phase 7-a + Release Gate(guardrail RC) 로드맵 초안 반영
+* [x] GitHub Actions 계획 메모(`slint-gate`, `roadmap-status`, `baseline-update`) 문서화
+* [x] README 후속 수정 포인트를 notes로 기록 (코드 변경 없음)
 
 ### Next command to run
 
-* (정규 작업 종료 - Phase 6 혹은 Deferred 백로그 우선순위 작업 대기)
+* `gh workflow list` (현재 CI 워크플로우 인벤토리 확인)
+* `gh workflow view <existing-ci-workflow>` (slint-gate/roadmap-status/baseline-update 매핑 대상 확인)
+* `rg -n "correctness|guardrail|lint-style|measurement failure" README.md README\\(Kor\\).md docs/current/*`
 
 ### If blocked, fallback check
 
-* (해당 없음)
+* `docs/DECISIONS.md`와 `docs/notes/phase-6b-guardrail-alignment-2026-03-07.md`를 기준 계약으로 우선 유지하고, 구현 단계는 Phase 6-c 이후로 분리
 
 ---
 
@@ -177,6 +184,22 @@ Update this file at the **start and end** of every stage/task.
 
 ## Pending Items
 
+### Stage Roadmap (draft)
+
+1. [ ] **Phase 6-b: goal/contract alignment**
+   - identity/contract/모드/회귀게이트/소비자 기준 저장소(hello-operator) 문서 정렬
+2. [ ] **Phase 6-c: regression gate model**
+   - baseline 대비 절대 임계치 + 회귀 비교를 policy gate로 1급화
+3. [ ] **Phase 6-d: GitHub Actions visibility**
+   - `slint-gate`: policy violation 중심 gate
+   - `roadmap-status`: 현재 stage/계약 충족도 요약
+   - `baseline-update`: 승인 기반 baseline 갱신 경로
+4. [ ] **Phase 7-a: hello-operator consumer validation**
+   - `hello-operator`를 canonical DX 검증 저장소로 고정
+   - ko+tilt inner-loop 검증 체크리스트 확정
+5. [ ] **Release Gate: guardrail RC**
+   - "테스트 프레임워크"가 아니라 "shift-left guardrail" 메시지/계약이 CI+문서+소비자 검증에서 일치할 때 RC 진행
+
 ### Follow-up (deferred)
 
 우선순위에 따른 장기/단기 기술 부채:
@@ -189,6 +212,8 @@ Update this file at the **start and end** of every stage/task.
 ### Backlog (optional)
 
 * [ ] Trigger-based 경계 지원 (Annotation/Condition 기반)
+* [ ] policy 결과물과 measurement 결과물 분리 출력 템플릿(요약 리포트) 초안
+* [ ] README / README(Kor) 메시지 재배치 (lint-style guardrail 전면화)
 
 ---
 
