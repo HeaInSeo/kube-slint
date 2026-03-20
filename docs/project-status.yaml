@@ -1,14 +1,15 @@
-current_stage: "Phase 7-a hello-operator consumer validation"
-roadmap_percent: 70
-roadmap_status: "in_progress"
+current_stage: "Phase 6-c Regression Gate Model"
+roadmap_percent: 72
+roadmap_status: "rc_approved"
 current_focus:
-  - "Keep Codex operating docs and repo identity aligned across kube-slint and hello-operator"
-  - "Preserve slint-gate and roadmap-status workflows as the current CI visibility baseline"
-  - "Close the hello-operator consumer validation loop as the canonical adoption fixture"
-next_milestone: "Phase 6-c Regression Gate Model"
+  - "Guardrail RC baseline is approved on the repository-stored policy/baseline pair and the canonical hello-operator consumer fixture"
+  - "Treat remaining bridge/workaround items as deferred non-blocking debt unless new evidence changes that classification"
+  - "Track the PreFetch/Start contract as an explicit operating risk after RC approval"
+  - "Carry schema expansion candidates such as reconcile_error_ratio as post-RC policy/measurement work"
+next_milestone: "Post-RC hardening and baseline update path refinement"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"
-  regression_gate_spec: "in_progress"
+  regression_gate_spec: "done"
   github_actions_visibility: "done"
   hello_operator_validation: "done"

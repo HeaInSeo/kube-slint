@@ -71,6 +71,19 @@ KIND_CLUSTER ?= kube-slint-test-e2e
 test-e2e: manifests generate fmt vet ## Run the modern, mock-based integration tests.
 	go test ./test/e2e/ -run TestHarnessIntegration_TableDriven -v
 
+BASELINE_SUMMARY ?=
+
+.PHONY: baseline-update-prepare
+baseline-update-prepare: ## Prepare a baseline update candidate/report. Example: make baseline-update-prepare BASELINE_SUMMARY=/opt/go/src/github.com/HeaInSeo/hello-operator/artifacts/sli-summary.json
+	@if [ -z "$(BASELINE_SUMMARY)" ]; then \
+		echo "ERROR: BASELINE_SUMMARY is required"; \
+		echo "  Usage: make baseline-update-prepare BASELINE_SUMMARY=/path/to/sli-summary.json"; \
+		echo "  Example: make baseline-update-prepare BASELINE_SUMMARY=/opt/go/src/github.com/HeaInSeo/hello-operator/artifacts/sli-summary.json"; \
+		echo "  Artifact example: make baseline-update-prepare BASELINE_SUMMARY=/tmp/downloaded-artifact/sli-summary.json"; \
+		exit 1; \
+	fi
+	bash hack/prepare-baseline-update.sh "$(BASELINE_SUMMARY)"
+
 # Prefer repo-pinned golangci-lint (v2) if present.
 GOLANGCI_LINT ?= ./bin/golangci-lint
 

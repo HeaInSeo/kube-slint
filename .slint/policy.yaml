@@ -1,0 +1,40 @@
+schema_version: "slint.policy.v1"
+metadata:
+  name: "rc-guardrail-policy"
+  owner: "kube-slint"
+
+thresholds:
+  - name: "reconcile_total_delta_min"
+    metric: "reconcile_total_delta"
+    operator: ">="
+    value: 1
+    severity: "fail"
+  - name: "workqueue_depth_end_max"
+    metric: "workqueue_depth_end"
+    operator: "<="
+    value: 5
+    severity: "fail"
+
+regression:
+  enabled: true
+  mode: "percent_delta"
+  tolerance_percent: 5
+
+reliability:
+  required: false
+  min_level: "partial"
+
+first_run:
+  default_result: "warn"
+  evaluate_thresholds: true
+  evaluate_regression: false
+
+baseline:
+  required: false
+  on_unavailable: "warn"
+  on_corrupt: "no_grade"
+  path: "docs/baselines/hello-operator-sli-summary.json"
+
+fail_on:
+  - "threshold_miss"
+  - "regression_detected"

@@ -5,21 +5,70 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (In Progress) — Phase 6-b Shift-left Guardrail Alignment
+## Current Status: Stage (RC Approved) — Phase 6-c Regression Gate Model
 
 **Branch:** `main`
-**Last updated:** 2026-03-07 (Phase 6-c I/O contract prep)
+**Last updated:** 2026-03-20 (RC baseline approval)
 
 ### Current Focus
 
-* kube-slint 정체성을 "operator correctness test framework" 중심이 아니라, **operator 개발 단계에서 operational SLI를 lint-style로 적용하는 shift-left quality guardrail**로 공식 정렬 중.
-* 현재 저장소 상태는 라이브러리/하네스 기반이 안정적이나, 최종 guardrail 목표 대비 **약 50~60% 수준**으로 평가함.
-* 이번 단계의 핵심 갭:
-  1. regression comparison first-class gate 부재
-  2. measurement failure vs policy violation 분리 메시지/계약 가시성 부족
-  3. GitHub Actions 상에서 guardrail 단계/상태 가시성 부족
-  4. hello-operator 기준의 ko+tilt inner-loop 검증 트랙 미고정
-  5. `slint-gate` policy input 경로/스키마 및 gate output(`slint-gate-summary.json`) 계약 미고정
+* kube-slint 정체성은 이미 **operator 개발 단계에서 operational SLI를 lint-style로 적용하는 shift-left quality guardrail**로 정렬되어 있음.
+* 현재 기준선에서 확정된 사실:
+  1. `docs/DECISIONS.md`와 `docs/project-status.yaml`가 현재 자동화/상태의 상위 기준선이다.
+  2. `slint-gate`와 `roadmap-status`는 현재 CI 가시성 기준선이다.
+  3. `hello-operator`는 canonical consumer validation fixture로 연결되어 있다.
+  4. `hello-operator`에서는 `kube-slint` 상향 후 `snapshotFetcher` 수동 워크어라운드 제거, `../kube-slint` 직접 의존 제거, `artifacts/` 경로 정렬, `E2E_SLI=1` 재검증이 완료되었다.
+  5. `.slint/policy.yaml` + `docs/baselines/hello-operator-sli-summary.json` + `hello-operator/artifacts/sli-summary.json` 조합으로 `slint-gate` smoke가 `PASS`를 반환했다.
+* 이번 RC 기준선의 확정 구성 요소는 `.slint/policy.yaml`, `docs/baselines/hello-operator-sli-summary.json`, 그리고 `hello-operator` canonical consumer fixture 경로(`Tiltfile`, `hack/run-slint-gate.sh`, `test/e2e/TestHelloSLIE2E`)다.
+* `hello-operator/.slint/policy.yaml`는 local first-run/dev policy이고, RC baseline contract와 경쟁하지 않는다. RC 판단은 계속 `kube-slint` 저장소의 policy + baseline pair를 기준으로 유지한다.
+* 현재 남은 실행/fixture 부채는 `hello-sample-create` 기본 fixture 의미와 local `pyyaml` 의존 자체다.
+* post-RC improvement는 artifact-backed baseline flow, summary schema 확장 후보, baseline update path의 추가 workflow 보조, 오래된 prose history 정리다.
+* 추적 리스크는 `hello-operator` E2E 경로의 `PreFetch/Start()` semantics 의존이다.
+
+### RC Approval
+
+1. **regression gate model 최소 완료 기준**
+   - RC 승인 기준은 현재 문서/정책/스모크 증거로 충족되었다:
+   - `slint-gate` workflow가 현재 summary/policy 입력으로 실행 가능할 것
+   - 현재 summary/policy 기준에서 `FAIL/WARN/NO_GRADE` 해석 경로가 문서와 workflow에서 일치할 것
+   - repository-stored baseline source는 `docs/baselines/hello-operator-sli-summary.json`로 고정할 것
+   - RC 기준 policy 파일은 `.slint/policy.yaml`로 고정할 것
+   - baseline update 경로는 일반 PR과 분리된 승인 기반 변경으로만 허용할 것
+   - 현재 smoke 결과는 `PASS`이며, RC 결정은 이 baseline contract를 기준으로 승인되었다.
+
+2. **canonical consumer fixture 재현 체크 항목**
+   - RC 기준 재현 체크 항목은 아래로 고정한다:
+   - `hello-operator`가 `kube-slint` `4d3867ccc6ba` 기준선으로 고정되어 있을 것
+   - `go test ./test/e2e -run TestHelloSLIE2E -tags e2e -count=1` 이 통과할 것
+   - `E2E_SLI=1 go test ./test/e2e -run TestHelloSLIE2E -tags e2e -count=1 -timeout 45s` 가 통과할 것
+   - `Tiltfile`, `hack/run-slint-gate.sh`, `.slint/policy.yaml` 조합이 현재 fixture 운영 경로로 유지될 것
+
+3. **deferred debt / post-RC improvement 분류**
+   - deferred debt:
+   - `hello-sample-create`: fixture용 고정 케이스이며 현재 canonical consumer 증거 경로를 깨지 않으므로 non-blocking.
+   - local `pyyaml`: bridge 스크립트 실행 의존성일 뿐 제품/consumer baseline 실증을 무효화하지 않으므로 non-blocking.
+   - post-RC improvement:
+   - `reconcile_error_ratio` 같은 summary schema 외부 metric
+   - baseline update path 추가 자동화와 artifact-backed baseline flow
+   - 오래된 prose history와 현재 기준선 표현의 추가 정리
+
+4. **추적 리스크**
+   - `hello-operator`의 실제 `E2E_SLI=1` 경로가 통과했고, 수동 `snapshotFetcher` 제거도 완료되었다.
+   - 따라서 `PreFetch/Start()` semantics 의존은 현재 **수용 가능한 운영 리스크**로 유지한다.
+   - 단, 이 경로는 `session.Start()`가 workload 변경 전에 호출된다는 계약에 의존하므로 post-RC 추적 리스크로 계속 남긴다.
+
+### Regression Baseline Lifecycle
+
+- **생성**: canonical consumer fixture(`hello-operator`)의 승인된 `E2E_SLI=1` summary를 repository-stored baseline file `docs/baselines/hello-operator-sli-summary.json`로 반영한다.
+- **사용**: RC 기준 regression comparison은 `.slint/policy.yaml`과 `docs/baselines/hello-operator-sli-summary.json` 조합을 기본 입력으로 사용한다.
+- **부재 시 판정**: first-run 또는 baseline 미지정은 `WARN` 기본값으로 취급하되, RC 결정 시점에는 baseline file이 존재해야 한다.
+- **손상 시 판정**: baseline file이 unreadable/corrupt면 regression 축은 `NO_GRADE`로 간주하며, RC 결정에는 불충분한 상태로 본다.
+- **갱신 승인 경로**: baseline update는 일반 PR 변경과 분리된 승인 기반 변경으로만 허용한다. 변경 이유와 비교 근거를 함께 남겨야 한다.
+- **승인 보조 helper**: `hack/prepare-baseline-update.sh /path/to/sli-summary.json` 는 baseline candidate 복사본과 normalized diff를 준비하지만, repository baseline을 자동 교체하지는 않는다.
+- **운영 진입점**: `make baseline-update-prepare BASELINE_SUMMARY=/path/to/sli-summary.json` 로 helper 실행 경로를 표준화한다.
+- **artifact-backed 시작점**: artifact summary는 repository baseline을 대체하지 않고, baseline update review용 candidate input source로만 사용한다.
+- **RC metric set**: 현재 RC 기준 regression policy는 summary에 실제 존재하는 `reconcile_total_delta`, `workqueue_depth_end`만 사용한다.
+- **post-RC 확장 후보**: `reconcile_error_ratio` 같은 summary schema 외부 metric은 이번 RC 기준에서는 제외하고, schema/measurement 확장 과제로 분리한다.
 
 ### Definition of Done (DoD)
 
@@ -188,17 +237,17 @@ Update this file at the **start and end** of every stage/task.
 
 ### Stage Roadmap (draft)
 
-1. [ ] **Phase 6-b: goal/contract alignment**
-   - identity/contract/모드/회귀게이트/소비자 기준 저장소(hello-operator) 문서 정렬
+1. [x] **Phase 6-b: goal/contract alignment**
+   - identity/contract/모드/회귀게이트/소비자 기준 저장소(hello-operator) 문서 정렬 완료
 2. [ ] **Phase 6-c: regression gate model**
    - baseline 대비 절대 임계치 + 회귀 비교를 policy gate로 1급화
-3. [ ] **Phase 6-d: GitHub Actions visibility**
+3. [x] **Phase 6-d: GitHub Actions visibility**
    - `slint-gate`: policy violation 중심 gate
    - `roadmap-status`: 현재 stage/계약 충족도 요약
-   - `baseline-update`: 승인 기반 baseline 갱신 경로
-4. [ ] **Phase 7-a: hello-operator consumer validation**
+   - `baseline-update`: 승인 기반 baseline 갱신 경로는 후속 작업으로 남음
+4. [x] **Phase 7-a: hello-operator consumer validation**
    - `hello-operator`를 canonical DX 검증 저장소로 고정
-   - ko+tilt inner-loop 검증 체크리스트 확정
+   - ko+tilt inner-loop 검증 기준선은 확정, 세부 하드닝은 후속 과제
 5. [ ] **Release Gate: guardrail RC**
    - "테스트 프레임워크"가 아니라 "shift-left guardrail" 메시지/계약이 CI+문서+소비자 검증에서 일치할 때 RC 진행
 

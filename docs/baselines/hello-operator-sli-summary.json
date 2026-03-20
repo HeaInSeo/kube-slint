@@ -1,0 +1,163 @@
+{
+  "schemaVersion": "slo.v3",
+  "generatedAt": "2026-03-07T22:03:18.921775458+09:00",
+  "config": {
+    "runId": "local-1772888598",
+    "startedAt": "2026-03-07T22:03:18.819877241+09:00",
+    "finishedAt": "2026-03-07T22:03:18.920145948+09:00",
+    "mode": {
+      "location": "inside",
+      "trigger": "none"
+    },
+    "tags": {
+      "namespace": "hello-operator-system",
+      "run_id": "local-1772888598",
+      "suite": "hello-operator-sli",
+      "test_case": "hello-sample-create"
+    },
+    "format": "v4.4"
+  },
+  "reliability": {
+    "collectionStatus": "Complete",
+    "evaluationStatus": "Partial",
+    "missingInputs": [
+      "controller_runtime_reconcile_total{result=\"success\"}",
+      "controller_runtime_reconcile_total{result=\"error\"}",
+      "rest_client_requests_total{code=\"429\"}",
+      "rest_client_requests_total{code=\"5xx\"}"
+    ],
+    "skippedSLIs": [
+      "reconcile_success_delta",
+      "reconcile_error_delta",
+      "rest_client_429_delta",
+      "rest_client_5xx_delta"
+    ],
+    "confidenceScore": 0.2,
+    "configSourceType": "injected",
+    "startSkewMs": 100,
+    "endSkewMs": 1,
+    "scrapeLatencyMs": 1
+  },
+  "results": [
+    {
+      "id": "reconcile_total_delta",
+      "title": "reconcile total delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of controller_runtime_reconcile_total during the test window (all results).",
+      "value": 3,
+      "status": "pass",
+      "inputsUsed": [
+        "controller_runtime_reconcile_total"
+      ]
+    },
+    {
+      "id": "reconcile_success_delta",
+      "title": "reconcile success delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of controller_runtime_reconcile_total{result=\"success\"}.",
+      "status": "skip",
+      "reason": "missing input metrics",
+      "inputsUsed": [
+        "controller_runtime_reconcile_total{result=\"success\"}"
+      ],
+      "inputsMissing": [
+        "controller_runtime_reconcile_total{result=\"success\"}"
+      ]
+    },
+    {
+      "id": "reconcile_error_delta",
+      "title": "reconcile error delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of controller_runtime_reconcile_total{result=\"error\"}.",
+      "status": "skip",
+      "reason": "missing input metrics",
+      "inputsUsed": [
+        "controller_runtime_reconcile_total{result=\"error\"}"
+      ],
+      "inputsMissing": [
+        "controller_runtime_reconcile_total{result=\"error\"}"
+      ]
+    },
+    {
+      "id": "workqueue_adds_total_delta",
+      "title": "workqueue adds total delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of workqueue_adds_total during the test window (all queues).",
+      "value": 3,
+      "status": "pass",
+      "inputsUsed": [
+        "workqueue_adds_total"
+      ]
+    },
+    {
+      "id": "workqueue_retries_total_delta",
+      "title": "workqueue retries total delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of workqueue_retries_total during the test window (all queues).",
+      "value": 0,
+      "status": "pass",
+      "inputsUsed": [
+        "workqueue_retries_total"
+      ]
+    },
+    {
+      "id": "workqueue_depth_end",
+      "title": "workqueue depth at end",
+      "unit": "items",
+      "kind": "gauge",
+      "description": "workqueue_depth gauge snapshot at the end time (all queues).",
+      "value": 0,
+      "status": "pass",
+      "inputsUsed": [
+        "workqueue_depth"
+      ]
+    },
+    {
+      "id": "rest_client_requests_total_delta",
+      "title": "rest client requests total delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of rest_client_requests_total during the test window (all codes/methods).",
+      "value": 10,
+      "status": "pass",
+      "inputsUsed": [
+        "rest_client_requests_total"
+      ]
+    },
+    {
+      "id": "rest_client_429_delta",
+      "title": "rest client 429 delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of rest_client_requests_total{code=\"429\"}. Indicates API server throttling.",
+      "status": "skip",
+      "reason": "missing input metrics",
+      "inputsUsed": [
+        "rest_client_requests_total{code=\"429\"}"
+      ],
+      "inputsMissing": [
+        "rest_client_requests_total{code=\"429\"}"
+      ]
+    },
+    {
+      "id": "rest_client_5xx_delta",
+      "title": "rest client 5xx delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "description": "Delta of rest_client_requests_total{code=\"5xx\"}. Some client-go versions aggregate 5xx as \"5xx\".",
+      "status": "skip",
+      "reason": "missing input metrics",
+      "inputsUsed": [
+        "rest_client_requests_total{code=\"5xx\"}"
+      ],
+      "inputsMissing": [
+        "rest_client_requests_total{code=\"5xx\"}"
+      ]
+    }
+  ]
+}
