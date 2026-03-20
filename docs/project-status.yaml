@@ -1,14 +1,14 @@
-current_stage: "Phase 6-b Shift-left Guardrail Alignment"
-roadmap_percent: 55
+current_stage: "Phase 7-a hello-operator consumer validation"
+roadmap_percent: 70
 roadmap_status: "in_progress"
 current_focus:
-  - "Stabilize machine-readable status schema for automation"
-  - "Define roadmap-status visibility contract (design only)"
-  - "Keep human narrative docs separate from automation input source"
+  - "Keep Codex operating docs and repo identity aligned across kube-slint and hello-operator"
+  - "Preserve slint-gate and roadmap-status workflows as the current CI visibility baseline"
+  - "Close the hello-operator consumer validation loop as the canonical adoption fixture"
 next_milestone: "Phase 6-c Regression Gate Model"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"
   regression_gate_spec: "in_progress"
-  github_actions_visibility: "in_progress"
-  hello_operator_validation: "planned"
+  github_actions_visibility: "done"
+  hello_operator_validation: "done"

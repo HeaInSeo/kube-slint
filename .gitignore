@@ -30,3 +30,8 @@ bin/
 # AI assistant local config (not for version control)
 .agent/
 .claude/
+
+# Local Python/cache and cross-repo convenience links
+__pycache__/
+hack/__pycache__/
+hello-operator-ref

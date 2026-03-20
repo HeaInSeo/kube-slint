@@ -39,18 +39,19 @@ It provides a guardrail layer that applies operational SLIs during operator deve
 
 - Absolute threshold gate: supported through current SLI judgment rules.
 - Regression comparison gate: **in progress** (`Phase 6-c Regression Gate Model`).
-- CI visibility for guardrail stages/gates: **in progress** (`Phase 6-d GitHub Actions visibility`).
+- CI visibility for guardrail stages/gates: available through `slint-gate` and `roadmap-status`; broader rollout remains iterative.
 
 ## Relationship to Tests and CI
 
 - Correctness path: lint/unit/mock-e2e validate implementation behavior.
-- Guardrail path: `slint-gate` (planned) evaluates policy outcomes and may fail CI on policy violation.
+- Guardrail path: `slint-gate` evaluates policy outcomes and may fail CI on policy violation.
+- Status visibility path: `roadmap-status` renders the machine-readable project state from `docs/project-status.yaml`.
 - This separation keeps measurement reliability issues distinct from correctness failures.
 
 ## Canonical Consumer DX Validation
 
 - `hello-operator` is the canonical consumer DX validation repository for kube-slint adoption flows.
-- ko+tilt inner-loop validation for this path is **planned/in progress** (`Phase 7-a`).
+- The repo identity and Codex operating rules for that consumer fixture are now established; deeper ko+tilt validation can continue on top of that baseline.
 
 ## How to Use
 
