@@ -251,7 +251,11 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	var value float64
 	switch s.Compute.Mode {
 	case spec.ComputeSingle:
+		fallthrough
+	case spec.ComputeStart:
 		value = valStart
+	case spec.ComputeEnd:
+		value = valEnd
 	case spec.ComputeDelta:
 		value = valEnd - valStart
 		if value < 0 {
