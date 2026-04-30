@@ -1,137 +1,381 @@
 # kube-slint
 
-`kube-slint`는 쿠버네티스 오퍼레이터를 위한 shift-left operational quality guardrail입니다.
+쿠버네티스 오퍼레이터를 위한 shift-left operational SLI 가드레일 라이브러리입니다.
 
-> **중요:** 이 저장소는 독립적으로 실행되는 오퍼레이터(Standalone Operator)에서 **라이브러리 및 테스트 하네스 프레임워크**로 전환되었습니다. 기존의 `cmd/main.go` 및 `controller-runtime` 매니저 실행 구조는 완전히 제거되었습니다.
-
-## 정체성과 범위
-
-`kube-slint`는 **operator correctness test framework 자체가 아닙니다.**
-
-이 도구는 오퍼레이터 개발 단계에서 operational SLI를 lint-style로 적용하여 성능/신뢰성/회귀 문제를 조기에 차단하는 가드레일 역할을 수행합니다.
-
-### kube-slint가 하는 것
-
-- operational SLI 스펙 정의/평가 (`pkg/slo/spec`, `pkg/slo/engine`)
-- 신뢰도 상태를 포함한 구조화 결과물(`sli-summary.json`) 생성
-- 계측 모드(측정 경계/방법)를 1급 개념으로 제공
-- CI 정책 게이트(절대 임계치 + 회귀 비교) 방향 제공
-
-### kube-slint가 하지 않는 것
-
-- `go test`/lint/기능 테스트를 대체하지 않음
-- 프로덕션 reconcile 경로에 계측 코드 삽입을 요구하지 않음(비침투 원칙)
-- 모든 계측 실패를 기본적으로 테스트 실패로 취급하지 않음
-
-## 핵심 계약
-
-1. Measurement failure != test failure
-2. Policy violation (absolute threshold miss / regression vs baseline) may fail CI
-3. Guardrail 평가와 correctness testing은 분리됨
-
-## Measurement Modes (1급 분류)
-
-- `InsideSnapshot` (default)
-- `InsideAnnotation` (precise / semantic-boundary)
-- `OutsideSnapshot` (environment-specific)
-
-## Gate 모델
-
-- 절대 임계치(absolute threshold) 게이트: 현재 SLI 판정 규칙 기반으로 지원
-- 회귀 비교(regression vs baseline) 게이트: **진행 중** (`Phase 6-c Regression Gate Model`)
-- GitHub Actions 가시화(guardrail stage/gate): **진행 중** (`Phase 6-d`)
-
-## 테스트/CI와의 관계
-
-- correctness 경로: lint/unit/mock-e2e가 구현 정합성을 검증
-- guardrail 경로: `slint-gate`(계획)에서 정책 위반을 별도로 판단하고 CI 실패로 승격 가능
-- 이 분리를 통해 계측 신뢰도 이슈와 기능 정합성 이슈를 혼동하지 않음
-
-## Canonical Consumer DX Validation
-
-- `hello-operator`를 kube-slint 소비자 DX 검증의 canonical 저장소로 사용
-- ko+tilt inner-loop 검증 트랙은 **계획/진행 중** (`Phase 7-a`)
-
-## 사용 방법
-
-이 프로젝트는 현재 두 가지 주요 개념으로 나뉘어 구성되어 있습니다.
-
-1. **오퍼레이터 계측 및 테스트 통합 (Go 라이브러리)**
-2. **관측성 스택 배포 (Kustomize)**
-
-### 1. 오퍼레이터 계측 및 테스트 통합 (Go Library)
-
-개발 중인 오퍼레이터 내부나 E2E 테스트 코드에서 `pkg/slo` 기반의 하네스 라이브러리를 활용할 수 있습니다:
-
-```sh
-go get github.com/HeaInSeo/kube-slint@latest
-```
-
-**실클러스터 연동 옵션 (Real-cluster Integration):**
-단순 로컬 테스트가 아닌 **실제 클러스터** 환경에 통합할 때는 자체 서명(Self-signed) 인증서 에러를 무시하거나, 프라이빗 curl 이미지를 바라보도록 `SessionConfig`를 다듬어 줄 수 있습니다.
-
-```go
-sess := harness.NewSession(harness.SessionConfig{
-    Namespace: "my-operator-system",
-    MetricsServiceName: "my-operator-metrics",
-    Specs: mySpecs,
-    
-    // -- 실클러스터 연동 옵션 (Real-cluster Integration Knobs) --
-    // 자체 서명 인증서 무시 (x509: certificate signed by unknown authority 방지)
-    TLSInsecureSkipVerify: true, 
-    // 프록시/프라이빗 이미지 레지스트리 (Docker-hub rate-limit 대비)
-    CurlImage: "my-private-registry.com/curlimages/curl:latest",
-})
-```
-
-> **RBAC 등 권한 주의:** `kube-slint`의 메트릭 수집기(Fetcher)는 메트릭을 긁어오기 위해 일회용 파드를 생성합니다. 따라서 이 라이브러리를 실행하는 매니저의 `ServiceAccount`에는 타겟 네임스페이스 내에 `pods`를 `create` 할 수 있는 RBAC 롤이 반드시 부여되어 있어야 합니다.
-
-> **참고:** `kube-slint`의 Go 코드는 메트릭을 **계산하고, 평가하여 JSON 결과를 리포팅**하는 역할을 담당합니다. 그 메트릭들을 시각화하거나 수집하도록 돕는 인프라 프로비저닝은 하단 Kustomize 스택의 몫입니다.
-
-### 2. 관측성 스택 배포 (Kustomize)
-
-이곳에 정의된 Kustomize 리소스들은 `kube-slint` 메트릭을 모니터링하기 위해 필요한 프로메테우스 태그, 레코딩 룰(Record Rules), 대시보드 등을 제공합니다.
-
-**원격 리소스 설치 (권장 사항)**  
-현재 작업 중인 오퍼레이터 저장소의 Kustomize overlay 내부에 관측성 스택을 직접 불러와 사용할 수 있습니다.
-
-> **주의:** `?ref=main`과 같은 브랜치 참조를 사용하지 마십시오. 재현 가능하고 불변하는 빌드를 보장하기 위해 반드시 **특정 태그나 커밋 SHA**를 지정해야 합니다.
-
-소비자 저장소의 최상위 `kustomization.yaml`을 생성하십시오. 저희 베이스 스택은 특정 네임스페이스를 강제하지 않는 **"Zero-Assumption" 전략**을 취하고 있으므로, overlay 단에서 반영할 대상을 `namespace` 필드로 명시해야 합니다:
-
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-# (필수) 원격 스택이 배포될 네임스페이스를 주입합니다.
-namespace: your-target-namespace
-
-resources:
-  # 구체적인 태그나 커밋 SHA 지정
-  - github.com/HeaInSeo/kube-slint//config/default?ref=<tag or commitSHA>
-```
-
-> **ServiceMonitors 주의사항 (명시적 패치 오버라이드 전략):** 리소스 원격 가져오기(`github.com/...`) 문법 자체는 정상 동작합니다. 하지만 현재 `config/samples/prometheus` 리소스에는 `kube-slint` 특정 라벨(`app.kubernetes.io/name: kube-slint`)이 하드코딩되어 있습니다. 이를 그대로 사용하면 프로메테우스가 여러분의 오퍼레이터를 스크랩하지 못하는 **조용한 장애(Silent Failure)** 가 발생합니다.
-> 
-> 단기 권장 완화책으로서, 소비자 저장소 측에서 **명시적 로컬 오버라이드(Kustomize Patch)** 를 통해 `spec.selector.matchLabels`를 여러분의 오퍼레이터 이름으로 덮어씌워야 합니다. (이 구조적 한계의 근본적 개선은 당분간 보류(Deferred) 상태로 남습니다.)
-> *(공식 튜토리얼과 패치 파일 예시는 [`test/consumer-onboarding/kustomize-remote-consumer/`](test/consumer-onboarding/kustomize-remote-consumer/README.md)를 참고하십시오.)*
+> **전환 안내:** kube-slint는 독립 실행형 오퍼레이터가 아닙니다. 임베드 가능한 Go 라이브러리 및 CLI 툴체인입니다. 이전 문서에서는 독립 오퍼레이터 모델을 언급했으나, 해당 모델은 폐기되었습니다. 현재 설계는 SLI 수집을 E2E 테스트 세션에 직접 내장하고, Go CLI 바이너리(`cmd/slint-gate`)를 통해 CI를 게이팅합니다.
 
 ---
 
-## 로컬 개발 및 검증
+## 정체성과 범위
 
-더 이상 백그라운드 서비스(데몬)로 동작하지 않으므로, 일반적인 Go 프로젝트의 검증 표준을 따릅니다.
+### kube-slint가 하는 것
 
-### 개발 및 테스트 명령어
+- E2E 테스트 세션 중 실행 중인 오퍼레이터에서 운영 SLI 메트릭(reconcile 비율, 워크큐 깊이, REST 클라이언트 오류)을 수집합니다.
+- 수집된 메트릭을 선언적 정책(`policy.yaml`)과 비교하여 게이트 결과를 산출합니다.
+- 저장된 기준선(baseline)과 비교하여 회귀를 감지합니다.
+- CI 소비 및 감사를 위한 구조화된 JSON 아티팩트(`sli-summary.json`, `slint-gate-summary.json`)를 작성합니다.
+- `--github-step-summary`를 통해 GitHub Actions에 마크다운 스텝 요약을 렌더링합니다.
 
-개발과 수정을 진행한 이후에는 반드시 다음 명령어들을 실행하여 정합성을 확인해야 합니다. **Push 전 `go mod tidy`에 의한 변경(diff) 차이가 없어야 CI(lint/test)를 무사히 통과할 수 있습니다.**
+### kube-slint가 하지 않는 것
 
-- `bin/golangci-lint run --timeout=10m --config=.golangci.yml ./...` : 정적 분석 린트 검사
-- `go test ./...` : 단위/통합 테스트 (E2E 하네스 시뮬레이션 포함)
-- `go mod tidy` : 누락되거나 불필요한 의존성 모듈 정리
-- `git diff --exit-code` : `go.mod/go.sum` 및 전체 의존성 무결성 체크
+- kube-slint는 correctness 테스트 프레임워크가 아닙니다. 오퍼레이터가 올바르게 동작하는지 단언하지 않습니다.
+- kube-slint는 모니터링 또는 알림 시스템이 아닙니다. 연속적인 프로덕션 메트릭이 아닌, 테스트 실행 시점의 가드레일 결과를 산출합니다.
+- kube-slint는 계측 실패 시 E2E 테스트를 실패시키지 않습니다. 메트릭 스크랩에 실패하면 미계측으로 기록되지만 테스트 세션은 계속됩니다(핵심 계약 참조).
 
-> 과거에 사용하던 `run`, `docker-build`, `deploy`, `install` 등의 빌드 배포 명령어들은 오작동 방지를 위해 안내 메시지만 출력하는 no-ops 껍데기로 남겨져 있습니다.
+---
+
+## 핵심 계약
+
+1. **계측 실패는 테스트 실패가 아닙니다.** kube-slint가 메트릭을 스크랩할 수 없는 경우, 해당 결과는 미계측으로 기록됩니다. E2E 테스트는 계속 진행됩니다.
+2. **정책 위반은 CI를 실패시킬 수 있습니다.** 임계치 미달 또는 기준선 대비 회귀가 감지되면 게이트 스텝이 비정상 종료 코드로 종료되어 CI 작업이 실패합니다.
+3. **가드레일 평가와 correctness 테스트는 분리됩니다.** 기존 E2E 단언과 kube-slint 게이트 결과는 독립적인 신호입니다. 둘 다 독립적으로 실패할 수 있습니다.
+
+---
+
+## 동작 방식
+
+```
+E2E 테스트 프로세스
+     |
+     |--- sess.Start() --------> 메트릭 관측 시작
+     |
+     | (E2E 시나리오 실행)
+     |
+     |--- sess.End(ctx) -------> 메트릭 수집, SLI 스펙 평가
+                                  artifacts/sli-summary.json 작성
+                                         |
+                                         v
+                              slint-gate CLI
+                         (cmd/slint-gate 바이너리)
+                                  |
+                         sli-summary.json 읽기
+                         .slint/policy.yaml 읽기
+                         baseline 읽기 (선택)
+                                  |
+                                  v
+                       slint-gate-summary.json
+                                  |
+                         gate_result: PASS
+                                     WARN
+                                     FAIL      ---> CI 실패
+                                     NO_GRADE
+```
+
+---
+
+## 빠른 시작
+
+**1단계: 의존성 추가**
+
+```sh
+go get github.com/HeaInSeo/kube-slint
+```
+
+**2단계: E2E 테스트에 하네스 임베드**
+
+```go
+import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+
+sess := harness.NewSession(harness.SessionConfig{
+    Namespace:             "my-operator-system",
+    MetricsServiceName:    "my-operator-controller-manager-metrics-service",
+    ArtifactsDir:          "artifacts",
+    Specs:                 harness.DefaultV3Specs(),
+    TLSInsecureSkipVerify: true,
+    CurlImage:             "my-registry/curlimages/curl:latest",
+})
+sess.Start()
+// ... E2E 시나리오 실행 ...
+sess.End(ctx)
+```
+
+**3단계: 결과 게이팅**
+
+```sh
+make slint-gate   # bin/slint-gate 빌드
+./bin/slint-gate --measurement-summary artifacts/sli-summary.json \
+                 --policy .slint/policy.yaml \
+                 --output slint-gate-summary.json
+```
+
+게이트 결과 확인:
+
+```sh
+jq -r '.gate_result' slint-gate-summary.json
+```
+
+---
+
+## 상세 사용법
+
+### 1. SLI 스펙 정의
+
+**프리셋 스펙 사용**
+
+`DefaultV3Specs()`(별칭: `BaselineV3Specs()`)는 kubebuilder로 생성된 오퍼레이터를 위해 설계된 프리셋 스펙 세트를 반환합니다. 다음 항목을 포함합니다:
+
+| ID | 설명 |
+|---|---|
+| `reconcile_total_delta` | 세션 중 총 reconcile 호출 횟수 |
+| `reconcile_success_delta` | 성공한 reconcile 호출 횟수 |
+| `reconcile_error_delta` | 실패한 reconcile 호출 횟수 |
+| `workqueue_adds_total_delta` | 워크큐에 추가된 항목 수 |
+| `workqueue_retries_total_delta` | 워크큐 재시도 횟수 |
+| `workqueue_depth_end` | 세션 종료 시점의 워크큐 깊이 |
+| `rest_client_requests_total_delta` | 총 REST 클라이언트 요청 수 |
+| `rest_client_429_delta` | 수신된 속도 제한(429) 응답 수 |
+| `rest_client_5xx_delta` | 수신된 서버 오류(5xx) 응답 수 |
+
+```go
+specs := harness.DefaultV3Specs()
+```
+
+**커스텀 SLI 스펙 정의**
+
+```go
+import (
+    "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
+)
+
+mySpecs := []spec.SLISpec{
+    {
+        ID:    "reconcile_error_delta",
+        Title: "Reconcile Error Delta",
+        Unit:  "count",
+        Kind:  "delta_counter",
+        Inputs: []spec.MetricRef{
+            spec.PromMetric("controller_runtime_reconcile_total", spec.Labels{"result": "error"}),
+        },
+        Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+        Judge: &spec.JudgeSpec{Rules: []spec.Rule{
+            {Op: spec.OpGT, Target: 0, Level: spec.LevelFail},
+        }},
+    },
+}
+```
+
+`mySpecs`를 `SessionConfig`의 `Specs` 필드에 전달합니다.
+
+---
+
+### 2. E2E 테스트에 하네스 임베드
+
+```go
+import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+
+sess := harness.NewSession(harness.SessionConfig{
+    // 오퍼레이터가 실행 중인 대상 네임스페이스
+    Namespace: "my-operator-system",
+
+    // /metrics를 노출하는 쿠버네티스 서비스 이름
+    MetricsServiceName: "my-operator-controller-manager-metrics-service",
+
+    // sli-summary.json이 작성될 디렉토리
+    ArtifactsDir: "artifacts",
+
+    // SLI 스펙 세트 — 프리셋 또는 커스텀 사용
+    Specs: harness.DefaultV3Specs(),
+
+    // 실클러스터 설정
+    TLSInsecureSkipVerify: true,
+    CurlImage:             "my-registry/curlimages/curl:latest",
+})
+
+sess.Start()
+// ... 여기에 E2E 시나리오 실행 ...
+sess.End(ctx)
+```
+
+**RBAC 주의사항:** 하네스는 curl 기반 페처를 사용하여 메트릭 엔드포인트를 스크랩하기 위한 임시 파드를 생성합니다. 오퍼레이터의 ServiceAccount는 대상 네임스페이스에서 `pods: create` 권한을 보유해야 합니다.
+
+**출력:** `artifacts/sli-summary.json`은 `sess.End(ctx)` 호출 시 작성됩니다. 이 파일이 slint-gate CLI의 입력이 됩니다.
+
+---
+
+### 3. 결과 게이팅 (slint-gate CLI)
+
+게이트 CLI는 `cmd/slint-gate`에 위치한 Go 바이너리입니다. 레거시 `hack/slint_gate.py` Python 스크립트를 대체하며, 해당 스크립트는 참조용으로만 보관됩니다.
+
+**빌드**
+
+```sh
+make slint-gate
+# bin/slint-gate 생성
+
+# 또는 빌드 없이 직접 실행
+go run ./cmd/slint-gate [flags]
+```
+
+**플래그**
+
+| 플래그 | 기본값 | 설명 |
+|---|---|---|
+| `--measurement-summary` | `artifacts/sli-summary.json` | 하네스가 생성한 SLI 요약 파일 경로 |
+| `--policy` | `.slint/policy.yaml` | 정책 파일 경로 |
+| `--baseline` | `""` (비활성) | 회귀 비교용 기준선 요약 경로; 생략하면 건너뜀 |
+| `--output` | `slint-gate-summary.json` | 게이트 결과 JSON 작성 경로 |
+| `--github-step-summary` | false | `$GITHUB_STEP_SUMMARY`에 마크다운 작성 (GitHub Actions용) |
+
+**종료 동작:** 바이너리는 항상 0으로 종료합니다. CI 워크플로우는 `jq`로 출력 JSON의 `gate_result`를 검사하여 실패를 판단합니다.
+
+**정책 파일 (`.slint/policy.yaml`)**
+
+```yaml
+schema_version: "slint.policy.v1"
+thresholds:
+  - name: "reconcile_total_delta_min"
+    metric: "reconcile_total_delta"   # sli-summary.json의 results[].id와 일치해야 함
+    operator: ">="
+    value: 1
+  - name: "workqueue_depth_end_max"
+    metric: "workqueue_depth_end"
+    operator: "<="
+    value: 5
+regression:
+  enabled: true
+  tolerance_percent: 5
+reliability:
+  required: false
+  min_level: "partial"
+fail_on:
+  - "threshold_miss"
+  - "regression_detected"
+```
+
+**게이트 결과값**
+
+| 결과 | 의미 |
+|---|---|
+| `PASS` | 모든 임계치 및 회귀 검사 통과 |
+| `WARN` | 비차단 이슈 (예: 기준선 없는 첫 실행, 신뢰도 최솟값 미달 등) |
+| `FAIL` | 정책 위반 — 임계치 미달 또는 회귀 감지; CI 실패 |
+| `NO_GRADE` | 평가 불가 — 입력 파일 누락 또는 손상 |
+
+---
+
+### 4. 관측성 스택 배포 (Kustomize)
+
+kube-slint는 클러스터에 메트릭 수집 인프라를 설치하는 Kustomize 베이스를 제공합니다.
+
+**원격 베이스 참조**
+
+```yaml
+# your overlay/kustomization.yaml
+resources:
+  - github.com/HeaInSeo/kube-slint//config/default?ref=<tag-or-SHA>
+```
+
+규칙:
+- 항상 태그 또는 SHA로 고정합니다. `?ref=main`은 절대 사용하지 않습니다.
+- 오버레이에 반드시 `namespace:`를 선언합니다. 베이스는 네임스페이스를 가정하지 않습니다.
+
+**ServiceMonitor 레이블**
+
+베이스의 ServiceMonitor에는 레이블이 하드코딩되어 있습니다. Prometheus 오퍼레이터의 셀렉터에 맞게 전략적 머지 패치로 이를 재정의해야 합니다.
+
+```yaml
+# overlay/patch-servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-slint-controller-manager-metrics-monitor
+  namespace: <your-namespace>
+spec:
+  selector:
+    matchLabels:
+      # Prometheus 오퍼레이터가 선택하는 레이블로 재정의
+      app: my-operator
+```
+
+전체 온보딩 튜토리얼은 `test/consumer-onboarding/kustomize-remote-consumer/`에서 확인할 수 있습니다.
+
+---
+
+## 계측 모드
+
+kube-slint는 세션 또는 스펙별로 설정할 수 있는 세 가지 1급 계측 모드를 지원합니다:
+
+| 모드 | 설명 |
+|---|---|
+| `InsideSnapshot` (기본) | 세션 시작과 종료 시 스냅샷 기반 수집; 두 값의 차이로 델타를 계산 |
+| `InsideAnnotation` | 정밀 시맨틱 경계 수집; 측정이 어노테이션된 테스트 경계에 정렬됨 |
+| `OutsideSnapshot` | 외부 스크랩; 세션 내부가 아닌 외부 소스에서 메트릭 수집 |
+
+---
+
+## 게이트 모델
+
+두 가지 게이트 모델 구성 요소가 모두 완성되었습니다.
+
+**임계치 검사** (완료): `sli-summary.json`의 각 메트릭 결과가 `policy.yaml`의 임계치 규칙과 비교됩니다. `fail_on`에 `threshold_miss`가 포함된 경우 임계치 미달 시 `gate_result`가 `FAIL`로 설정됩니다.
+
+**회귀 감지** (완료): `--baseline`이 제공된 경우, 각 메트릭 결과가 저장된 기준선 값과 비교됩니다. 변화량이 `tolerance_percent`를 초과하면 회귀로 플래그됩니다. `fail_on`에 `regression_detected`가 포함된 경우 회귀 감지 시 `gate_result`가 `FAIL`로 설정됩니다.
+
+---
+
+## CI 통합
+
+`.github/workflows/slint-gate.yml` 워크플로우는 E2E 테스트가 `sli-summary.json`을 아티팩트로 업로드한 후 게이트를 평가합니다.
+
+```yaml
+- name: Evaluate slint gate
+  run: go run ./cmd/slint-gate --github-step-summary
+
+- name: Upload gate summary
+  uses: actions/upload-artifact@v4
+  with:
+    name: slint-gate-summary
+    path: slint-gate-summary.json
+
+- name: Check gate result
+  run: |
+    result=$(jq -r '.gate_result' slint-gate-summary.json)
+    if [ "$result" = "FAIL" ]; then
+      echo "Gate result: FAIL"
+      exit 1
+    fi
+    echo "Gate result: $result"
+```
+
+게이트 스텝은 별도로 재정의하지 않는 한 기본 플래그값(`--measurement-summary artifacts/sli-summary.json`, `--policy .slint/policy.yaml`)을 사용합니다.
+
+---
+
+## 기준선 관리
+
+기준선은 회귀 비교를 위해 이전 게이트의 메트릭 결과를 저장합니다.
+
+**기준선 업데이트**
+
+```sh
+make baseline-update-prepare BASELINE_SUMMARY=/path/to/sli-summary.json
+```
+
+**승인 요구사항:** 기준선 변경은 일반 기능 PR이 아닌 별도의 승인 PR에 포함되어야 합니다. 이는 성능이 저하된 실행 결과가 자동으로 회귀 기준점을 초기화하는 것을 방지합니다.
+
+**기준선 없는 첫 실행:** `--baseline`을 지정하지 않으면 회귀 감지를 건너뛰고 `gate_result`가 `WARN`(비차단)으로 설정됩니다. 이는 온보딩 후 첫 실행에서 예상되는 동작입니다.
+
+---
+
+## 로컬 개발 및 테스트
+
+```sh
+# 린터 실행
+./bin/golangci-lint run --timeout=10m --config=.golangci.yml ./...
+
+# 단위 테스트 실행
+go test ./...
+
+# 모듈 일관성 확인
+go mod tidy
+git diff --exit-code
+
+# slint-gate CLI 빌드
+make slint-gate
+
+# 로컬 요약으로 기준선 업데이트
+make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json
+```
 
 ---
 
@@ -139,4 +383,7 @@ resources:
 
 Copyright 2026.
 
-Apache License 2.0 하에 배포됩니다.
+Apache License, Version 2.0에 따라 배포됩니다.
+자세한 내용은 http://www.apache.org/licenses/LICENSE-2.0 를 참조하십시오.
+
+본 소프트웨어는 관련 법령이나 서면 동의에 의해 별도로 명시되지 않는 한, 명시적 또는 묵시적 어떠한 종류의 보증도 없이 "있는 그대로" 배포됩니다.
