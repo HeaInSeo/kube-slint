@@ -14,6 +14,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const categoryThreshold = "threshold"
+
 // --- fixtures ---
 
 type policyFixture struct {
@@ -133,7 +135,7 @@ func TestEvaluate_FirstRun_ThresholdPass(t *testing.T) {
 	// threshold checks themselves still pass
 	var thresholdChecks []gate.Check
 	for _, c := range result.Checks {
-		if c.Category == "threshold" {
+		if c.Category == categoryThreshold {
 			thresholdChecks = append(thresholdChecks, c)
 		}
 	}
@@ -350,7 +352,7 @@ func TestEvaluate_AllOperators(t *testing.T) {
 
 			var check gate.Check
 			for _, c := range result.Checks {
-				if c.Category == "threshold" {
+				if c.Category == categoryThreshold {
 					check = c
 				}
 			}
@@ -421,4 +423,177 @@ func TestEvaluate_OutputSchema(t *testing.T) {
 	assert.Equal(t, meas, result.InputRefs.MeasurementSummary)
 	assert.Equal(t, policy, result.InputRefs.PolicyFile)
 	assert.Nil(t, result.InputRefs.BaselineFile)
+}
+
+func TestEvaluate_PolicyInvalidYAML(t *testing.T) {
+	dir := t.TempDir()
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath, []byte(":\tinvalid: yaml: :::"), 0o644))
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policyPath,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
+func TestEvaluate_BaselinePath_Set_InputRefs(t *testing.T) {
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	require.NotNil(t, result.InputRefs.BaselineFile)
+	assert.Equal(t, baseline, *result.InputRefs.BaselineFile)
+}
+
+func TestEvaluate_RegressionEnabled_BaselineAbsent_NoGrade(t *testing.T) {
+	// regression enabled + no baseline → WARN (hasWarn=true from runRegression)
+	// but hasNoGrade also true → computeGateResult: failed=false, hasWarn=true → WARN wins
+	dir := t.TempDir()
+	p := defaultPolicy()
+	p.Regression = map[string]any{"enabled": true, "tolerance_percent": 5}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateWarn, result.GateResult)
+}
+
+func TestEvaluate_NoThresholds_RegressionDisabled_Pass(t *testing.T) {
+	// 정책에 threshold 없고 regression disabled → reliability check만 통과하면 PASS
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+}
+
+func TestEvaluate_ReliabilityPartial_NotRequired_Pass(t *testing.T) {
+	// reliability.required=false → reliability check는 warn 발생 안 함
+	dir := t.TempDir()
+	p := defaultPolicy()
+	p.Regression = map[string]any{"enabled": false}
+	p.Reliability = map[string]any{"required": false, "min_level": "complete"}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Partial",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+}
+
+func TestEvaluate_DefaultFailOn_Applied(t *testing.T) {
+	// FailOn 필드 비어있으면 기본값(threshold_miss, regression_detected) 적용 → FAIL
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 10},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{}, // 비어있음 → 기본값 적용
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+}
+
+func TestEvaluate_UnnamedThreshold(t *testing.T) {
+	// threshold name이 비어있으면 "unnamed-threshold"로 대체
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 5}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	for _, c := range result.Checks {
+		if c.Category == categoryThreshold {
+			assert.Equal(t, "unnamed-threshold", c.Name)
+		}
+	}
+}
+
+func TestEvaluate_RegressionMetricMissingInBaseline(t *testing.T) {
+	// 현재에는 metric이 있지만 baseline에 없으면 regression check → no_grade
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Complete",
+	))
+	// baseline에 workqueue_depth_end 없음
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	// regression check 일부가 no_grade → partially_evaluated
+	assert.Equal(t, "partially_evaluated", result.EvaluationStatus)
 }
