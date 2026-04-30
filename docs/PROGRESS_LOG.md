@@ -5,6 +5,33 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
+## Current Status: Stage (Post-RC) — Phase 6-d Go CLI Migration Complete
+
+**Branch:** `main`
+**Last updated:** 2026-04-30 (Go CLI migration + README full rewrite)
+
+---
+
+### Phase 6-d: Go CLI Migration (COMPLETE)
+
+**완료 항목:**
+
+* [x] `hack/slint_gate.py` (Python + pyyaml) → `cmd/slint-gate` Go 바이너리로 완전 대체
+* [x] `internal/gate` 패키지 구현 (threshold check, regression detection, reliability check, gate result 계산)
+* [x] `internal/gate` 단위 테스트 16종, 89.2% coverage
+* [x] `Makefile` `slint-gate` 타깃 추가 (`bin/slint-gate` 빌드)
+* [x] `.github/workflows/slint-gate.yml`: Python 의존 제거, Go + jq 전환
+* [x] `--github-step-summary` 플래그로 Actions step summary 렌더링 Go 내부 흡수
+* [x] `README.md` 전면 재작성 (영문, Quick Start / 플로우 다이어그램 / 상세 사용법 포함)
+* [x] `README(Kor).md` 전면 재작성 (한국어, 동일 구조 미러링)
+* [x] `golangci-lint v2.1.0` — 0 issues
+* [x] `DECISIONS.md` D-012 결정 추가
+* [x] GitHub push 완료 (커밋 3개: feat, ci, docs)
+
+**근거:** Python 런타임/pyyaml 의존 제거 + Go 단일 스택 통합. 내부 게이트 로직을 테스트 가능한 `internal/gate` 패키지로 캡슐화하여 회귀 방어.
+
+---
+
 ## Current Status: Stage (RC Approved) — Phase 6-c Regression Gate Model
 
 **Branch:** `main`

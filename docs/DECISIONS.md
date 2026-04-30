@@ -109,9 +109,22 @@ This file records architecture/product-direction decisions that define the proje
 ## D-011: slint-gate-summary.json is the machine-readable output contract for gate evaluation
 
 - Date: 2026-03-07
-- Status: Accepted (draft schema)
+- Status: Accepted (implemented)
 - Decision:
   - gate 결과의 machine-readable 출력 계약은 `slint-gate-summary.json`으로 정의한다.
   - 최소 필드(`gate_result`, `evaluation_status`, `measurement_status`, `baseline_status`, `policy_status`, `checks` 등)를 유지한다.
 - Rationale:
   - Actions summary, PR 코멘트, 후속 리포팅 경로가 동일한 gate 결과 구조를 재사용할 수 있다.
+
+## D-012: slint-gate CLI is implemented in Go (cmd/slint-gate); Python prototype is retired
+
+- Date: 2026-04-30
+- Status: Accepted
+- Decision:
+  - `hack/slint_gate.py` (Python + pyyaml)를 레거시 참조용으로 보존하되, 운영 gate 경로는 `cmd/slint-gate` Go 바이너리로 완전 대체한다.
+  - gate 평가 로직은 `internal/gate` 패키지로 캡슐화하며, CLI는 `cmd/slint-gate/main.go`에서만 flag 파싱 및 출력을 담당한다.
+  - CI workflow (`slint-gate.yml`)는 Python 의존을 제거하고 `go run ./cmd/slint-gate`로 전환한다.
+- Rationale:
+  - Go 단일 언어 스택으로 통합하여 Python 런타임/pyyaml 의존을 제거한다.
+  - `internal/gate` 단위 테스트(89.2% coverage)로 게이트 로직의 회귀를 방어한다.
+  - `--github-step-summary` 플래그로 Actions step summary 렌더링을 Go 바이너리 내부로 흡수한다.

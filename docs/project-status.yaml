@@ -1,15 +1,18 @@
-current_stage: "Phase 6-c Regression Gate Model"
-roadmap_percent: 72
-roadmap_status: "rc_approved"
+current_stage: "Phase 6-d Go CLI Migration"
+roadmap_percent: 80
+roadmap_status: "post_rc"
 current_focus:
-  - "Guardrail RC baseline is approved on the repository-stored policy/baseline pair and the canonical hello-operator consumer fixture"
-  - "Treat remaining bridge/workaround items as deferred non-blocking debt unless new evidence changes that classification"
+  - "Python slint_gate.py retired; cmd/slint-gate Go binary is the operational gate path"
+  - "internal/gate package provides tested gate evaluation logic (89.2% coverage)"
+  - "README.md and README(Kor).md fully rewritten and in sync"
   - "Track the PreFetch/Start contract as an explicit operating risk after RC approval"
   - "Carry schema expansion candidates such as reconcile_error_ratio as post-RC policy/measurement work"
-next_milestone: "Post-RC hardening and baseline update path refinement"
+next_milestone: "Post-RC hardening: cmd/slint-gate integration tests, baseline update workflow automation"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"
   regression_gate_spec: "done"
   github_actions_visibility: "done"
   hello_operator_validation: "done"
+  go_cli_gate: "done"
+  readme_rewrite: "done"
