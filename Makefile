@@ -103,8 +103,12 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 ##@ Build
 
 .PHONY: build
-build: ## Build library packages.
+build: ## Build library packages and CLI binaries.
 	go build ./...
+
+.PHONY: slint-gate
+slint-gate: ## Build the slint-gate CLI binary to bin/slint-gate.
+	go build -o bin/slint-gate ./cmd/slint-gate
 
 .PHONY: run
 run: ## Run a controller from your host.
