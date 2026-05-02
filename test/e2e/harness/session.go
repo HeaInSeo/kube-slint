@@ -114,7 +114,7 @@ func NewSession(cfg SessionConfig) *Session {
 		Config: cfg,
 
 		ServiceURLFormat: "https://%s.%s.svc:8443/metrics",
-		CurlImage:        "curlimages/curl:latest",
+		CurlImage:        "docker.io/curlimages/curl:8.11.0",
 
 		ScrapeTimeout:      2 * time.Minute,
 		WaitPodDoneTimeout: 5 * time.Minute,

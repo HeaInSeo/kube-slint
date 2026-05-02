@@ -11,6 +11,19 @@ import (
 )
 
 func main() {
+	// Subcommand routing: slint-gate init [flags]
+	if len(os.Args) > 1 && os.Args[1] == "init" {
+		if err := runInit(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "slint-gate init: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	runGate()
+}
+
+func runGate() {
 	measurementPath := flag.String("measurement-summary", "artifacts/sli-summary.json", "Path to measurement summary JSON")
 	policyPath := flag.String("policy", ".slint/policy.yaml", "Path to policy YAML")
 	baselinePath := flag.String("baseline", "", "Optional path to baseline summary JSON")
@@ -29,6 +42,8 @@ func main() {
 		os.Exit(2)
 	}
 	fmt.Println(*outputPath)
+
+	printDiagnostics(result)
 
 	if *githubStepSummary {
 		if err := renderGitHubStepSummary(result); err != nil {
