@@ -34,7 +34,10 @@ func pollUntil(ctx context.Context, interval time.Duration, fn func() (bool, err
 	for {
 		select {
 		case <-ctx.Done():
-			return errors.Join(lastErr, ctx.Err())
+			if lastErr != nil {
+				return errors.Join(lastErr, ctx.Err())
+			}
+			return ctx.Err()
 		case <-ticker.C:
 			if tryOnce() {
 				return nil

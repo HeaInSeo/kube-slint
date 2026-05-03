@@ -224,7 +224,7 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	}
 
 	used := make([]string, 0, len(s.Inputs))
-	missing := make([]string, 0)
+	missing := make([]string, 0, len(s.Inputs))
 
 	// v3: 단일 입력 SLI를 권장함. 여러 입력이 존재하면 이를 합산함.
 	var valStart, valEnd float64

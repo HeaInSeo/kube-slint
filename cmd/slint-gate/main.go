@@ -62,6 +62,7 @@ func writeJSON(path string, v any) error {
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
 		_ = f.Close()
+		_ = os.Remove(path)
 		return err
 	}
 	return f.Close()
