@@ -1,0 +1,129 @@
+name: slint-gate
+description: >
+  Evaluate a kube-slint policy gate against a sli-summary.json produced by
+  the kube-slint harness. Fails the job on FAIL (or optionally WARN).
+  Requires Go to be installed in the calling workflow (actions/setup-go).
+
+inputs:
+  measurement-summary:
+    description: Path to sli-summary.json (relative to workspace)
+    required: false
+    default: artifacts/sli-summary.json
+
+  policy:
+    description: Path to .slint/policy.yaml (relative to workspace)
+    required: false
+    default: .slint/policy.yaml
+
+  baseline:
+    description: Optional path to baseline summary JSON (relative to workspace)
+    required: false
+    default: ''
+
+  output:
+    description: Output path for slint-gate-summary.json (relative to workspace)
+    required: false
+    default: slint-gate-summary.json
+
+  fail-on:
+    description: >
+      Gate result level that fails the job.
+      FAIL         — only hard violations fail (default).
+      FAIL_OR_WARN — treat WARN as a failure too.
+    required: false
+    default: FAIL
+
+  github-step-summary:
+    description: Append a Markdown result table to $GITHUB_STEP_SUMMARY
+    required: false
+    default: 'true'
+
+  upload-artifact:
+    description: Upload slint-gate-summary.json as a workflow artifact
+    required: false
+    default: 'true'
+
+  artifact-name:
+    description: Name for the uploaded artifact
+    required: false
+    default: slint-gate-summary
+
+outputs:
+  gate-result:
+    description: Gate evaluation result — PASS | WARN | FAIL | NO_GRADE
+    value: ${{ steps.run-gate.outputs.gate_result }}
+
+  evaluation-status:
+    description: Evaluation completeness — evaluated | partially_evaluated | not_evaluated
+    value: ${{ steps.run-gate.outputs.evaluation_status }}
+
+  summary-path:
+    description: Absolute path to the written slint-gate-summary.json
+    value: ${{ steps.run-gate.outputs.summary_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run slint-gate
+      id: run-gate
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_MEASUREMENT: ${{ inputs.measurement-summary }}
+        INPUT_POLICY: ${{ inputs.policy }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_STEP_SUMMARY: ${{ inputs.github-step-summary }}
+      run: |
+        set -euo pipefail
+
+        EXTRA=""
+        if [ "${INPUT_STEP_SUMMARY}" = "true" ]; then
+          EXTRA="--github-step-summary"
+        fi
+
+        go run "${ACTION_PATH}/../../../cmd/slint-gate" \
+          --measurement-summary "${INPUT_MEASUREMENT}" \
+          --policy             "${INPUT_POLICY}" \
+          --baseline           "${INPUT_BASELINE}" \
+          --output             "${INPUT_OUTPUT}" \
+          ${EXTRA}
+
+        GATE=$(jq -r '.gate_result'        "${INPUT_OUTPUT}")
+        EVAL=$(jq -r '.evaluation_status'  "${INPUT_OUTPUT}")
+        ABS_PATH="$(realpath "${INPUT_OUTPUT}")"
+
+        echo "gate_result=${GATE}"        >> "${GITHUB_OUTPUT}"
+        echo "evaluation_status=${EVAL}"  >> "${GITHUB_OUTPUT}"
+        echo "summary_path=${ABS_PATH}"   >> "${GITHUB_OUTPUT}"
+
+    - name: Upload gate summary artifact
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ github.workspace }}/${{ inputs.output }}
+        retention-days: 30
+        overwrite: true
+
+    - name: Check gate result
+      shell: bash
+      env:
+        GATE_RESULT: ${{ steps.run-gate.outputs.gate_result }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        set -euo pipefail
+        echo "slint-gate result: ${GATE_RESULT}"
+
+        if [ "${GATE_RESULT}" = "FAIL" ]; then
+          echo "::error::slint-gate FAIL — policy violation detected. Check the Diagnostics output above."
+          exit 1
+        fi
+
+        if [ "${FAIL_ON}" = "FAIL_OR_WARN" ] && [ "${GATE_RESULT}" = "WARN" ]; then
+          echo "::error::slint-gate WARN treated as failure (fail-on=FAIL_OR_WARN)."
+          exit 1
+        fi
+
+        echo "slint-gate ${GATE_RESULT} — continuing."

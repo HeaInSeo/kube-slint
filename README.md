@@ -315,29 +315,59 @@ Both gate model components are complete.
 
 ## CI Integration
 
-The `.github/workflows/slint-gate.yml` workflow evaluates the gate after your E2E tests upload `sli-summary.json` as an artifact.
+### GitHub Composite Action (recommended)
+
+Drop the action into any workflow — no extra scripting required:
+
+```yaml
+jobs:
+  e2e:
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # ... your E2E steps that produce artifacts/sli-summary.json ...
+
+      - name: slint-gate
+        uses: HeaInSeo/kube-slint/.github/actions/slint-gate@main
+        with:
+          measurement-summary: artifacts/sli-summary.json   # default
+          policy:              .slint/policy.yaml            # default
+          fail-on:             FAIL                          # FAIL | FAIL_OR_WARN
+```
+
+**Inputs**
+
+| Input | Default | Description |
+|---|---|---|
+| `measurement-summary` | `artifacts/sli-summary.json` | Path to sli-summary.json |
+| `policy` | `.slint/policy.yaml` | Path to policy YAML |
+| `baseline` | `` | Optional baseline summary path |
+| `output` | `slint-gate-summary.json` | Output path for gate result |
+| `fail-on` | `FAIL` | `FAIL` or `FAIL_OR_WARN` |
+| `github-step-summary` | `true` | Append Markdown table to step summary |
+| `upload-artifact` | `true` | Upload gate result as artifact |
+
+**Outputs**: `gate-result`, `evaluation-status`, `summary-path`
+
+### Manual invocation
 
 ```yaml
 - name: Evaluate slint gate
-  run: go run ./cmd/slint-gate --github-step-summary
-
-- name: Upload gate summary
-  uses: actions/upload-artifact@v4
-  with:
-    name: slint-gate-summary
-    path: slint-gate-summary.json
+  run: |
+    go run ./cmd/slint-gate \
+      --measurement-summary artifacts/sli-summary.json \
+      --policy .slint/policy.yaml \
+      --github-step-summary
 
 - name: Check gate result
   run: |
     result=$(jq -r '.gate_result' slint-gate-summary.json)
-    if [ "$result" = "FAIL" ]; then
-      echo "Gate result: FAIL"
-      exit 1
-    fi
-    echo "Gate result: $result"
+    [ "$result" != "FAIL" ] || exit 1
 ```
-
-The gate step uses default flag values (`--measurement-summary artifacts/sli-summary.json`, `--policy .slint/policy.yaml`) unless overridden.
 
 ---
 

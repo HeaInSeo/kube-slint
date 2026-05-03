@@ -18,23 +18,17 @@ on:
   pull_request:
     paths:
       - ".github/workflows/slint-gate.yml"
-      - "hack/slint_gate.py"
+      - ".github/actions/slint-gate/**"
       - "cmd/slint-gate/**"
       - "internal/gate/**"
       - ".slint/**"
-      - "docs/notes/slint-gate-*.md"
-      - "docs/DECISIONS.md"
-      - "docs/PROGRESS_LOG.md"
   push:
     paths:
       - ".github/workflows/slint-gate.yml"
-      - "hack/slint_gate.py"
+      - ".github/actions/slint-gate/**"
       - "cmd/slint-gate/**"
       - "internal/gate/**"
       - ".slint/**"
-      - "docs/notes/slint-gate-*.md"
-      - "docs/DECISIONS.md"
-      - "docs/PROGRESS_LOG.md"
 
 permissions:
   contents: read
@@ -48,12 +42,8 @@ jobs:
     name: Evaluate slint policy gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      MEASUREMENT_SUMMARY_PATH: ${{ github.event.inputs.measurement_summary_path || 'artifacts/sli-summary.json' }}
-      BASELINE_PATH: ${{ github.event.inputs.baseline_path || '' }}
-      POLICY_PATH: ${{ github.event.inputs.policy_path || '.slint/policy.yaml' }}
     steps:
-      - name: Clone the code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
@@ -61,29 +51,13 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Run slint-gate evaluator
-        run: |
-          go run ./cmd/slint-gate \
-            --measurement-summary "${MEASUREMENT_SUMMARY_PATH}" \
-            --policy "${POLICY_PATH}" \
-            --baseline "${BASELINE_PATH}" \
-            --output "slint-gate-summary.json" \
-            --github-step-summary
-
-      - name: Upload slint-gate summary artifact
-        uses: actions/upload-artifact@v4
+      - name: Run slint-gate
+        uses: ./.github/actions/slint-gate
         with:
-          name: slint-gate-summary
-          path: slint-gate-summary.json
-          retention-days: 30
-          overwrite: true
-
-      - name: Fail job on policy violation
-        run: |
-          gate=$(jq -r '.gate_result' slint-gate-summary.json)
-          echo "gate_result=${gate}"
-          if [ "${gate}" = "FAIL" ]; then
-            echo "slint-gate detected policy violation; failing job."
-            exit 1
-          fi
-          echo "slint-gate non-fail result; job succeeds."
+          measurement-summary: ${{ github.event.inputs.measurement_summary_path || 'artifacts/sli-summary.json' }}
+          policy:              ${{ github.event.inputs.policy_path || '.slint/policy.yaml' }}
+          baseline:            ${{ github.event.inputs.baseline_path || '' }}
+          output:              slint-gate-summary.json
+          fail-on:             FAIL
+          github-step-summary: 'true'
+          upload-artifact:     'true'
