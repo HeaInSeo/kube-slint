@@ -71,6 +71,12 @@ KIND_CLUSTER ?= kube-slint-test-e2e
 test-e2e: manifests generate fmt vet ## Run the modern, mock-based integration tests.
 	go test ./test/e2e/ -run TestHarnessIntegration_TableDriven -v
 
+##@ Quickstart
+
+.PHONY: quickstart
+quickstart: slint-gate ## Run the zero-dependency quickstart demo (no cluster required).
+	bash hack/quickstart.sh
+
 BASELINE_SUMMARY ?=
 
 .PHONY: baseline-update-prepare

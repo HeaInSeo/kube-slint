@@ -138,3 +138,40 @@ func TestSnippetData_PreservesValues(t *testing.T) {
 	assert.Equal(t, "ns", d.Namespace)
 	assert.Equal(t, "svc", d.ServiceName)
 }
+
+func TestRunInit_EmitRBAC(t *testing.T) {
+	dir := t.TempDir()
+	policyOut := filepath.Join(dir, "policy.yaml")
+	rbacOut := filepath.Join(dir, "rbac-slint.yaml")
+
+	err := runInit([]string{
+		"--output", policyOut,
+		"--namespace", "my-ns",
+		"--emit-rbac", rbacOut,
+	})
+	require.NoError(t, err)
+
+	require.FileExists(t, rbacOut)
+	data, err := os.ReadFile(rbacOut)
+	require.NoError(t, err)
+
+	body := string(data)
+	assert.Contains(t, body, "ServiceAccount")
+	assert.Contains(t, body, "ClusterRole")
+	assert.Contains(t, body, "ClusterRoleBinding")
+	assert.Contains(t, body, "my-ns")
+	assert.Contains(t, body, "kube-slint-scraper")
+}
+
+func TestRunInit_EmitRBAC_NoNamespace(t *testing.T) {
+	dir := t.TempDir()
+	policyOut := filepath.Join(dir, "policy.yaml")
+	rbacOut := filepath.Join(dir, "rbac.yaml")
+
+	// No --namespace: namespace placeholder should appear in RBAC
+	err := runInit([]string{"--output", policyOut, "--emit-rbac", rbacOut})
+	require.NoError(t, err)
+
+	data, _ := os.ReadFile(rbacOut)
+	assert.Contains(t, string(data), "ClusterRoleBinding")
+}

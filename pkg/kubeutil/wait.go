@@ -10,15 +10,6 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
-// TODO(refactor): Extract the common polling loop logic into a generic 'Poll' function.
-// Currently, similar retry loops are duplicated here and in pkg/kubeutil/token.go.
-// Implementing a shared 'Poll(ctx, interval, condition)' utility will standardize
-// async waiting patterns and reduce code duplication.
-// TODO(refactor): 공통 폴링 루프 로직을 일반적인 'Poll' 함수로 추출하세요.
-// 현재 pkg/kubeutil/token.go와 여기에 유사한 재시도 루프가 중복되어 있습니다.
-// 공유된 'Poll(ctx, interval, condition)' 유틸리티를 구현하면
-// 비동기 대기 패턴을 표준화하고 코드 중복을 줄일 수 있습니다.
-
 // WaitOptions controls polling behavior.
 // WaitOptions는 폴링 동작을 제어합니다.
 type WaitOptions struct {
@@ -98,10 +89,7 @@ func WaitPodContainerReadyByLabel(
 		containerIndex,
 	)
 
-	ticker := time.NewTicker(opts.Interval)
-	defer ticker.Stop()
-
-	tryOnce := func() (bool, error) {
+	err := pollUntil(waitCtx, opts.Interval, func() (bool, error) {
 		cmd := exec.Command(
 			"kubectl", "get", "pods",
 			"-n", ns,
@@ -110,38 +98,18 @@ func WaitPodContainerReadyByLabel(
 		)
 		out, err := r.Run(waitCtx, logger, cmd)
 		if err != nil {
+			logger.Logf("wait pod ready: not ready yet: %v", err)
 			return false, err
 		}
 		return strings.TrimSpace(out) == "true", nil
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"timeout waiting pod ready (ns=%s selector=%q): %w",
+			ns, labelSelector, err,
+		)
 	}
-
-	if ok, err := tryOnce(); err == nil && ok {
-		return nil
-	} else if err != nil {
-		logger.Logf("wait pod ready: not ready yet: %v", err)
-	}
-
-	for {
-		select {
-		case <-waitCtx.Done():
-			return fmt.Errorf(
-				"timeout waiting pod ready (ns=%s selector=%q): %w",
-				ns,
-				labelSelector,
-				waitCtx.Err(),
-			)
-
-		case <-ticker.C:
-			ok, err := tryOnce()
-			if err != nil {
-				logger.Logf("wait pod ready: not ready yet: %v", err)
-				continue
-			}
-			if ok {
-				return nil
-			}
-		}
-	}
+	return nil
 }
 
 // WaitServiceHasEndpoints waits until the Endpoints object has at least one address.
@@ -167,10 +135,7 @@ func WaitServiceHasEndpoints(
 	waitCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(opts.Interval)
-	defer ticker.Stop()
-
-	tryOnce := func() (bool, error) {
+	err := pollUntil(waitCtx, opts.Interval, func() (bool, error) {
 		cmd := exec.Command(
 			"kubectl", "get", "endpoints", svc,
 			"-n", ns,
@@ -178,36 +143,16 @@ func WaitServiceHasEndpoints(
 		)
 		out, err := r.Run(waitCtx, logger, cmd)
 		if err != nil {
+			logger.Logf("wait endpoints: not ready yet: %v", err)
 			return false, err
 		}
 		return strings.TrimSpace(out) != "", nil
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"timeout waiting endpoints (ns=%s svc=%s): %w",
+			ns, svc, err,
+		)
 	}
-
-	if ok, err := tryOnce(); err == nil && ok {
-		return nil
-	} else if err != nil {
-		logger.Logf("wait endpoints: not ready yet: %v", err)
-	}
-
-	for {
-		select {
-		case <-waitCtx.Done():
-			return fmt.Errorf(
-				"timeout waiting endpoints (ns=%s svc=%s): %w",
-				ns,
-				svc,
-				waitCtx.Err(),
-			)
-
-		case <-ticker.C:
-			ok, err := tryOnce()
-			if err != nil {
-				logger.Logf("wait endpoints: not ready yet: %v", err)
-				continue
-			}
-			if ok {
-				return nil
-			}
-		}
-	}
+	return nil
 }

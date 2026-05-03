@@ -33,13 +33,8 @@ const tokenRequestBody = `{"apiVersion":"authentication.k8s.io/v1","kind":"Token
 // }
 
 // ServiceAccountToken requests a token for the given ServiceAccount.
-// - Retries until ctx is done.
+// - Retries every 2 s until ctx is done.
 // - logger may be nil (no-op).
-// TODO(refactor): Refactor manual retry loop to use a shared 'Poll' utility.
-// Currently, this function implements a custom loop/ticker to handle eventual consistency.
-// We should standardize this pattern by implementing a helper (e.g., PollImmediate in pkg/kubeutil/wait.go)
-// to improve stability and code reuse across the project.
-// context 가 잘 넘어간다, func(ctx context.Context) (string, error => 이것과 동일한 형태이다, Closure 가 선언될 당시의 변수를 캡쳐해서 사용하기 때문에 가능하다.
 func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns, sa string) (string, error) {
 	logger = slo.NewLogger(logger)
 	if r == nil {
@@ -50,33 +45,17 @@ func ServiceAccountToken(ctx context.Context, logger slo.Logger, r CmdRunner, ns
 		return "", err
 	}
 
-	var lastErr error
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	if tok, err := requestServiceAccountTokenOnce(ctx, r, logger, ns, sa); err == nil {
-		return tok, nil
-	} else {
-		lastErr = err
-		logger.Logf("token not ready yet: %v", err)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			if lastErr == nil {
-				lastErr = ctx.Err()
-			}
-			return "", lastErr
-		case <-ticker.C:
-			tok, err := requestServiceAccountTokenOnce(ctx, r, logger, ns, sa)
-			if err == nil {
-				return tok, nil
-			}
-			lastErr = err
-			logger.Logf("token not ready yet: %v", err)
+	var result string
+	err := pollUntil(ctx, 2*time.Second, func() (bool, error) {
+		tok, e := requestServiceAccountTokenOnce(ctx, r, logger, ns, sa)
+		if e != nil {
+			logger.Logf("token not ready yet: %v", e)
+			return false, e
 		}
-	}
+		result = tok
+		return true, nil
+	})
+	return result, err
 }
 
 func requestServiceAccountTokenOnce(
