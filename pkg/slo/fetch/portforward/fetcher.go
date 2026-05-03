@@ -19,9 +19,14 @@ import (
 const (
 	defaultRemotePort = 8080
 	defaultPath       = "/metrics"
-	readyRetries      = 20
+	readyTimeout      = 4 * time.Second // total deadline for port-forward to become reachable
 	readyInterval     = 200 * time.Millisecond
+	scrapeHTTPTimeout = 30 * time.Second // per-request timeout; prevents hang if port-forward dies
 )
+
+// httpClient is a shared client with a bounded timeout.
+// http.DefaultClient has no timeout and can block indefinitely.
+var httpClient = &http.Client{Timeout: scrapeHTTPTimeout}
 
 // Fetcher scrapes a Kubernetes Service's /metrics endpoint via kubectl port-forward.
 // It implements both fetch.MetricsFetcher and fetch.SnapshotFetcher.
@@ -30,6 +35,8 @@ const (
 //
 //	f := &portforward.Fetcher{Namespace: "my-ns", ServiceName: "my-svc"}
 //	sess := harness.NewSession(harness.SessionConfig{..., Fetcher: f})
+//
+// Note: Fetcher is not safe for concurrent use; the harness calls Fetch sequentially.
 type Fetcher struct {
 	Namespace   string
 	ServiceName string
@@ -44,7 +51,7 @@ type Fetcher struct {
 }
 
 // Start launches kubectl port-forward and waits until the local port is reachable.
-// The caller must call Stop() (or cancel the ctx) when done.
+// The caller must call Stop() when done.
 func (f *Fetcher) Start(ctx context.Context) error {
 	port, err := freePort()
 	if err != nil {
@@ -129,7 +136,7 @@ func (f *Fetcher) scrape(ctx context.Context) (fetch.Sample, error) {
 		return fetch.Sample{}, fmt.Errorf("portforward: build request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fetch.Sample{}, fmt.Errorf("portforward: GET %s: %w", url, err)
 	}
@@ -150,6 +157,8 @@ func (f *Fetcher) scrape(ctx context.Context) (fetch.Sample, error) {
 	return fetch.Sample{At: time.Now(), Values: values}, nil
 }
 
+// waitReady polls the /metrics endpoint until it responds or readyTimeout elapses.
+// The ticker-based loop is ctx-aware: no time.Sleep blocking.
 func (f *Fetcher) waitReady(ctx context.Context) error {
 	path := f.Path
 	if path == "" {
@@ -157,25 +166,29 @@ func (f *Fetcher) waitReady(ctx context.Context) error {
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d%s", f.localPort, path)
 
-	for i := 0; i < readyRetries; i++ {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("portforward: context cancelled while waiting for ready")
-		default:
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	readyCtx, cancel := context.WithTimeout(ctx, readyTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(readyInterval)
+	defer ticker.Stop()
+
+	for {
+		req, err := http.NewRequestWithContext(readyCtx, http.MethodGet, url, nil)
 		if err != nil {
-			return fmt.Errorf("portforward: wait-ready: %w", err)
+			return fmt.Errorf("portforward: wait-ready build request: %w", err)
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err == nil {
 			_ = resp.Body.Close()
 			return nil
 		}
-		time.Sleep(readyInterval)
+		select {
+		case <-readyCtx.Done():
+			return fmt.Errorf("portforward: service %s/%s not ready after %v: %w",
+				f.Namespace, f.ServiceName, readyTimeout, readyCtx.Err())
+		case <-ticker.C:
+		}
 	}
-	return fmt.Errorf("portforward: service %s/%s not ready after %v",
-		f.Namespace, f.ServiceName, time.Duration(readyRetries)*readyInterval)
 }
 
 func freePort() (int, error) {

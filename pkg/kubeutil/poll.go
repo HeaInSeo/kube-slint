@@ -2,18 +2,29 @@ package kubeutil
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
-// pollUntil calls fn immediately, then every interval, until fn returns (true, nil),
-// ctx is cancelled, or a tick after ctx cancels.
+// pollUntil calls fn immediately, then every interval, until fn returns (true, nil)
+// or ctx is cancelled.
 //
-// fn returning (false, nil) means "not ready yet — keep retrying".
-// fn returning (false, non-nil) is treated the same as (false, nil): log and retry.
-// fn returning (true, nil) terminates with success.
-// ctx cancellation terminates with ctx.Err().
+// fn returning (false, nil)     — not ready yet; keep retrying.
+// fn returning (false, non-nil) — transient error; keep retrying, remember error.
+// fn returning (true, nil)      — success; return nil.
+// ctx cancellation              — return last fn error if any, otherwise ctx.Err().
 func pollUntil(ctx context.Context, interval time.Duration, fn func() (bool, error)) error {
-	if ok, _ := fn(); ok {
+	var lastErr error
+
+	tryOnce := func() bool {
+		ok, err := fn()
+		if err != nil {
+			lastErr = err
+		}
+		return ok
+	}
+
+	if tryOnce() {
 		return nil
 	}
 
@@ -23,9 +34,9 @@ func pollUntil(ctx context.Context, interval time.Duration, fn func() (bool, err
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return errors.Join(lastErr, ctx.Err())
 		case <-ticker.C:
-			if ok, _ := fn(); ok {
+			if tryOnce() {
 				return nil
 			}
 		}

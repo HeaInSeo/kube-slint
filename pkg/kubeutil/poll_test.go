@@ -56,3 +56,20 @@ func TestPollUntil_ContextCancelled(t *testing.T) {
 	assert.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
 	assert.Greater(t, calls, 0)
 }
+
+func TestPollUntil_ContextCancelled_PreservesLastError(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	sentinel := errors.New("transient: not ready")
+	err := pollUntil(ctx, 5*time.Millisecond, func() (bool, error) {
+		return false, sentinel
+	})
+	require.Error(t, err)
+	// Both the transient error and ctx error must be present
+	assert.True(t, errors.Is(err, sentinel), "last fn error must be preserved")
+	assert.True(t,
+		errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled),
+		"ctx error must be present",
+	)
+}
