@@ -2,6 +2,7 @@ package curlpod
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -68,6 +69,15 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	curlCmd := fmt.Sprintf(`set -euo pipefail;
 curl %s -sS --fail-with-body -H "Authorization: Bearer %s" "%s";`, insecureFlag, token, metricsURL)
 
+	// Build pod labels from LabelSelector so that CleanupByLabel and
+	// runCleanupActions (which use the same selector) can find these pods.
+	// Always include app=curl-metrics for base compatibility.
+	podLabels := parseSelectorToLabels(c.LabelSelector)
+	if _, ok := podLabels["app"]; !ok {
+		podLabels["app"] = "curl-metrics"
+	}
+	labelsJSON, _ := json.Marshal(podLabels) // map[string]string never fails Marshal
+
 	cmd := exec.Command(
 		"kubectl", "run", podName,
 		"--restart=Never",
@@ -81,7 +91,7 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer %s" "%s";`, insecureFlag,
   "metadata":{
     "name":"%s",
     "namespace":"%s",
-    "labels":{"app":"curl-metrics"}
+    "labels":%s
   },
   "spec":{
     "serviceAccountName":"%s",
@@ -99,7 +109,7 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer %s" "%s";`, insecureFlag,
       }
     }]
   }
-}`, podName, ns, serviceAccountName, c.Image, curlCmd),
+}`, podName, ns, string(labelsJSON), serviceAccountName, c.Image, curlCmd),
 	)
 
 	_, err := c.Runner.Run(ctx, c.Logger, cmd)
@@ -187,6 +197,27 @@ func (c *Client) CleanupByLabel(ctx context.Context, ns string) error {
 	_, err := c.Runner.Run(ctx, c.Logger, cmd)
 	// 최선의 노력(best-effort)이므로 에러를 하드 실패로 간주하지 않고 호출부에서 무시해도 됨.
 	return err
+}
+
+// parseSelectorToLabels converts a simple equality label selector string into a
+// map. Only key=value pairs are supported; set-based selectors are ignored.
+// Example: "app.kubernetes.io/managed-by=kube-slint,slint-run-id=abc" →
+//
+//	{"app.kubernetes.io/managed-by": "kube-slint", "slint-run-id": "abc"}
+func parseSelectorToLabels(selector string) map[string]string {
+	m := map[string]string{}
+	for _, pair := range strings.Split(selector, ",") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		idx := strings.IndexByte(pair, '=')
+		if idx < 0 {
+			continue
+		}
+		m[strings.TrimSpace(pair[:idx])] = strings.TrimSpace(pair[idx+1:])
+	}
+	return m
 }
 
 func (c *Client) isTerminal(ctx context.Context, ns, podName string) (bool, error) {
