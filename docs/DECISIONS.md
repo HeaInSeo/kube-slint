@@ -116,15 +116,15 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - Actions summary, PR 코멘트, 후속 리포팅 경로가 동일한 gate 결과 구조를 재사용할 수 있다.
 
-## D-012: slint-gate CLI is implemented in Go (cmd/slint-gate); Python prototype is retired
+## D-012: slint-gate CLI is implemented in Go (cmd/slint-gate); Python prototype removed
 
-- Date: 2026-04-30
-- Status: Accepted
+- Date: 2026-04-30 (updated 2026-05-11)
+- Status: Accepted, Completed
 - Decision:
-  - `hack/slint_gate.py` (Python + pyyaml)를 레거시 참조용으로 보존하되, 운영 gate 경로는 `cmd/slint-gate` Go 바이너리로 완전 대체한다.
+  - `hack/slint_gate.py` (Python + pyyaml)는 삭제되었다. 운영 gate 경로는 `cmd/slint-gate` Go 바이너리만 사용한다.
   - gate 평가 로직은 `internal/gate` 패키지로 캡슐화하며, CLI는 `cmd/slint-gate/main.go`에서만 flag 파싱 및 출력을 담당한다.
-  - CI workflow (`slint-gate.yml`)는 Python 의존을 제거하고 `go run ./cmd/slint-gate`로 전환한다.
+  - `hack/prepare-baseline-update.sh`도 `go run ./cmd/slint-gate` + `jq` 기반으로 재작성되었다.
 - Rationale:
-  - Go 단일 언어 스택으로 통합하여 Python 런타임/pyyaml 의존을 제거한다.
-  - `internal/gate` 단위 테스트(89.2% coverage)로 게이트 로직의 회귀를 방어한다.
+  - Go 단일 언어 스택으로 통합하여 Python 런타임/pyyaml 의존을 완전 제거한다.
+  - `internal/gate` 단위 테스트로 게이트 로직의 회귀를 방어한다.
   - `--github-step-summary` 플래그로 Actions step summary 렌더링을 Go 바이너리 내부로 흡수한다.

@@ -10,7 +10,7 @@ End-to-end demonstration of kube-slint measuring a real operator running inside 
 | 2. `sess.Start()` | kube-slint launches a curl pod to capture the pre-workload snapshot |
 | 3. Workload runs | `hello-operator` fires reconcile loops in the background |
 | 4. `sess.End()` | kube-slint captures the post-workload snapshot, computes deltas, writes `artifacts/sli-summary.json` |
-| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml` and exits non-zero on policy violation |
+| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml`; exits 0 by default, exits 1 with `--fail-on FAIL` |
 
 ## Prerequisites
 
@@ -46,8 +46,8 @@ mkdir -p artifacts
 SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -tags kind -v -timeout 120s -run TestHelloOperatorSLI \
   github.com/HeaInSeo/kube-slint/examples/kind-hello-operator/e2e
 
-# 7. Evaluate policy gate
-go run ../../../cmd/slint-gate \
+# 7. Evaluate policy gate (run from examples/kind-hello-operator/)
+go run ../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --fail-on FAIL
@@ -58,8 +58,12 @@ kind delete cluster --name slint-demo
 
 ## How to get the ServiceAccount token
 
-kube-slint's curl pod uses a bearer token to authenticate against the Kubernetes API server
-when spawning pods in your namespace. Use one of these approaches:
+The harness uses `kubectl` to create a temporary curl pod in your namespace. `SessionConfig.Token`
+is forwarded to `curl` as an `Authorization: Bearer <token>` header when scraping the metrics
+endpoint. For operators that require token-authenticated `/metrics`, use a short-lived
+ServiceAccount token. (hello-operator serves plain HTTP without auth, so any non-empty token works.)
+
+Use one of these approaches:
 
 ### Option A — `kubectl create token` (recommended for CI/local dev)
 

@@ -194,7 +194,7 @@ sess.End(ctx)
 
 ### 3. 결과 게이팅 (slint-gate CLI)
 
-게이트 CLI는 `cmd/slint-gate`에 위치한 Go 바이너리입니다. 레거시 `hack/slint_gate.py` Python 스크립트를 대체하며, 해당 스크립트는 참조용으로만 보관됩니다.
+게이트 CLI는 `cmd/slint-gate`에 위치한 Go 바이너리입니다. 이전 Python prototype(`hack/slint_gate.py`)은 완전히 제거되었으며, 운영 경로는 Go 바이너리만 사용합니다.
 
 **빌드**
 

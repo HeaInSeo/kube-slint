@@ -1,5 +1,9 @@
 # slint-gate workflow implementation note (2026-03-07)
 
+> **Historical note (2026-05-11):** `hack/slint_gate.py` has been deleted.
+> The operational gate path is now `cmd/slint-gate` (Go binary) exclusively.
+
+
 ## Implemented files
 
 - `.github/workflows/slint-gate.yml`

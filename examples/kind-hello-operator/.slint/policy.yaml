@@ -2,14 +2,15 @@ schema_version: "slint.policy.v1"
 
 thresholds:
   # Reconcile loop must have fired at least once during the measurement window.
+  # metric must match results[].id in sli-summary.json — use the SLI spec ID, not the raw Prometheus name.
   - name: reconcile-activity
-    metric: hello_reconcile_total
+    metric: hello_reconcile_delta
     operator: ">="
     value: 1
 
   # Workqueue should not be accumulating (depth at window end must be ≤ 5).
   - name: workqueue-not-backed-up
-    metric: hello_workqueue_depth
+    metric: hello_workqueue_depth_end
     operator: "<="
     value: 5
 

@@ -82,7 +82,7 @@ func TestHelloOperatorSLI(t *testing.T) {
 		MetricsServiceName: "hello-operator-metrics",
 		ServiceAccountName: "kube-slint",
 		Token:              token,
-		ArtifactsDir:       "artifacts",
+		ArtifactsDir:       "../artifacts", // relative to e2e/ → kind-hello-operator/artifacts/
 		Specs:              helloOperatorSpecs(),
 		// hello-operator uses plain HTTP on port 8080, not HTTPS.
 		ServiceURLFormat:      slint.ServiceURLHTTP,
@@ -116,11 +116,10 @@ func TestHelloOperatorSLI(t *testing.T) {
 	}
 
 	// 7. Optionally evaluate policy gate inline.
-	artifactsDir := "artifacts"
-	summaryPath := artifactsDir + "/sli-summary.json"
+	summaryPath := "../artifacts/sli-summary.json"
 	if _, statErr := os.Stat(summaryPath); statErr == nil {
 		t.Logf("Artifact written: %s", summaryPath)
-		t.Log("Run slint-gate to evaluate against policy:")
-		t.Logf("  go run ../../../cmd/slint-gate --measurement-summary %s --policy .slint/policy.yaml", summaryPath)
+		t.Log("Run slint-gate to evaluate against policy (from kind-hello-operator/):")
+		t.Log("  go run ../../cmd/slint-gate --measurement-summary artifacts/sli-summary.json --policy .slint/policy.yaml --fail-on FAIL")
 	}
 }

@@ -1,5 +1,9 @@
 # slint-gate post-adjustment note (2026-03-07)
 
+> **Historical note (2026-05-11):** `hack/slint_gate.py` has been deleted.
+> References to it below are historical context only. Current gate: `cmd/slint-gate`.
+
+
 ## 1) pull_request trigger scope adjustment
 
 Problem observed:

@@ -19,8 +19,11 @@ fi
 
 echo ""
 echo "Cluster ready. Next steps:"
-echo "  docker build -f operator/Dockerfile -t hello-operator:dev ../.."
+echo "  docker build -t hello-operator:dev operator/"
 echo "  kind load docker-image hello-operator:dev --name ${CLUSTER_NAME}"
 echo "  kubectl apply -f manifests/"
+echo "  kubectl -n hello-system rollout status deployment/hello-operator"
 echo "  export SLINT_SA_TOKEN=\$(kubectl -n hello-system create token kube-slint --duration=1h)"
-echo "  go test -v -timeout 120s -run TestHelloOperatorSLI ./e2e/"
+echo "  mkdir -p artifacts"
+echo "  go test -tags kind -v -timeout 120s -run TestHelloOperatorSLI ./e2e/"
+echo "  go run ../../cmd/slint-gate --measurement-summary artifacts/sli-summary.json --policy .slint/policy.yaml --fail-on FAIL"

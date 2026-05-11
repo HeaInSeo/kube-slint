@@ -2,7 +2,7 @@ current_stage: "Phase 6-d Go CLI Migration"
 roadmap_percent: 80
 roadmap_status: "post_rc"
 current_focus:
-  - "Python slint_gate.py retired; cmd/slint-gate Go binary is the operational gate path"
+  - "hack/slint_gate.py removed; cmd/slint-gate Go binary is the sole operational gate path"
   - "internal/gate package provides tested gate evaluation logic (89.2% coverage)"
   - "README.md and README(Kor).md fully rewritten and in sync"
   - "Track the PreFetch/Start contract as an explicit operating risk after RC approval"
