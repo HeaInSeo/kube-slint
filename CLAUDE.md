@@ -43,11 +43,11 @@
 - [x] NO_GRADE fail-on 옵션 (`--fail-on` flag + action.yml 4-level case 처리)
 - [x] CONTRIBUTING.md + GitHub issue 템플릿 (bug, feature)
 
-#### Batch 2 — 개발자 경험 (3~4일)
-- [ ] kind + hello-operator 예제 (실제 클러스터 end-to-end)
-- [ ] Token/ServiceAccount 온보딩 헬퍼 문서 보강
-- [ ] `ServiceURLFormat` SessionConfig에 노출
-- [ ] policy unknown field 경고 (`slint-gate diagnose`)
+#### Batch 2 — 개발자 경험 ✅ (커밋 `c005738`)
+- [x] kind + hello-operator 예제 (`examples/kind-hello-operator/`)
+- [x] Token/ServiceAccount 온보딩 헬퍼 (`pkg/slint/token.go` — ReadServiceAccountToken, ReadServiceAccountTokenFromEnv)
+- [x] `ServiceURLFormat` SessionConfig에 노출 + `slint.ServiceURLHTTPS/HTTP` 상수
+- [x] policy unknown field 경고 (gate.go — PolicyWarnings in Summary JSON + stderr)
 
 #### Batch 3 — 공모전 완성도 (2~3일)
 - [ ] 한국어 README 보강 (README(Kor).md)
@@ -111,10 +111,7 @@ fail_on:
 
 | 항목 | 위치 | 설명 |
 |---|---|---|
-| ServiceURLFormat | `session.go` | `https://%s.%s.svc:8443/metrics` 하드코딩 (Batch 2) |
-| Token 온보딩 | `attach.go:validateSessionConfigOrFail` | Token 획득 방법 문서/헬퍼 부족 (Batch 2) |
-| policy strict decode | `internal/gate/gate.go:loadPolicy` | unknown field silent ignore (Batch 2) |
-| NextSummaryPath 충돌 파일명 | `session.go:NextSummaryPath` | `file.json-1` 형태 (`.json` 뒤에 suffix) |
+| NextSummaryPath 충돌 파일명 | `session.go:NextSummaryPath` | `file.json-1` 형태 (`.json` 뒤에 suffix) — 미미한 UX 이슈 |
 
 ## 주요 결정 히스토리
 
