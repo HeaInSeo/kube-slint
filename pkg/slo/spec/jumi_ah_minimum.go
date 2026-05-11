@@ -1,3 +1,5 @@
+//go:build ignore
+
 package spec
 
 // JUMIAHMinimumSpecs returns the minimum batch-oriented spec set needed to

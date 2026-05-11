@@ -1,3 +1,5 @@
+//go:build ignore
+
 package spec
 
 // JUMIAHSmokeGuardrailSpecs returns the minimum guardrail rules that should

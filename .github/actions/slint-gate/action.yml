@@ -28,8 +28,10 @@ inputs:
   fail-on:
     description: >
       Gate result level that fails the job.
-      FAIL         — only hard violations fail (default).
-      FAIL_OR_WARN — treat WARN as a failure too.
+      FAIL                 — only hard violations fail (default).
+      FAIL_OR_WARN         — treat WARN as a failure too.
+      FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure.
+      FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures.
     required: false
     default: FAIL
 
@@ -75,6 +77,7 @@ runs:
         INPUT_BASELINE: ${{ inputs.baseline }}
         INPUT_OUTPUT: ${{ inputs.output }}
         INPUT_STEP_SUMMARY: ${{ inputs.github-step-summary }}
+        FAIL_ON: ${{ inputs.fail-on }}
       run: |
         set -euo pipefail
 
@@ -116,14 +119,37 @@ runs:
         set -euo pipefail
         echo "slint-gate result: ${GATE_RESULT}"
 
-        if [ "${GATE_RESULT}" = "FAIL" ]; then
-          echo "::error::slint-gate FAIL — policy violation detected. Check the Diagnostics output above."
-          exit 1
-        fi
-
-        if [ "${FAIL_ON}" = "FAIL_OR_WARN" ] && [ "${GATE_RESULT}" = "WARN" ]; then
-          echo "::error::slint-gate WARN treated as failure (fail-on=FAIL_OR_WARN)."
-          exit 1
-        fi
+        case "${FAIL_ON}" in
+          FAIL)
+            if [ "${GATE_RESULT}" = "FAIL" ]; then
+              echo "::error::slint-gate FAIL — policy violation detected."
+              exit 1
+            fi
+            ;;
+          FAIL_OR_WARN)
+            if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "WARN" ]; then
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              exit 1
+            fi
+            ;;
+          FAIL_OR_NOGRADE)
+            if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "NO_GRADE" ]; then
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              exit 1
+            fi
+            ;;
+          FAIL_WARN_OR_NOGRADE)
+            if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "WARN" ] || [ "${GATE_RESULT}" = "NO_GRADE" ]; then
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              exit 1
+            fi
+            ;;
+          *)
+            if [ "${GATE_RESULT}" = "FAIL" ]; then
+              echo "::error::slint-gate FAIL — policy violation detected."
+              exit 1
+            fi
+            ;;
+        esac
 
         echo "slint-gate ${GATE_RESULT} — continuing."

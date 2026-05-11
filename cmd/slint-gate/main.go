@@ -29,6 +29,12 @@ func runGate() {
 	baselinePath := flag.String("baseline", "", "Optional path to baseline summary JSON")
 	outputPath := flag.String("output", "slint-gate-summary.json", "Output path for gate summary JSON")
 	githubStepSummary := flag.Bool("github-step-summary", false, "Append markdown result to $GITHUB_STEP_SUMMARY")
+	failOn := flag.String("fail-on", "FAIL",
+		"Gate result level that causes non-zero exit.\n"+
+			"  FAIL                — only hard policy violations (default)\n"+
+			"  FAIL_OR_WARN        — treat WARN as failure too\n"+
+			"  FAIL_OR_NOGRADE     — treat NO_GRADE as failure too\n"+
+			"  FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures")
 	flag.Parse()
 
 	result := gate.Evaluate(gate.Request{
@@ -49,6 +55,27 @@ func runGate() {
 		if err := renderGitHubStepSummary(result); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: could not write GitHub step summary: %v\n", err)
 		}
+	}
+
+	if shouldFailOn(result.GateResult, strings.ToUpper(strings.TrimSpace(*failOn))) {
+		fmt.Fprintf(os.Stderr, "slint-gate: exit 1 (gate_result=%s, fail-on=%s)\n", result.GateResult, *failOn)
+		os.Exit(1)
+	}
+}
+
+// shouldFailOn returns true when gateResult meets the failOn threshold.
+func shouldFailOn(gateResult, failOn string) bool {
+	switch failOn {
+	case "FAIL":
+		return gateResult == gate.GateFail
+	case "FAIL_OR_WARN":
+		return gateResult == gate.GateFail || gateResult == gate.GateWarn
+	case "FAIL_OR_NOGRADE":
+		return gateResult == gate.GateFail || gateResult == gate.GateNoGrade
+	case "FAIL_WARN_OR_NOGRADE":
+		return gateResult == gate.GateFail || gateResult == gate.GateWarn || gateResult == gate.GateNoGrade
+	default:
+		return gateResult == gate.GateFail
 	}
 }
 
