@@ -49,12 +49,13 @@
 - [x] `ServiceURLFormat` SessionConfig에 노출 + `slint.ServiceURLHTTPS/HTTP` 상수
 - [x] policy unknown field 경고 (gate.go — PolicyWarnings in Summary JSON + stderr)
 
-#### Batch 3 — 공모전 완성도 (2~3일)
-- [ ] 한국어 README 보강 (README(Kor).md)
-- [ ] 아키텍처 다이어그램
-- [ ] CHANGELOG + `v0.1.0` git tag
-- [ ] `make coverage` 테스트 커버리지 리포트
-- [ ] GitHub release + 공모전 제출 문서
+#### Batch 3 — 공모전 완성도 ✅ (커밋 `f0fc563`)
+- [x] 한국어 README 보강 (README(Kor).md) — pkg/slint API, --fail-on, token 헬퍼, ServiceURLFormat, kind 예제
+- [x] 아키텍처 다이어그램 (docs/architecture.md)
+- [x] CHANGELOG (CHANGELOG.md, v0.1.0 엔트리)
+- [x] `make coverage` 테스트 커버리지 리포트
+- [x] 공모전 제출 문서 (docs/competition-submission.md)
+- [ ] `v0.1.0` git tag + GitHub release
 
 ---
 
