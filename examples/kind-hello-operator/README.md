@@ -123,25 +123,27 @@ ServiceURLFormat: "http://%s.%s.svc:9090/metrics",
 ```
 kind-hello-operator/
   operator/
-    main.go        -- hello-operator metrics server (//go:build ignore)
-    Dockerfile     -- builds the hello-operator image
+    main.go        -- hello-operator metrics server, stdlib-only (no build tag)
+    Dockerfile     -- builds the hello-operator image (context: operator/)
   manifests/
     namespace.yaml
     deployment.yaml  -- Deployment + Service
     rbac.yaml        -- kube-slint ServiceAccount + ClusterRole
   e2e/
-    e2e_test.go    -- example E2E test (//go:build ignore)
+    e2e_test.go    -- example E2E test (//go:build kind — excluded from go test ./...)
   .slint/
     policy.yaml    -- gate policy for hello-operator metrics
-  setup.sh         -- kind cluster bootstrap
+  setup.sh         -- kind cluster bootstrap (cluster creation only)
   README.md
 ```
 
 ## Policy gate
 
 The included `.slint/policy.yaml` fails CI if:
-- `hello_reconcile_total` did not increase (operator is stuck)
-- `hello_workqueue_depth` at window end exceeds 5 (operator is backed up)
+- `hello_reconcile_delta` is less than 1 (operator ran no reconcile loops)
+- `hello_workqueue_depth_end` exceeds 5 (operator workqueue is backed up)
+
+These IDs match `results[].id` in `sli-summary.json`, not raw Prometheus metric names.
 
 Run the gate separately after any E2E suite that writes `artifacts/sli-summary.json`:
 

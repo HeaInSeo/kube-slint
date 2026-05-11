@@ -74,13 +74,16 @@ go get github.com/HeaInSeo/kube-slint
 **Step 2: Embed the harness in your E2E test**
 
 ```go
-import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-sess := harness.NewSession(harness.SessionConfig{
+token, _ := slint.ReadServiceAccountTokenFromEnv("SLINT_SA_TOKEN", slint.DefaultTokenPath)
+
+sess := slint.NewSession(slint.SessionConfig{
     Namespace:             "my-operator-system",
     MetricsServiceName:    "my-operator-controller-manager-metrics-service",
+    Token:                 token,
     ArtifactsDir:          "artifacts",
-    Specs:                 harness.DefaultV3Specs(),
+    Specs:                 slint.DefaultSpecs(),
     TLSInsecureSkipVerify: true,
     CurlImage:             "my-registry/curlimages/curl:latest",
 })
@@ -112,7 +115,7 @@ jq -r '.gate_result' slint-gate-summary.json
 
 **Using preset specs**
 
-`DefaultV3Specs()` (alias: `BaselineV3Specs()`) returns a preset spec set designed for kubebuilder-generated operators. It covers:
+`slint.DefaultSpecs()` (previously `DefaultV3Specs`, `BaselineV3Specs`) returns a preset spec set designed for kubebuilder-generated operators. It covers:
 
 | ID | Description |
 |---|---|
@@ -127,7 +130,7 @@ jq -r '.gate_result' slint-gate-summary.json
 | `rest_client_5xx_delta` | Server error (5xx) responses received |
 
 ```go
-specs := harness.DefaultV3Specs()
+specs := slint.DefaultSpecs()
 ```
 
 **Defining custom SLI specs**
@@ -161,20 +164,26 @@ Pass `mySpecs` as the `Specs` field in `SessionConfig`.
 ### 2. Embed Harness in E2E Tests
 
 ```go
-import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-sess := harness.NewSession(harness.SessionConfig{
+// Read token from env var first, fall back to mounted ServiceAccount file
+token, _ := slint.ReadServiceAccountTokenFromEnv("SLINT_SA_TOKEN", slint.DefaultTokenPath)
+
+sess := slint.NewSession(slint.SessionConfig{
     // Target namespace where your operator runs
     Namespace: "my-operator-system",
 
     // Name of the Kubernetes Service exposing /metrics
     MetricsServiceName: "my-operator-controller-manager-metrics-service",
 
+    // ServiceAccount token for curl Authorization header
+    Token: token,
+
     // Directory where sli-summary.json will be written
     ArtifactsDir: "artifacts",
 
     // SLI spec set — use preset or custom
-    Specs: harness.DefaultV3Specs(),
+    Specs: slint.DefaultSpecs(),
 
     // Real-cluster settings
     TLSInsecureSkipVerify: true,
@@ -186,9 +195,11 @@ sess.Start()
 sess.End(ctx)
 ```
 
-**RBAC note:** The harness uses a curl-based fetcher that creates a temporary pod to scrape the metrics endpoint. The operator's ServiceAccount must have `pods: create` permission in the target namespace.
+**RBAC note:** The harness creates a temporary curl pod to scrape the metrics endpoint. The operator's ServiceAccount must have `pods: create` permission in the target namespace. Run `slint-gate init --emit-rbac rbac.yaml` to scaffold the required ServiceAccount, ClusterRole, and binding.
 
-**Output:** `artifacts/sli-summary.json` is written by `sess.End(ctx)`. This file is the input to the slint-gate CLI.
+**Output:** `sess.End(ctx)` writes two files:
+- `artifacts/sli-summary.<runID>.<testcase>.json` — unique audit file
+- `artifacts/sli-summary.json` — latest alias; default input for slint-gate
 
 ---
 
@@ -337,7 +348,7 @@ jobs:
         with:
           measurement-summary: artifacts/sli-summary.json   # default
           policy:              .slint/policy.yaml            # default
-          fail-on:             FAIL                          # FAIL | FAIL_OR_WARN
+          fail-on:             FAIL                          # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **Inputs**
@@ -348,7 +359,7 @@ jobs:
 | `policy` | `.slint/policy.yaml` | Path to policy YAML |
 | `baseline` | `` | Optional baseline summary path |
 | `output` | `slint-gate-summary.json` | Output path for gate result |
-| `fail-on` | `FAIL` | `FAIL` or `FAIL_OR_WARN` |
+| `fail-on` | `FAIL` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
 | `github-step-summary` | `true` | Append Markdown table to step summary |
 | `upload-artifact` | `true` | Upload gate result as artifact |
 

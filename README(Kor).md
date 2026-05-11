@@ -425,11 +425,13 @@ jobs:
 
 ```sh
 cd examples/kind-hello-operator
-./setup.sh         # kind 클러스터 생성, hello-operator 배포
+./setup.sh   # kind 클러스터 생성 (클러스터만)
+
+# setup.sh 출력의 Next steps를 따라 이미지 빌드/배포 후:
 go test -tags kind ./e2e/ -v
 ```
 
-`setup.sh`는 kind 클러스터 생성, hello-operator Docker 이미지 빌드, RBAC 적용, 디플로이먼트 배포까지 자동으로 수행합니다. 상세 안내는 `examples/kind-hello-operator/README.md`를 참조하십시오.
+`setup.sh`는 kind 클러스터 생성만 수행합니다. Docker 이미지 빌드, kind load, kubectl apply 등은 스크립트 실행 후 출력되는 Next steps 안내를 따르십시오. 상세 안내는 `examples/kind-hello-operator/README.md`를 참조하십시오.
 
 ---
 

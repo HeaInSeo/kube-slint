@@ -122,13 +122,17 @@ const sessionSnippet = `
 // ── SessionConfig snippet ──────────────────────────────────────────────────
 // Add this to your E2E test file (e.g., suite_test.go or e2e_test.go).
 //
-// import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+// import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-sess := harness.NewSession(harness.SessionConfig{
+token, _ := slint.ReadServiceAccountTokenFromEnv("SLINT_SA_TOKEN", slint.DefaultTokenPath)
+
+sess := slint.NewSession(slint.SessionConfig{
     Namespace:             "{{ .Namespace }}",
     MetricsServiceName:    "{{ .ServiceName }}",
+    ServiceAccountName:    "kube-slint-scraper",
+    Token:                 token,
     ArtifactsDir:          "artifacts",
-    Specs:                 harness.DefaultV3Specs(),
+    Specs:                 slint.DefaultSpecs(),
     TLSInsecureSkipVerify: true,
 })
 sess.Start()
@@ -137,7 +141,7 @@ sess.End(ctx)
 
 // Then run the gate:
 //   make slint-gate
-//   ./bin/slint-gate --policy .slint/policy.yaml
+//   ./bin/slint-gate --policy .slint/policy.yaml --fail-on FAIL
 // ──────────────────────────────────────────────────────────────────────────
 `
 
