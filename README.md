@@ -1,26 +1,15 @@
 # kube-slint
 
-A shift-left operational SLI guardrail library for Kubernetes Operators.
+**kube-slint does not replace your tests. It measures what happens during them.**
 
-> **Transition note:** kube-slint is not a standalone operator. It is an embeddable Go library and CLI toolchain. Earlier documentation referred to a standalone operator model; that model has been retired. The current design embeds SLI collection directly into your E2E test session and gates CI via a Go CLI binary (`cmd/slint-gate`).
+Attach kube-slint to your existing Kubernetes operator E2E session. It reads `/metrics` before and after your workload, computes operational SLI deltas (reconcile rate, workqueue depth, REST errors), and evaluates them against a declarative policy — without modifying your operator code.
 
----
+**Try it now** (requires kind ≥ v0.22, Docker, and Go 1.25+):
 
-## Identity and Scope
-
-### What kube-slint does
-
-- Collects operational SLI metrics (reconcile rates, workqueue depth, REST client errors) from a running operator during an E2E test session.
-- Evaluates collected metrics against a declarative policy (`policy.yaml`) to produce a gate result.
-- Detects regressions against a stored baseline.
-- Writes structured JSON artifacts (`sli-summary.json`, `slint-gate-summary.json`) for CI consumption and audit.
-- Renders a markdown step summary to GitHub Actions via `--github-step-summary`.
-
-### What kube-slint does not do
-
-- kube-slint is not a correctness test framework. It does not assert that your operator behaves correctly.
-- kube-slint is not a monitoring or alerting system. It produces point-in-time guardrail results for a test run, not continuous production metrics.
-- kube-slint does not fail your E2E test on measurement failure. A failed metric scrape is recorded but does not abort the test session (see Core Contracts).
+```bash
+cd examples/kind-hello-operator
+make demo
+```
 
 ---
 

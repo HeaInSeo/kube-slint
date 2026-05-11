@@ -2,6 +2,15 @@
 
 End-to-end demonstration of kube-slint measuring a real operator running inside a kind cluster.
 
+## Quick path
+
+```bash
+# Prerequisites: kind ≥ v0.22, Docker, Go 1.25+
+make demo
+```
+
+`make demo` runs the full cycle — cluster creation, image build, deploy, E2E test, gate evaluation, and teardown — in one command. Use `make demo-keep` to leave the cluster running for inspection after the run.
+
 ## What this example shows
 
 | Step | What happens |
@@ -19,7 +28,9 @@ End-to-end demonstration of kube-slint measuring a real operator running inside 
 - [Docker](https://docs.docker.com/get-docker/) (for building the image)
 - Go 1.25+
 
-## Quick start
+## Manual steps
+
+If you prefer to run steps individually instead of `make demo`:
 
 ```bash
 # 1. Create the kind cluster

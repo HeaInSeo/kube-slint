@@ -1,26 +1,15 @@
 # kube-slint
 
-쿠버네티스 오퍼레이터를 위한 shift-left operational SLI 가드레일 라이브러리입니다.
+**kube-slint는 여러분의 테스트를 대체하지 않습니다. 테스트 중에 일어나는 일을 측정합니다.**
 
-> **전환 안내:** kube-slint는 독립 실행형 오퍼레이터가 아닙니다. 임베드 가능한 Go 라이브러리 및 CLI 툴체인입니다. 이전 문서에서는 독립 오퍼레이터 모델을 언급했으나, 해당 모델은 폐기되었습니다. 현재 설계는 SLI 수집을 E2E 테스트 세션에 직접 내장하고, Go CLI 바이너리(`cmd/slint-gate`)를 통해 CI를 게이팅합니다.
+기존 Kubernetes 오퍼레이터 E2E 세션에 kube-slint를 붙이세요. 워크로드 전후의 `/metrics`를 읽어 운영 SLI 델타(reconcile 비율, 워크큐 깊이, REST 오류)를 계산하고, 선언적 정책과 대조해 평가합니다 — 오퍼레이터 코드를 수정할 필요 없습니다.
 
----
+**지금 바로 체험** (kind ≥ v0.22, Docker, Go 1.25+ 필요):
 
-## 정체성과 범위
-
-### kube-slint가 하는 것
-
-- E2E 테스트 세션 중 실행 중인 오퍼레이터에서 운영 SLI 메트릭(reconcile 비율, 워크큐 깊이, REST 클라이언트 오류)을 수집합니다.
-- 수집된 메트릭을 선언적 정책(`policy.yaml`)과 비교하여 게이트 결과를 산출합니다.
-- 저장된 기준선(baseline)과 비교하여 회귀를 감지합니다.
-- CI 소비 및 감사를 위한 구조화된 JSON 아티팩트(`sli-summary.json`, `slint-gate-summary.json`)를 작성합니다.
-- `--github-step-summary`를 통해 GitHub Actions에 마크다운 스텝 요약을 렌더링합니다.
-
-### kube-slint가 하지 않는 것
-
-- kube-slint는 correctness 테스트 프레임워크가 아닙니다. 오퍼레이터가 올바르게 동작하는지 단언하지 않습니다.
-- kube-slint는 모니터링 또는 알림 시스템이 아닙니다. 연속적인 프로덕션 메트릭이 아닌, 테스트 실행 시점의 가드레일 결과를 산출합니다.
-- kube-slint는 계측 실패 시 E2E 테스트를 실패시키지 않습니다. 메트릭 스크랩에 실패하면 미계측으로 기록되지만 테스트 세션은 계속됩니다(핵심 계약 참조).
+```bash
+cd examples/kind-hello-operator
+make demo
+```
 
 ---
 
