@@ -2,11 +2,15 @@ package harness
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewSession(t *testing.T) {
@@ -139,6 +143,76 @@ func ExampleSession_End() {
 	sess.Start()
 
 	// 3. 오퍼레이터 활동 유발 및 수렴 대기...
+}
+
+// TestSession_End_DualWrite verifies that Session.End() writes both:
+//   - a unique audit file: sli-summary.<runID>.<testcase>.json
+//   - a static latest alias: sli-summary.json (matches slint-gate default input)
+func TestSession_End_DualWrite(t *testing.T) {
+	t.Setenv("SLINT_DISABLE_DISCOVERY", "1")
+
+	dir := t.TempDir()
+	cfg := SessionConfig{
+		Namespace:          "ns",
+		MetricsServiceName: "svc",
+		TestCase:           "my-test",
+		RunID:              "run-abc",
+		ArtifactsDir:       dir,
+		Fetcher:            &mockFetcher{},
+	}
+
+	sess := NewSession(cfg)
+	sess.Start()
+	_, err := sess.End(context.Background())
+	require.NoError(t, err)
+
+	uniquePath := filepath.Join(dir, "sli-summary.run-abc.my-test.json")
+	staticPath := filepath.Join(dir, "sli-summary.json")
+
+	assert.FileExists(t, uniquePath, "unique audit file must be written")
+	assert.FileExists(t, staticPath, "static alias sli-summary.json must be written")
+
+	uniqueBytes, err := os.ReadFile(uniquePath)
+	require.NoError(t, err)
+	staticBytes, err := os.ReadFile(staticPath)
+	require.NoError(t, err)
+
+	// Both files must contain valid JSON with identical content.
+	var u, s map[string]any
+	require.NoError(t, json.Unmarshal(uniqueBytes, &u))
+	require.NoError(t, json.Unmarshal(staticBytes, &s))
+	assert.Equal(t, u, s, "unique and static alias must have identical content")
+}
+
+// TestSession_End_DualWrite_NoCollision verifies that running the same
+// runID+testcase twice produces two separate unique files without overwriting,
+// while the static alias is always updated to the latest result.
+func TestSession_End_DualWrite_NoCollision(t *testing.T) {
+	t.Setenv("SLINT_DISABLE_DISCOVERY", "1")
+
+	dir := t.TempDir()
+	cfg := SessionConfig{
+		Namespace:          "ns",
+		MetricsServiceName: "svc",
+		TestCase:           "my-test",
+		RunID:              "run-abc",
+		ArtifactsDir:       dir,
+		Fetcher:            &mockFetcher{},
+	}
+
+	for i := 0; i < 2; i++ {
+		sess := NewSession(cfg)
+		sess.Start()
+		_, err := sess.End(context.Background())
+		require.NoError(t, err)
+	}
+
+	// First unique file (no suffix).
+	assert.FileExists(t, filepath.Join(dir, "sli-summary.run-abc.my-test.json"))
+	// Second unique file (collision avoided with -1 suffix).
+	assert.FileExists(t, filepath.Join(dir, "sli-summary.run-abc.my-test.json-1"))
+	// Static alias exists and represents the latest run.
+	assert.FileExists(t, filepath.Join(dir, "sli-summary.json"))
 }
 
 func TestShouldRunCleanup(t *testing.T) {

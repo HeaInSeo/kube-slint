@@ -1,5 +1,5 @@
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+# Image URL for the slint-gate CLI container image
+IMG ?= ghcr.io/heainseo/slint-gate:dev
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -121,16 +121,16 @@ run: ## Run a controller from your host.
 	@echo "operator runtime removed; this repo is purely a library/framework now."
 
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	@echo "operator runtime removed; docker-build is no longer applicable."
+docker-build: ## Build the slint-gate CLI container image (IMG=ghcr.io/heainseo/slint-gate:dev).
+	$(CONTAINER_TOOL) build -t $(IMG) .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	@echo "operator runtime removed; docker-push is no longer applicable."
+docker-push: ## Push the slint-gate CLI container image.
+	$(CONTAINER_TOOL) push $(IMG)
 
 .PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	@echo "operator runtime removed; docker-buildx is no longer applicable."
+docker-buildx: ## Build and push slint-gate image for multiple platforms (linux/amd64, linux/arm64).
+	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -t $(IMG) --push .
 
 .PHONY: build-installer
 build-installer: ## Generate a consolidated YAML with CRDs and deployment.

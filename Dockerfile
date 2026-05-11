@@ -3,7 +3,7 @@
 #          --measurement-summary /workspace/artifacts/sli-summary.json \
 #          --policy /workspace/.slint/policy.yaml \
 #          --output /workspace/slint-gate-summary.json
-FROM golang:1.24 AS builder
+FROM golang:1.25 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
