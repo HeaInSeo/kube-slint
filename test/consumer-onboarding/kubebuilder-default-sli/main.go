@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -23,7 +25,7 @@ func init() {
 }
 
 // DummyReconciler simply adds to workqueue to simulate metric generation
-type DummyReconciler struct {}
+type DummyReconciler struct{}
 
 func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil

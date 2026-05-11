@@ -3,6 +3,7 @@ package harness
 import (
 	"testing"
 
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,4 +29,13 @@ func TestDefaultSpecs_Smoke(t *testing.T) {
 		}
 	}
 	assert.True(t, hasReconcileTotal, "reconcile_total_delta should be provided in baseline defaults")
+
+	// workqueue_depth_end must use ComputeEnd so it reflects the end-of-window snapshot,
+	// not the start snapshot (ComputeSingle/ComputeStart).
+	for _, s := range specs {
+		if s.ID == "workqueue_depth_end" {
+			assert.Equal(t, spec.ComputeEnd, s.Compute.Mode,
+				"workqueue_depth_end must use ComputeEnd to measure queue depth at window close")
+		}
+	}
 }

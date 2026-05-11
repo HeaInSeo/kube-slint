@@ -1,34 +1,31 @@
-schema_version: "slint.policy.v1"
-metadata:
-  name: "example-default-policy"
-  owner: "kube-slint"
+# kube-slint policy example
+# Supported fields: thresholds, regression, reliability, fail_on
+# Copy this file to .slint/policy.yaml and adjust for your operator.
 
+schema_version: "slint.policy.v1"
+
+# Threshold checks: gate on absolute SLI values.
+# 'metric' must match an SLI ID from your sli-summary.json.
+# 'operator' supports: >=, <=, >, <, ==
 thresholds:
   - name: "reconcile_error_ratio_max"
-    metric: "reconcile_error_ratio"
+    metric: "reconcile_error_delta"
     operator: "<="
-    value: 0.02
-    severity: "fail"
+    value: 0
 
+# Regression detection: compare current run against a stored baseline.
+# Pass --baseline <path> to slint-gate to enable comparison.
 regression:
   enabled: true
-  mode: "percent_delta"
   tolerance_percent: 5
 
+# Reliability: require a minimum collection quality before evaluating.
 reliability:
   required: false
-  min_level: "partial"
+  min_level: "partial"  # "partial" or "complete"
 
-first_run:
-  default_result: "warn"
-  evaluate_thresholds: true
-  evaluate_regression: false
-
-baseline:
-  required: false
-  on_unavailable: "warn"
-  on_corrupt: "no_grade"
-
+# fail_on: which violation categories cause a non-zero exit.
+# Remove "regression_detected" if you want regression checks to warn only.
 fail_on:
   - "threshold_miss"
   - "regression_detected"

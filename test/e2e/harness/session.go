@@ -408,18 +408,22 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	eng := engine.New(fetcher, s.impl.writer, nil)
 
-	outPath := ""
+	// uniquePath: 감사 추적용 고유 파일 (덮어쓰기 없음)
+	// staticPath: slint-gate 기본 입력과 일치하는 latest alias
+	uniquePath := ""
+	staticPath := ""
 	if s.ShouldWriteArtifacts() {
-		filename := fmt.Sprintf(
+		uniqueFilename := fmt.Sprintf(
 			"sli-summary.%s.%s.json",
 			SanitizeFilename(s.impl.RunID),
 			SanitizeFilename(s.impl.Config.TestCase),
 		)
-		path, err := s.NextSummaryPath(filename)
+		p, err := s.NextSummaryPath(uniqueFilename)
 		if err != nil {
 			return nil, err
 		}
-		outPath = path
+		uniquePath = p
+		staticPath = filepath.Join(s.impl.Config.ArtifactsDir, "sli-summary.json")
 	}
 
 	rel := &summary.Reliability{
@@ -437,13 +441,21 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 			Tags:       s.impl.Tags,
 		},
 		Specs:       s.impl.specs,
-		OutPath:     outPath,
+		OutPath:     uniquePath,
 		Reliability: rel,
 	})
 
 	if err != nil {
 		s.impl.hasFailed = true
 		return sum, err
+	}
+
+	// static alias: slint-gate 기본 입력 경로와 일치시킴.
+	// 병렬/멀티 테스트에서는 --measurement-summary 로 uniquePath를 명시할 것.
+	if staticPath != "" && sum != nil {
+		if writeErr := s.impl.writer.Write(staticPath, *sum); writeErr != nil {
+			fmt.Printf("kube-slint [session]: warning - static alias write failed: %v\n", writeErr)
+		}
 	}
 
 	// 1. Strictness Check (파이프라인 신뢰도 검증)

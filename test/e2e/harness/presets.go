@@ -82,13 +82,11 @@ func BaselineV3Specs() []spec.SLISpec {
 			Title:       "workqueue depth at end",
 			Unit:        "items",
 			Kind:        "gauge",
-			Description: "workqueue_depth gauge snapshot at the end time (all queues).",
+			Description: "workqueue_depth gauge snapshot at the end of the test window (all queues).",
 			Inputs: []spec.MetricRef{
 				spec.PromMetric("workqueue_depth", nil),
 			},
-			Compute: spec.ComputeSpec{Mode: spec.ComputeSingle}, // v4에서는 end-only gauge 권장, v3는 single(start) 사용함
-			// 참고(v3): ComputeSingle은 엔진에서 스냅샷 시작 값을 사용함.
-			// 게이지에 대해 스냅샷 최종 값을 원한다면, v3에 ComputeEnd 또는 ComputeSingleAt 추가가 필요함.
+			Compute: spec.ComputeSpec{Mode: spec.ComputeEnd},
 		},
 
 		// ---------------------------

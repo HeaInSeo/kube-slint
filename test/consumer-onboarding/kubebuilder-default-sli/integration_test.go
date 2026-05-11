@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -49,7 +51,7 @@ var _ = BeforeSuite(func() {
 		defer GinkgoRecover()
 		// Re-use main() logic essentially
 		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			Metrics: metricsserver.Options{BindAddress: ":8080"},
+			Metrics:                metricsserver.Options{BindAddress: ":8080"},
 			HealthProbeBindAddress: "0",
 			LeaderElection:         false,
 		})

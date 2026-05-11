@@ -3,6 +3,7 @@ package harness
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -66,9 +67,11 @@ func Attach(provider func() SessionConfig) (*Session, error) {
 	return session, nil
 }
 
+// isEnabledByEnv returns false only when SLINT_ENABLED is explicitly set to "0" or "false".
+// Calling Attach() itself is the opt-in; this allows programmatic disable without code changes.
 func isEnabledByEnv() bool {
-	// 현재는 attach 함수 내부이므로 항상 활성화됨
-	return true
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("SLINT_ENABLED")))
+	return v != "0" && v != "false"
 }
 
 func validateSessionConfigOrFail(cfg SessionConfig) {
