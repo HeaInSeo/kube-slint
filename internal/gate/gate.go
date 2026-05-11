@@ -113,6 +113,7 @@ type Summary struct {
 	BaselineStatus    string    `json:"baseline_status"`
 	PolicyStatus      string    `json:"policy_status"`
 	Reasons           []string  `json:"reasons"`
+	PolicyWarnings    []string  `json:"policy_warnings,omitempty"`
 	EvaluatedAt       string    `json:"evaluated_at"`
 	InputRefs         InputRefs `json:"input_refs"`
 	Checks            []Check   `json:"checks"`
@@ -191,7 +192,13 @@ func newSummary(req Request) *Summary {
 }
 
 func initPolicy(out *Summary, path string) *Policy {
-	policy, state := loadPolicy(path)
+	policy, state, warnings := loadPolicy(path)
+	if len(warnings) > 0 {
+		out.PolicyWarnings = warnings
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "slint-gate: policy warning: %s\n", w)
+		}
+	}
 	switch state {
 	case policyMissing:
 		out.PolicyStatus = policyMissing
@@ -447,22 +454,60 @@ func gateMessage(result string) string {
 
 // --- file loaders ---
 
-func loadPolicy(path string) (*Policy, string) {
+// knownPolicyKeys is the set of top-level keys that policy.yaml supports.
+var knownPolicyKeys = map[string]bool{
+	"schema_version": true,
+	"thresholds":     true,
+	"regression":     true,
+	"reliability":    true,
+	"fail_on":        true,
+}
+
+func loadPolicy(path string) (*Policy, string, []string) {
 	if path == "" {
-		return nil, policyMissing
+		return nil, policyMissing, nil
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, policyMissing
+			return nil, policyMissing, nil
 		}
-		return nil, policyInvalid
+		return nil, policyInvalid, nil
 	}
+
+	var warnings []string
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err == nil {
+		warnings = collectUnknownPolicyKeys(&doc)
+	}
+
 	var p Policy
 	if err := yaml.Unmarshal(data, &p); err != nil {
-		return nil, policyInvalid
+		return nil, policyInvalid, warnings
 	}
-	return &p, policyOK
+	return &p, policyOK, warnings
+}
+
+// collectUnknownPolicyKeys walks the top-level mapping node and returns
+// warning messages for any key not in knownPolicyKeys.
+func collectUnknownPolicyKeys(doc *yaml.Node) []string {
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return nil
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil
+	}
+	var warnings []string
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		key := root.Content[i].Value
+		if !knownPolicyKeys[key] {
+			warnings = append(warnings,
+				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, fail_on",
+					key, root.Content[i].Line))
+		}
+	}
+	return warnings
 }
 
 func loadMeasurement(path string) (*summary.Summary, string) {

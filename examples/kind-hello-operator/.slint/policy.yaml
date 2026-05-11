@@ -1,0 +1,21 @@
+schema_version: "slint.policy.v1"
+
+thresholds:
+  # Reconcile loop must have fired at least once during the measurement window.
+  - name: reconcile-activity
+    metric: hello_reconcile_total
+    operator: ">="
+    value: 1
+
+  # Workqueue should not be accumulating (depth at window end must be ≤ 5).
+  - name: workqueue-not-backed-up
+    metric: hello_workqueue_depth
+    operator: "<="
+    value: 5
+
+reliability:
+  required: false
+  min_level: partial
+
+fail_on:
+  - threshold_miss

@@ -43,6 +43,11 @@ type SessionConfig struct {
 	// Real-cluster Integration Knobs
 	CurlImage             string // overrides default curl image
 	TLSInsecureSkipVerify bool   // true to skip self-signed cert verification (pass -k to curl)
+	// ServiceURLFormat overrides the default metrics URL template.
+	// Format: two %s verbs — service name, namespace.
+	// Default: "https://%s.%s.svc:8443/metrics"
+	// Use "http://%s.%s.svc:8080/metrics" for plain-HTTP dev clusters.
+	ServiceURLFormat string
 
 	// Internal metadata
 	ConfigSourceType string
@@ -130,6 +135,9 @@ func NewSession(cfg SessionConfig) *Session {
 
 	if cfg.CurlImage != "" {
 		impl.CurlImage = cfg.CurlImage
+	}
+	if cfg.ServiceURLFormat != "" {
+		impl.ServiceURLFormat = cfg.ServiceURLFormat
 	}
 	impl.TLSInsecureSkipVerify = cfg.TLSInsecureSkipVerify
 

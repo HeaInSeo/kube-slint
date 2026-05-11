@@ -597,3 +597,56 @@ func TestEvaluate_RegressionMetricMissingInBaseline(t *testing.T) {
 	// regression check 일부가 no_grade → partially_evaluated
 	assert.Equal(t, "partially_evaluated", result.EvaluationStatus)
 }
+
+// --- policy unknown field warning tests ---
+
+func TestEvaluate_PolicyUnknownField_EmitsWarning(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a policy with an unknown top-level field.
+	policyYAML := `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+metadata:
+  author: test     # unknown field — should produce a warning
+severity: high     # another unknown field
+`
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
+
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"reconcile_total_delta": 2,
+	}, "complete"))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policyPath,
+	})
+
+	require.Equal(t, gate.GatePass, result.GateResult)
+	require.Len(t, result.PolicyWarnings, 2, "expected two unknown-field warnings")
+
+	for _, w := range result.PolicyWarnings {
+		assert.Contains(t, w, "unknown field")
+	}
+}
+
+func TestEvaluate_PolicyKnownFieldsOnly_NoWarnings(t *testing.T) {
+	dir := t.TempDir()
+
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"reconcile_total_delta": 3,
+		"workqueue_depth_end":   1,
+	}, "complete"))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Empty(t, result.PolicyWarnings, "expected no warnings for a valid policy")
+}

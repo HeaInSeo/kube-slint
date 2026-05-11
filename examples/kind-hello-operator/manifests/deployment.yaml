@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-operator
+  namespace: hello-system
+  labels:
+    app: hello-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-operator
+  template:
+    metadata:
+      labels:
+        app: hello-operator
+    spec:
+      containers:
+        - name: hello-operator
+          image: hello-operator:dev
+          imagePullPolicy: Never   # loaded via: kind load docker-image hello-operator:dev
+          ports:
+            - containerPort: 8080
+              name: metrics
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-operator-metrics
+  namespace: hello-system
+  labels:
+    app: hello-operator
+spec:
+  selector:
+    app: hello-operator
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080
