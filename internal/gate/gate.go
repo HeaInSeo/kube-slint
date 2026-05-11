@@ -151,13 +151,13 @@ func Evaluate(req Request) *Summary {
 	base := resultValueMap(baseline)
 	failOn := makeFailOn(policy)
 
-	tFailed, tNoGrade := runThresholds(out, policy.Thresholds, cur, failOn)
+	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, failOn)
 	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
 	relWarn := runReliability(out, policy, measurement)
 
 	anyFailed := tFailed || rFailed
 	anyNoGrade := tNoGrade || rNoGrade
-	hasWarn := rWarn || relWarn
+	hasWarn := rWarn || relWarn || tWarn
 
 	out.EvaluationStatus = computeEvalStatus(out.Checks, anyNoGrade)
 	out.GateResult = computeGateResult(anyFailed, hasWarn, anyNoGrade, out.BaselineStatus, policy.Regression.Enabled)
@@ -243,11 +243,14 @@ func initBaseline(out *Summary, path string) *summary.Summary {
 
 // --- check runners ---
 
-func runThresholds(out *Summary, rules []ThresholdRule, cur map[string]float64, failOn map[string]bool) (failed, anyNoGrade bool) {
+func runThresholds(out *Summary, rules []ThresholdRule, cur map[string]float64, failOn map[string]bool) (failed, warn, anyNoGrade bool) {
 	for _, rule := range rules {
-		check, ruleFailed, ruleNoGrade := evalThreshold(rule, cur, failOn)
+		check, ruleFailed, ruleWarn, ruleNoGrade := evalThreshold(rule, cur, failOn)
 		if ruleFailed {
 			failed = true
+		}
+		if ruleWarn {
+			warn = true
 		}
 		if ruleNoGrade {
 			anyNoGrade = true
@@ -265,7 +268,10 @@ type thresholdResult struct {
 	pendingReasons []string
 }
 
-func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string]bool) (thresholdResult, bool, bool) {
+// evalThreshold returns (result, failed, warn, noGrade).
+// failed=true  → threshold miss and threshold_miss is in fail_on → gate FAIL
+// warn=true    → threshold miss but threshold_miss not in fail_on → gate WARN (never PASS)
+func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string]bool) (thresholdResult, bool, bool, bool) {
 	name := rule.Name
 	if name == "" {
 		name = "unnamed-threshold"
@@ -284,7 +290,7 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string
 	if rule.Metric == "" || !ok {
 		c.Message = "metric missing or invalid threshold target"
 		c.pendingReasons = []string{reasonMeasInputMissing}
-		return c, false, true
+		return c, false, false, true
 	}
 
 	c.Observed = observed
@@ -292,19 +298,22 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string
 	if err != nil {
 		c.Message = "invalid operator"
 		c.pendingReasons = []string{reasonPolicyInvalid}
-		return c, false, true
+		return c, false, false, true
 	}
 
 	if matched {
 		c.Status = "pass"
 		c.Message = "within threshold"
-		return c, false, false
+		return c, false, false, false
 	}
 
 	c.Status = "fail"
 	c.Message = "threshold miss"
 	c.pendingReasons = []string{reasonThresholdMiss}
-	return c, failOn["threshold_miss"], false
+	if failOn["threshold_miss"] {
+		return c, true, false, false
+	}
+	return c, false, true, false
 }
 
 func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (failed, anyWarn, anyNoGrade bool) {
@@ -323,9 +332,12 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 		if rule.Metric == "" {
 			continue
 		}
-		check, rFailed, rNoGrade := evalRegressionCheck(rule, cur, base, policy.Regression.TolerancePercent, failOn)
+		check, rFailed, rWarnCheck, rNoGrade := evalRegressionCheck(rule, cur, base, policy.Regression.TolerancePercent, failOn)
 		if rFailed {
 			failed = true
+		}
+		if rWarnCheck {
+			anyWarn = true
 		}
 		if rNoGrade {
 			anyNoGrade = true
@@ -338,7 +350,10 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 	return failed, anyWarn, anyNoGrade
 }
 
-func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, tolerancePct float64, failOn map[string]bool) (thresholdResult, bool, bool) {
+// evalRegressionCheck returns (result, failed, warn, noGrade).
+// failed=true  → regression detected and regression_detected is in fail_on → gate FAIL
+// warn=true    → regression detected but regression_detected not in fail_on → gate WARN (never PASS)
+func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, tolerancePct float64, failOn map[string]bool) (thresholdResult, bool, bool, bool) {
 	c := thresholdResult{
 		Check: Check{
 			Name:     fmt.Sprintf("regression:%s", rule.Metric),
@@ -353,7 +368,20 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 	baseVal, hasBase := base[rule.Metric]
 	if !hasCur || !hasBase {
 		c.Message = "metric missing in current/baseline"
-		return c, false, true
+		return c, false, false, true
+	}
+
+	// baseline=0, current≠0: unquantifiable regression from zero.
+	// Guard here to prevent math.Inf(1) from reaching JSON encoding.
+	if baseVal == 0 && curVal != 0 {
+		c.Status = "fail"
+		c.Observed = "baseline_zero_current_nonzero"
+		c.Message = "regression detected: baseline is zero, current is non-zero"
+		c.pendingReasons = []string{reasonRegressionDetected}
+		if failOn["regression_detected"] {
+			return c, true, false, false
+		}
+		return c, false, true, false
 	}
 
 	d := deltaPct(curVal, baseVal)
@@ -363,12 +391,15 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 		c.Status = "fail"
 		c.Message = "regression detected"
 		c.pendingReasons = []string{reasonRegressionDetected}
-		return c, failOn["regression_detected"], false
+		if failOn["regression_detected"] {
+			return c, true, false, false
+		}
+		return c, false, true, false
 	}
 
 	c.Status = "pass"
 	c.Message = "within regression tolerance"
-	return c, false, false
+	return c, false, false, false
 }
 
 func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn bool) {

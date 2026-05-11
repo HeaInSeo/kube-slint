@@ -634,6 +634,146 @@ severity: high     # another unknown field
 	}
 }
 
+// --- fail_on semantics: check=fail must never produce PASS ---
+
+func TestEvaluate_ThresholdFail_NotInFailOn_IsWarn(t *testing.T) {
+	// threshold fails but fail_on only contains regression_detected → WARN, not PASS
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 10},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"regression_detected"}, // threshold_miss intentionally absent
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	// check must be fail
+	require.Len(t, result.Checks, 2) // threshold + reliability
+	var tCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "threshold" {
+			tCheck = c
+		}
+	}
+	assert.Equal(t, "fail", tCheck.Status)
+
+	// gate_result must be WARN, never PASS
+	assert.Equal(t, gate.GateWarn, result.GateResult)
+}
+
+func TestEvaluate_RegressionFail_NotInFailOn_IsWarn(t *testing.T) {
+	// regression detected but fail_on only contains threshold_miss → WARN, not PASS
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
+		},
+		Regression:  map[string]any{"enabled": true, "tolerance_percent": 5},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"}, // regression_detected intentionally absent
+	}
+	policy := writePolicyFile(t, dir, p)
+	// 100% increase → exceeds 5% tolerance
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 6}, "Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	var rCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "regression" {
+			rCheck = c
+		}
+	}
+	assert.Equal(t, "fail", rCheck.Status)
+	assert.Equal(t, gate.GateWarn, result.GateResult)
+}
+
+// --- regression base=0 guard: no +Inf in JSON ---
+
+func TestEvaluate_Regression_BaselineZero_CurrentNonzero_IsFail(t *testing.T) {
+	// baseline=0, current=1 → must not produce +Inf; JSON must be valid
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 1},
+		"Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, // workqueue base=0
+		"Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	// gate must fail (regression_detected in default fail_on)
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "REGRESSION_DETECTED")
+
+	// regression check observed must be a string, not a float — no +Inf
+	var rCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "regression" && c.Metric == "workqueue_depth_end" {
+			rCheck = c
+		}
+	}
+	assert.Equal(t, "fail", rCheck.Status)
+	assert.Equal(t, "baseline_zero_current_nonzero", rCheck.Observed)
+
+	// JSON serialization must succeed (no +Inf)
+	_, err := json.Marshal(result)
+	assert.NoError(t, err, "JSON marshal must not fail with baseline=0 current!=0")
+}
+
+func TestEvaluate_Regression_BothZero_IsPass(t *testing.T) {
+	// baseline=0, current=0 → delta=0 → within tolerance → pass
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0},
+		"Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0},
+		"Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	for _, c := range result.Checks {
+		if c.Category == "regression" && c.Metric == "workqueue_depth_end" {
+			assert.Equal(t, "pass", c.Status)
+		}
+	}
+}
+
 func TestEvaluate_PolicyKnownFieldsOnly_NoWarnings(t *testing.T) {
 	dir := t.TempDir()
 
