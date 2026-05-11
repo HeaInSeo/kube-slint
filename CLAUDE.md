@@ -34,14 +34,14 @@
 
 ### 다음 작업
 
-**Stage 2 — 오픈소스 배포 수준** (미시작)
+**Stage 2 — 오픈소스 배포 수준** (Batch 1 완료)
 
-#### Batch 1 — 오픈소스 기본 요건 (1~2일)
-- [ ] LICENSE 추가 (Apache 2.0 권장)
-- [ ] `pkg/slint` public API wrapper (`test/e2e/harness` re-export)
-- [ ] JUMI/AH spec → `examples/consumer-specs/` 분리
-- [ ] NO_GRADE fail-on 옵션 (GitHub Action + slint-gate CLI)
-- [ ] CONTRIBUTING.md + GitHub issue 템플릿
+#### Batch 1 — 오픈소스 기본 요건 ✅ (커밋 `278f1a5`)
+- [x] LICENSE 추가 (Apache 2.0)
+- [x] `pkg/slint` public API wrapper (`test/e2e/harness` re-export)
+- [x] JUMI/AH spec → `examples/consumer-specs/jumi-ah/specs.go` 분리
+- [x] NO_GRADE fail-on 옵션 (`--fail-on` flag + action.yml 4-level case 처리)
+- [x] CONTRIBUTING.md + GitHub issue 템플릿 (bug, feature)
 
 #### Batch 2 — 개발자 경험 (3~4일)
 - [ ] kind + hello-operator 예제 (실제 클러스터 end-to-end)
@@ -111,12 +111,9 @@ fail_on:
 
 | 항목 | 위치 | 설명 |
 |---|---|---|
-| public API 경로 | `test/e2e/harness` | `pkg/slint`로 이동 필요 (Stage 2 Batch 1) |
-| JUMI/AH spec | `pkg/slo/spec/jumi_ah_*.go` | examples로 분리 필요 |
-| ServiceURLFormat | `session.go:116` | `https://%s.%s.svc:8443/metrics` 하드코딩 |
-| Token 온보딩 | `attach.go:validateSessionConfigOrFail` | Token 획득 방법 문서/헬퍼 부족 |
-| policy strict decode | `internal/gate/gate.go:loadPolicy` | unknown field silent ignore |
-| NO_GRADE CI 통과 | `.github/actions/slint-gate/action.yml` | measurement 누락 시 조용히 통과 |
+| ServiceURLFormat | `session.go` | `https://%s.%s.svc:8443/metrics` 하드코딩 (Batch 2) |
+| Token 온보딩 | `attach.go:validateSessionConfigOrFail` | Token 획득 방법 문서/헬퍼 부족 (Batch 2) |
+| policy strict decode | `internal/gate/gate.go:loadPolicy` | unknown field silent ignore (Batch 2) |
 | NextSummaryPath 충돌 파일명 | `session.go:NextSummaryPath` | `file.json-1` 형태 (`.json` 뒤에 suffix) |
 
 ## 주요 결정 히스토리
