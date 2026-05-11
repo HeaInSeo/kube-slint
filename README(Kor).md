@@ -74,13 +74,16 @@ go get github.com/HeaInSeo/kube-slint
 **2단계: E2E 테스트에 하네스 임베드**
 
 ```go
-import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-sess := harness.NewSession(harness.SessionConfig{
+token, _ := slint.ReadServiceAccountToken(slint.DefaultTokenPath)
+
+sess := slint.NewSession(slint.SessionConfig{
     Namespace:             "my-operator-system",
     MetricsServiceName:    "my-operator-controller-manager-metrics-service",
+    Token:                 token,
     ArtifactsDir:          "artifacts",
-    Specs:                 harness.DefaultV3Specs(),
+    Specs:                 slint.DefaultSpecs(),
     TLSInsecureSkipVerify: true,
     CurlImage:             "my-registry/curlimages/curl:latest",
 })
@@ -112,7 +115,7 @@ jq -r '.gate_result' slint-gate-summary.json
 
 **프리셋 스펙 사용**
 
-`DefaultV3Specs()`(별칭: `BaselineV3Specs()`)는 kubebuilder로 생성된 오퍼레이터를 위해 설계된 프리셋 스펙 세트를 반환합니다. 다음 항목을 포함합니다:
+`slint.DefaultSpecs()`(구 이름: `DefaultV3Specs`, `BaselineV3Specs`)는 kubebuilder로 생성된 오퍼레이터를 위해 설계된 프리셋 스펙 세트를 반환합니다. 다음 항목을 포함합니다:
 
 | ID | 설명 |
 |---|---|
@@ -127,7 +130,7 @@ jq -r '.gate_result' slint-gate-summary.json
 | `rest_client_5xx_delta` | 수신된 서버 오류(5xx) 응답 수 |
 
 ```go
-specs := harness.DefaultV3Specs()
+specs := slint.DefaultSpecs()
 ```
 
 **커스텀 SLI 스펙 정의**
@@ -161,20 +164,23 @@ mySpecs := []spec.SLISpec{
 ### 2. E2E 테스트에 하네스 임베드
 
 ```go
-import "github.com/HeaInSeo/kube-slint/test/e2e/harness"
+import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-sess := harness.NewSession(harness.SessionConfig{
+sess := slint.NewSession(slint.SessionConfig{
     // 오퍼레이터가 실행 중인 대상 네임스페이스
     Namespace: "my-operator-system",
 
     // /metrics를 노출하는 쿠버네티스 서비스 이름
     MetricsServiceName: "my-operator-controller-manager-metrics-service",
 
+    // ServiceAccount 토큰 (아래 "Token 온보딩" 참조)
+    Token: token,
+
     // sli-summary.json이 작성될 디렉토리
     ArtifactsDir: "artifacts",
 
     // SLI 스펙 세트 — 프리셋 또는 커스텀 사용
-    Specs: harness.DefaultV3Specs(),
+    Specs: slint.DefaultSpecs(),
 
     // 실클러스터 설정
     TLSInsecureSkipVerify: true,
@@ -188,7 +194,38 @@ sess.End(ctx)
 
 **RBAC 주의사항:** 하네스는 curl 기반 페처를 사용하여 메트릭 엔드포인트를 스크랩하기 위한 임시 파드를 생성합니다. 오퍼레이터의 ServiceAccount는 대상 네임스페이스에서 `pods: create` 권한을 보유해야 합니다.
 
-**출력:** `artifacts/sli-summary.json`은 `sess.End(ctx)` 호출 시 작성됩니다. 이 파일이 slint-gate CLI의 입력이 됩니다.
+**출력:** `sess.End(ctx)` 호출 시 두 파일이 작성됩니다:
+- `artifacts/sli-summary.<runID>.<testcase>.json` — 감사 추적용 unique 파일
+- `artifacts/sli-summary.json` — slint-gate 기본 입력 경로 (latest alias)
+
+---
+
+### 2a. Token 온보딩
+
+`pkg/slint`는 ServiceAccount 토큰 읽기 헬퍼를 제공합니다:
+
+```go
+import "github.com/HeaInSeo/kube-slint/pkg/slint"
+
+// 기본 경로에서 토큰 읽기 (/var/run/secrets/kubernetes.io/serviceaccount/token)
+token, err := slint.ReadServiceAccountToken(slint.DefaultTokenPath)
+
+// 환경 변수 우선, 없으면 파일 폴백
+token, err := slint.ReadServiceAccountTokenFromEnv("SLINT_TOKEN", slint.DefaultTokenPath)
+```
+
+토큰은 curl pod이 오퍼레이터 `/metrics` HTTPS 엔드포인트에 연결할 때 `Authorization: Bearer` 헤더로 사용됩니다.
+
+**HTTP 엔드포인트 사용 시 (기본 포트 8443 → 8080 변경):**
+
+```go
+sess := slint.NewSession(slint.SessionConfig{
+    // ...
+    ServiceURLFormat: slint.ServiceURLHTTP, // "http://%s.%s.svc:8080/metrics"
+})
+```
+
+기본값은 `slint.ServiceURLHTTPS` (`"https://%s.%s.svc:8443/metrics"`)입니다.
 
 ---
 
@@ -214,9 +251,20 @@ go run ./cmd/slint-gate [flags]
 | `--policy` | `.slint/policy.yaml` | 정책 파일 경로 |
 | `--baseline` | `""` (비활성) | 회귀 비교용 기준선 요약 경로; 생략하면 건너뜀 |
 | `--output` | `slint-gate-summary.json` | 게이트 결과 JSON 작성 경로 |
+| `--fail-on` | `NEVER` | 종료 코드 1을 반환할 gate_result 조건 (아래 참조) |
 | `--github-step-summary` | false | `$GITHUB_STEP_SUMMARY`에 마크다운 작성 (GitHub Actions용) |
 
-**종료 동작:** 바이너리는 항상 0으로 종료합니다. CI 워크플로우는 `jq`로 출력 JSON의 `gate_result`를 검사하여 실패를 판단합니다.
+**`--fail-on` 레벨**
+
+| 값 | 설명 |
+|---|---|
+| `NEVER` | 항상 0으로 종료 (기본값) |
+| `FAIL` | `gate_result=FAIL`일 때 exit 1 |
+| `FAIL_OR_WARN` | `FAIL` 또는 `WARN`일 때 exit 1 |
+| `FAIL_OR_NOGRADE` | `FAIL` 또는 `NO_GRADE`일 때 exit 1 |
+| `FAIL_WARN_OR_NOGRADE` | `FAIL`, `WARN`, `NO_GRADE` 모두 exit 1 |
+
+**종료 동작:** 기본값(`NEVER`)에서는 항상 0으로 종료합니다. `--fail-on FAIL` 이상을 지정하면 해당 조건에서 exit 1이 반환됩니다.
 
 **정책 파일 (`.slint/policy.yaml`)**
 
@@ -336,7 +384,7 @@ jobs:
         with:
           measurement-summary: artifacts/sli-summary.json   # 기본값
           policy:              .slint/policy.yaml            # 기본값
-          fail-on:             FAIL                          # FAIL | FAIL_OR_WARN
+          fail-on:             FAIL                          # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **입력값**
@@ -347,7 +395,7 @@ jobs:
 | `policy` | `.slint/policy.yaml` | 정책 YAML 경로 |
 | `baseline` | `` | 선택적 기준선 경로 |
 | `output` | `slint-gate-summary.json` | 게이트 결과 출력 경로 |
-| `fail-on` | `FAIL` | `FAIL` 또는 `FAIL_OR_WARN` |
+| `fail-on` | `FAIL` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
 | `github-step-summary` | `true` | Markdown 요약 테이블 출력 여부 |
 | `upload-artifact` | `true` | 게이트 결과 아티팩트 업로드 여부 |
 
@@ -368,6 +416,20 @@ jobs:
     result=$(jq -r '.gate_result' slint-gate-summary.json)
     [ "$result" != "FAIL" ] || exit 1
 ```
+
+---
+
+## kind 클러스터 예제
+
+외부 클러스터 없이 kind 로컬 클러스터로 전체 흐름을 체험할 수 있는 예제가 `examples/kind-hello-operator/`에 포함되어 있습니다.
+
+```sh
+cd examples/kind-hello-operator
+./setup.sh         # kind 클러스터 생성, hello-operator 배포
+go test -tags kind ./e2e/ -v
+```
+
+`setup.sh`는 kind 클러스터 생성, hello-operator Docker 이미지 빌드, RBAC 적용, 디플로이먼트 배포까지 자동으로 수행합니다. 상세 안내는 `examples/kind-hello-operator/README.md`를 참조하십시오.
 
 ---
 

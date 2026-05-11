@@ -61,6 +61,13 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet ## Run tests.
 	go test ./... -coverprofile cover.out
 
+.PHONY: coverage
+coverage: manifests generate fmt vet ## Run tests and generate HTML coverage report (cover.html).
+	go test ./... -coverprofile cover.out -covermode atomic
+	go tool cover -html=cover.out -o cover.html
+	@go tool cover -func cover.out | grep -E "^total|100\.0%"
+	@echo "Full report: cover.html"
+
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
