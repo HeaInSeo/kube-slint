@@ -24,8 +24,14 @@ reliability:
   required: false
   min_level: "partial"  # "partial" or "complete"
 
-# fail_on: which violation categories cause a non-zero exit.
-# Remove "regression_detected" if you want regression checks to warn only.
+# fail_on controls which violation categories promote the gate_result to FAIL.
+# Violations not listed here become gate_result=WARN instead of PASS.
+# Process exit behavior is controlled separately by the slint-gate CLI --fail-on flag.
+#
+# If fail_on is omitted or empty, kube-slint uses the default hard-fail categories:
+# threshold_miss and regression_detected.
+#
+# Remove "regression_detected" to downgrade regression violations to WARN.
 fail_on:
   - "threshold_miss"
   - "regression_detected"

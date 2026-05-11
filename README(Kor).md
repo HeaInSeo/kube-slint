@@ -295,9 +295,24 @@ fail_on:
 | 결과 | 의미 |
 |---|---|
 | `PASS` | 모든 임계치 및 회귀 검사 통과 |
-| `WARN` | 비차단 이슈 (예: 기준선 없는 첫 실행, 신뢰도 최솟값 미달 등) |
-| `FAIL` | 정책 위반 — 임계치 미달 또는 회귀 감지; CI 실패 |
+| `WARN` | 검사가 실패했지만 해당 항목이 `fail_on`에 없거나, 비차단 조건(기준선 없는 첫 실행, 신뢰도 최솟값 미달)인 경우 |
+| `FAIL` | `fail_on`에 포함된 정책 위반 — 임계치 미달 또는 회귀 감지 |
 | `NO_GRADE` | 평가 불가 — 입력 파일 누락 또는 손상 |
+
+**`fail_on` 두 레이어 구조**
+
+`policy.fail_on`과 CLI `--fail-on`은 별개의 제어 레이어입니다.
+
+| 레이어 | 역할 |
+|---|---|
+| `policy.fail_on` | 어떤 위반 항목을 `gate_result=FAIL`로 승격할지 결정. 목록에 없는 위반은 `WARN`이 됩니다. 실패한 검사가 `PASS`가 되는 일은 없습니다. |
+| CLI `--fail-on` | 어떤 `gate_result`에서 프로세스를 exit 1로 종료할지 결정 |
+
+`fail_on`을 생략하거나 빈 배열로 두면 기본 hard-fail 항목인 `threshold_miss`, `regression_detected`가 적용됩니다.
+
+**`checks[].observed` 타입 주의사항**
+
+`observed`는 일반적으로 숫자입니다. 다만 baseline=0이고 current가 0이 아닌 regression처럼 수치 비율로 표현하기 어려운 경우에는 `"baseline_zero_current_nonzero"` 같은 문자열 marker가 들어갈 수 있습니다. jq 스크립트나 대시보드는 `observed`가 항상 숫자라고 가정하면 안 됩니다.
 
 ---
 

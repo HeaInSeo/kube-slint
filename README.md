@@ -259,9 +259,19 @@ fail_on:
 | Result | Meaning |
 |---|---|
 | `PASS` | All threshold and regression checks passed |
-| `WARN` | Non-blocking issue (e.g., first run without baseline, reliability below minimum) |
-| `FAIL` | Policy violation — threshold miss or regression detected; CI fails |
+| `WARN` | A check failed but its category is not listed in `fail_on`, or a non-blocking condition (first run without baseline, reliability below minimum) |
+| `FAIL` | Policy violation listed in `fail_on` — threshold miss or regression detected |
 | `NO_GRADE` | Evaluation not possible — missing or corrupt inputs |
+
+**`fail_on` semantics**
+
+`policy.fail_on` controls which violation categories promote `gate_result` to `FAIL`. Violations not listed become `WARN` — a failed check can never produce `PASS`. If `fail_on` is omitted or empty, kube-slint applies the default: `threshold_miss` and `regression_detected`.
+
+`--fail-on` (CLI flag / action input) is a separate layer that controls whether a given `gate_result` exits the process with code 1. The two settings are independent.
+
+**`checks[].observed` field**
+
+`observed` is normally a number. In non-quantifiable edge cases — such as a regression check where the baseline value is zero and the current value is non-zero — `observed` contains a string marker (e.g. `"baseline_zero_current_nonzero"`). Consumers (jq scripts, dashboards) should not assume `observed` is always a number.
 
 ---
 
@@ -319,9 +329,9 @@ kube-slint supports three first-class measurement modes, set per-session or per-
 
 Both gate model components are complete.
 
-**Threshold checking** (DONE): Each metric result in `sli-summary.json` is evaluated against the threshold rules in `policy.yaml`. A threshold miss sets `gate_result` to `FAIL` if `threshold_miss` is listed in `fail_on`.
+**Threshold checking** (DONE): Each metric result in `sli-summary.json` is evaluated against the threshold rules in `policy.yaml`. A threshold miss sets `gate_result` to `FAIL` if `threshold_miss` is in `fail_on`; otherwise it sets `gate_result` to `WARN`.
 
-**Regression detection** (DONE): When `--baseline` is provided, each metric result is compared to the stored baseline value. If the change exceeds `tolerance_percent`, the result is flagged as a regression. Regression detection sets `gate_result` to `FAIL` if `regression_detected` is listed in `fail_on`.
+**Regression detection** (DONE): When `--baseline` is provided, each metric result is compared to the stored baseline value. If the change exceeds `tolerance_percent`, the result is flagged as a regression. A detected regression sets `gate_result` to `FAIL` if `regression_detected` is in `fail_on`; otherwise it sets `gate_result` to `WARN`. A regression from a zero baseline to a non-zero current value is always treated as a detected regression.
 
 ---
 

@@ -99,10 +99,22 @@ slint-gate-summary.json                 # gate evaluation result, written by sli
   "gate_result": "PASS",
   "evaluation_status": "evaluated",
   "checks": [
-    { "name": "reconcile-activity", "category": "threshold", "status": "pass" }
+    { "name": "reconcile-activity", "category": "threshold", "status": "pass",
+      "observed": 5, "expected": ">= 1" }
   ]
 }
 ```
+
+**`checks[].observed` type note:** `observed` is normally a `number`. In non-quantifiable edge cases — for example, a regression check where the baseline is zero and the current value is non-zero — `observed` contains a string marker such as `"baseline_zero_current_nonzero"`. Consumers (jq scripts, dashboards) must not assume `observed` is always numeric.
+
+**`fail_on` two-layer model:**
+
+| Layer | Controls |
+|---|---|
+| `policy.fail_on` | Which violation categories promote `gate_result` to `FAIL`; violations not listed become `WARN` |
+| CLI `--fail-on` | Which `gate_result` values cause the process to exit with code 1 |
+
+If `fail_on` is omitted or set to `[]`, the default hard-fail categories apply: `threshold_miss` and `regression_detected`.
 
 ---
 

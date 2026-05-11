@@ -597,6 +597,12 @@ func reliabilityRank(status string) int {
 	}
 }
 
+// deltaPct returns the percentage change from base to cur.
+//
+// Contract: callers MUST handle base == 0 && cur != 0 before calling this
+// function if the result will be serialized to JSON, because deltaPct returns
+// +Inf for that case and encoding/json cannot marshal +Inf.
+// See evalRegressionCheck for the required guard pattern.
 func deltaPct(cur, base float64) float64 {
 	if base == 0 {
 		if cur != 0 {
