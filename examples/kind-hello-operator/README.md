@@ -26,7 +26,8 @@ End-to-end demonstration of kube-slint measuring a real operator running inside 
 ./setup.sh
 
 # 2. Build and load hello-operator
-docker build -f operator/Dockerfile -t hello-operator:dev ../..
+# Build context is the operator/ directory — no repo-root dependency required.
+docker build -t hello-operator:dev operator/
 kind load docker-image hello-operator:dev --name slint-demo
 
 # 3. Deploy hello-operator + RBAC
@@ -39,14 +40,17 @@ kubectl -n hello-system rollout status deployment/hello-operator
 export SLINT_SA_TOKEN=$(kubectl -n hello-system create token kube-slint --duration=1h)
 
 # 6. Run the E2E test
+# The -tags kind flag is required — the test file is guarded by //go:build kind
+# to keep it out of the default `go test ./...` run.
 mkdir -p artifacts
-SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -v -timeout 120s -run TestHelloOperatorSLI \
+SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -tags kind -v -timeout 120s -run TestHelloOperatorSLI \
   github.com/HeaInSeo/kube-slint/examples/kind-hello-operator/e2e
 
 # 7. Evaluate policy gate
 go run ../../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
-  --policy .slint/policy.yaml
+  --policy .slint/policy.yaml \
+  --fail-on FAIL
 
 # 8. Tear down
 kind delete cluster --name slint-demo

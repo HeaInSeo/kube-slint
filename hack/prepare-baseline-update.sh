@@ -10,7 +10,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CURRENT_BASELINE="${REPO_ROOT}/docs/baselines/hello-operator-sli-summary.json"
 RC_POLICY="${REPO_ROOT}/.slint/policy.yaml"
-SLINT_GATE_PY="${REPO_ROOT}/hack/slint_gate.py"
 INPUT_SUMMARY="${1:-}"
 
 if [ -z "${INPUT_SUMMARY}" ]; then
@@ -34,21 +33,9 @@ if [ ! -f "${RC_POLICY}" ]; then
   exit 1
 fi
 
-if [ ! -f "${SLINT_GATE_PY}" ]; then
-  echo "ERROR: slint_gate.py not found: ${SLINT_GATE_PY}"
-  exit 1
-fi
-
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "ERROR: python3 not found in PATH"
-  echo "  This helper uses python3 to normalize JSON before diffing."
-  exit 1
-fi
-
-if ! python3 -c "import yaml" >/dev/null 2>&1; then
-  echo "ERROR: missing Python dependency: pyyaml"
-  echo "  This helper reuses hack/slint_gate.py, which reads the RC policy YAML."
-  echo "  Install it with: python3 -m pip install pyyaml"
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq not found in PATH"
+  echo "  Install: https://jqlang.github.io/jq/download/"
   exit 1
 fi
 
@@ -63,27 +50,9 @@ CANDIDATE_GATE_FILE="${WORK_DIR}/candidate-gate.json"
 
 cp "${INPUT_SUMMARY}" "${CANDIDATE_FILE}"
 
-python3 - "${CURRENT_BASELINE}" "${CURRENT_PRETTY}" <<'PY'
-import json
-import sys
-src, dst = sys.argv[1], sys.argv[2]
-with open(src, "r", encoding="utf-8") as f:
-    data = json.load(f)
-with open(dst, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
-    f.write("\n")
-PY
-
-python3 - "${CANDIDATE_FILE}" "${CANDIDATE_PRETTY}" <<'PY'
-import json
-import sys
-src, dst = sys.argv[1], sys.argv[2]
-with open(src, "r", encoding="utf-8") as f:
-    data = json.load(f)
-with open(dst, "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
-    f.write("\n")
-PY
+# Normalize JSON for diffing (sorted keys, indented).
+jq --sort-keys '.' "${CURRENT_BASELINE}" > "${CURRENT_PRETTY}"
+jq --sort-keys '.' "${CANDIDATE_FILE}" > "${CANDIDATE_PRETTY}"
 
 if diff -u "${CURRENT_PRETTY}" "${CANDIDATE_PRETTY}" > "${DIFF_FILE}"; then
   DIFF_STATUS="no_changes"
@@ -91,111 +60,85 @@ else
   DIFF_STATUS="changes_detected"
 fi
 
-python3 "${SLINT_GATE_PY}" \
+# Evaluate gate for current baseline and candidate using the Go CLI.
+go run "${REPO_ROOT}/cmd/slint-gate" \
   --measurement-summary "${CURRENT_BASELINE}" \
-  --policy "${RC_POLICY}" \
-  --baseline "${CURRENT_BASELINE}" \
-  --output "${CURRENT_GATE_FILE}" >/dev/null
+  --policy             "${RC_POLICY}" \
+  --baseline           "${CURRENT_BASELINE}" \
+  --output             "${CURRENT_GATE_FILE}" >/dev/null
 
-python3 "${SLINT_GATE_PY}" \
+go run "${REPO_ROOT}/cmd/slint-gate" \
   --measurement-summary "${CANDIDATE_FILE}" \
-  --policy "${RC_POLICY}" \
-  --baseline "${CURRENT_BASELINE}" \
-  --output "${CANDIDATE_GATE_FILE}" >/dev/null
+  --policy             "${RC_POLICY}" \
+  --baseline           "${CURRENT_BASELINE}" \
+  --output             "${CANDIDATE_GATE_FILE}" >/dev/null
 
-python3 - "${CURRENT_BASELINE}" "${CANDIDATE_FILE}" "${CURRENT_PRETTY}" "${CANDIDATE_PRETTY}" "${DIFF_FILE}" "${REPORT_FILE}" "${CURRENT_GATE_FILE}" "${CANDIDATE_GATE_FILE}" <<'PY'
-import json
-import sys
-from pathlib import Path
+# Generate markdown report from gate results and metric diffs.
+CURRENT_GATE_RESULT="$(jq -r '.gate_result'   "${CURRENT_GATE_FILE}")"
+CANDIDATE_GATE_RESULT="$(jq -r '.gate_result' "${CANDIDATE_GATE_FILE}")"
+GATE_CHANGED="$([ "${CURRENT_GATE_RESULT}" = "${CANDIDATE_GATE_RESULT}" ] && echo "no" || echo "yes")"
 
-current_path, candidate_path, current_pretty, candidate_pretty, diff_path, report_path, current_gate_path, candidate_gate_path = sys.argv[1:]
+CUR_COLLECT="$(jq -r '.reliability.collectionStatus // "unknown"' "${CURRENT_BASELINE}")"
+CAN_COLLECT="$(jq -r '.reliability.collectionStatus // "unknown"' "${CANDIDATE_FILE}")"
+CUR_EVAL="$(jq -r    '.reliability.evaluationStatus // "unknown"' "${CURRENT_BASELINE}")"
+CAN_EVAL="$(jq -r    '.reliability.evaluationStatus // "unknown"' "${CANDIDATE_FILE}")"
 
-with open(current_path, "r", encoding="utf-8") as f:
-    current = json.load(f)
-with open(candidate_path, "r", encoding="utf-8") as f:
-    candidate = json.load(f)
-with open(current_gate_path, "r", encoding="utf-8") as f:
-    current_gate = json.load(f)
-with open(candidate_gate_path, "r", encoding="utf-8") as f:
-    candidate_gate = json.load(f)
+# Build changed-metric table via jq.
+CHANGED_ROWS="$(jq -r --slurpfile cur "${CURRENT_PRETTY}" --slurpfile can "${CANDIDATE_PRETTY}" -n '
+  def result_map(data):
+    (data[0].results // []) | map(select(.id != null))
+    | map({(.id): {status: .status, value: .value}}) | add // {};
+  ($cur | result_map(.)) as $cm |
+  ($can | result_map(.)) as $nm |
+  (($cm | keys) + ($nm | keys)) | unique | sort |
+  map(
+    . as $k |
+    {
+      metric: $k,
+      cur_status: ($cm[$k].status // "—"),
+      cur_value:  ($cm[$k].value  // "—" | tostring),
+      can_status: ($nm[$k].status // "—"),
+      can_value:  ($nm[$k].value  // "—" | tostring)
+    } |
+    select(.cur_status != .can_status or .cur_value != .can_value) |
+    "| `\(.metric)` | `\(.cur_status)` / `\(.cur_value)` | `\(.can_status)` / `\(.can_value)` |"
+  ) | .[]
+')"
 
-def result_map(data):
-    out = {}
-    for item in data.get("results", []):
-        if isinstance(item, dict) and isinstance(item.get("id"), str):
-            out[item["id"]] = {
-                "status": item.get("status"),
-                "value": item.get("value"),
-            }
-    return out
-
-cur = result_map(current)
-can = result_map(candidate)
-all_metrics = sorted(set(cur) | set(can))
-
-changed = []
-for metric in all_metrics:
-    c = cur.get(metric, {})
-    n = can.get(metric, {})
-    if c.get("status") != n.get("status") or c.get("value") != n.get("value"):
-        changed.append(
-            (
-                metric,
-                c.get("status"),
-                c.get("value"),
-                n.get("status"),
-                n.get("value"),
-            )
-        )
-
-cur_rel = current.get("reliability", {}) if isinstance(current.get("reliability"), dict) else {}
-can_rel = candidate.get("reliability", {}) if isinstance(candidate.get("reliability"), dict) else {}
-current_gate_result = current_gate.get("gate_result", "unknown")
-candidate_gate_result = candidate_gate.get("gate_result", "unknown")
-gate_changed = "yes" if current_gate_result != candidate_gate_result else "no"
-
-lines = [
-    "# Baseline Update Report",
-    "",
-    "## Paths",
-    "",
-    f"- Current baseline: `{current_path}`",
-    f"- Candidate: `{candidate_path}`",
-    f"- Normalized diff: `{diff_path}`",
-    f"- Approval target: `{current_path}`",
-    "",
-    "## Summary",
-    "",
-    f"- Changed metrics: `{len(changed)}`",
-    f"- Current gate result: `{current_gate_result}`",
-    f"- Candidate gate result: `{candidate_gate_result}`",
-    f"- Gate result changed: `{gate_changed}`",
-    f"- Reliability change: `{cur_rel.get('collectionStatus')}/{cur_rel.get('evaluationStatus')}` -> `{can_rel.get('collectionStatus')}/{can_rel.get('evaluationStatus')}`",
-    "",
-    "## Changed Metrics",
-    "",
-]
-
-if changed:
-    lines.append("| Metric | Current | Candidate |")
-    lines.append("|---|---|---|")
-    for metric, cs, cv, ns, nv in changed:
-        lines.append(f"| `{metric}` | `{cs}` / `{cv}` | `{ns}` / `{nv}` |")
-else:
-    lines.append("- No metric changes detected.")
-
-lines += [
-    "",
-    "## Reviewer Checklist",
-    "",
-    "- Confirm the candidate came from an approved hello-operator summary run.",
-    "- Review the changed metrics above.",
-    "- Review the normalized diff file for full JSON changes.",
-    "- If approved, replace the repository baseline with the candidate file.",
-]
-
-Path(report_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
-PY
+{
+  echo "# Baseline Update Report"
+  echo ""
+  echo "## Paths"
+  echo ""
+  echo "- Current baseline: \`${CURRENT_BASELINE}\`"
+  echo "- Candidate: \`${CANDIDATE_FILE}\`"
+  echo "- Normalized diff: \`${DIFF_FILE}\`"
+  echo "- Approval target: \`${CURRENT_BASELINE}\`"
+  echo ""
+  echo "## Summary"
+  echo ""
+  echo "- Current gate result: \`${CURRENT_GATE_RESULT}\`"
+  echo "- Candidate gate result: \`${CANDIDATE_GATE_RESULT}\`"
+  echo "- Gate result changed: \`${GATE_CHANGED}\`"
+  echo "- Reliability change: \`${CUR_COLLECT}/${CUR_EVAL}\` -> \`${CAN_COLLECT}/${CAN_EVAL}\`"
+  echo ""
+  echo "## Changed Metrics"
+  echo ""
+  if [ -n "${CHANGED_ROWS}" ]; then
+    echo "| Metric | Current | Candidate |"
+    echo "|---|---|---|"
+    echo "${CHANGED_ROWS}"
+  else
+    echo "- No metric changes detected."
+  fi
+  echo ""
+  echo "## Reviewer Checklist"
+  echo ""
+  echo "- Confirm the candidate came from an approved hello-operator summary run."
+  echo "- Review the changed metrics above."
+  echo "- Review the normalized diff file for full JSON changes."
+  echo "- If approved, replace the repository baseline with the candidate file."
+} > "${REPORT_FILE}"
 
 echo "Baseline update candidate prepared."
 echo ""

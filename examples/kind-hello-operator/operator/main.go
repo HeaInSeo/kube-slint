@@ -1,13 +1,13 @@
-//go:build ignore
-
-// hello-operator: minimal Prometheus-instrumented service for kube-slint integration testing.
+// hello-operator: minimal metrics-emitting service for kube-slint integration testing.
 //
-// Build and deploy:
+// Uses only Go stdlib — no external dependencies required.
+// Exposes Prometheus text-format /metrics on HTTP port 8080.
 //
-//	docker build -f operator/Dockerfile -t hello-operator:dev .
+// Build:
+//
+//	docker build -t hello-operator:dev examples/kind-hello-operator/operator/
 //	kind load docker-image hello-operator:dev --name slint-demo
 //
-// Exposes /metrics on HTTP port 8080 — no TLS required.
 // In your kube-slint SessionConfig set:
 //
 //	ServiceURLFormat: slint.ServiceURLHTTP  // "http://%s.%s.svc:8080/metrics"
@@ -18,31 +18,32 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	reconcileTotal = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "hello_reconcile_total",
-		Help: "Total number of reconcile loops executed.",
-	})
-	reconcileErrors = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "hello_reconcile_errors_total",
-		Help: "Total number of reconcile errors.",
-	})
-	workqueueDepth = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "hello_workqueue_depth",
-		Help: "Current depth of the hello-operator workqueue.",
-	})
-	workqueueAdds = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "hello_workqueue_adds_total",
-		Help: "Total items added to the workqueue.",
-	})
+	reconcileTotal  atomic.Int64
+	reconcileErrors atomic.Int64
+	workqueueDepth  atomic.Int64
+	workqueueAdds   atomic.Int64
 )
+
+func metricsHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	fmt.Fprintf(w, "# HELP hello_reconcile_total Total reconcile loops executed.\n")
+	fmt.Fprintf(w, "# TYPE hello_reconcile_total counter\n")
+	fmt.Fprintf(w, "hello_reconcile_total %d\n", reconcileTotal.Load())
+	fmt.Fprintf(w, "# HELP hello_reconcile_errors_total Total reconcile errors.\n")
+	fmt.Fprintf(w, "# TYPE hello_reconcile_errors_total counter\n")
+	fmt.Fprintf(w, "hello_reconcile_errors_total %d\n", reconcileErrors.Load())
+	fmt.Fprintf(w, "# HELP hello_workqueue_depth Current workqueue depth.\n")
+	fmt.Fprintf(w, "# TYPE hello_workqueue_depth gauge\n")
+	fmt.Fprintf(w, "hello_workqueue_depth %d\n", workqueueDepth.Load())
+	fmt.Fprintf(w, "# HELP hello_workqueue_adds_total Total items added to workqueue.\n")
+	fmt.Fprintf(w, "# TYPE hello_workqueue_adds_total counter\n")
+	fmt.Fprintf(w, "hello_workqueue_adds_total %d\n", workqueueAdds.Load())
+}
 
 func main() {
 	addr := ":8080"
@@ -50,23 +51,23 @@ func main() {
 		addr = v
 	}
 
-	// Background goroutine: simulate reconcile loops every 500ms.
+	// Simulate reconcile loops every 500ms.
 	go func() {
 		for {
-			workqueueAdds.Inc()
-			workqueueDepth.Inc()
+			workqueueAdds.Add(1)
+			workqueueDepth.Add(1)
 			time.Sleep(50 * time.Millisecond)
-			reconcileTotal.Inc()
-			workqueueDepth.Dec()
-			if rand.Float64() < 0.05 { // 5% error rate
-				reconcileErrors.Inc()
+			reconcileTotal.Add(1)
+			workqueueDepth.Add(-1)
+			if rand.Float64() < 0.05 {
+				reconcileErrors.Add(1)
 			}
 			time.Sleep(450 * time.Millisecond)
 		}
 	}()
 
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/metrics", metricsHandler)
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
 

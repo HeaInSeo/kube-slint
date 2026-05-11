@@ -47,8 +47,7 @@ Read these before making non-trivial changes:
 3. `docs/CODEX_OPERATING_RULES.md`
 4. `docs/PROGRESS_LOG.md`
 5. `README.md`
-6. `hack/slint_gate.py`
-7. `.github/workflows/*`
+6. `.github/workflows/*`
 8. `test/e2e/README.md` and `test/e2e/harness/*`
 
 ## Reporting Format

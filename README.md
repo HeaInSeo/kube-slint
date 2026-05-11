@@ -194,7 +194,7 @@ sess.End(ctx)
 
 ### 3. Gate the Result (slint-gate CLI)
 
-The gate CLI is a Go binary located in `cmd/slint-gate`. It supersedes the legacy `hack/slint_gate.py` Python script, which is retained for reference only.
+The gate CLI is a Go binary located in `cmd/slint-gate`.
 
 **Build**
 
@@ -215,8 +215,9 @@ go run ./cmd/slint-gate [flags]
 | `--baseline` | `""` (disabled) | Path to a baseline summary for regression comparison; omit to skip |
 | `--output` | `slint-gate-summary.json` | Path to write the gate result JSON |
 | `--github-step-summary` | false | Write markdown to `$GITHUB_STEP_SUMMARY` for GitHub Actions |
+| `--fail-on` | `NEVER` | Exit 1 when gate result meets this level: `NEVER` \| `FAIL` \| `FAIL_OR_WARN` \| `FAIL_OR_NOGRADE` \| `FAIL_WARN_OR_NOGRADE` |
 
-**Exit behavior:** The binary always exits 0. The CI workflow fails by inspecting `gate_result` in the output JSON via `jq`.
+**Exit behavior:** The binary exits 0 by default (`--fail-on NEVER`). Pass `--fail-on FAIL` (or stricter) to exit 1 on a policy violation. The GitHub Actions wrapper handles this automatically via its `fail-on` input — you do not need to set `--fail-on` when using the composite action.
 
 **Policy file (`.slint/policy.yaml`)**
 

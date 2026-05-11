@@ -1,4 +1,4 @@
-//go:build ignore
+//go:build kind
 
 // Package e2e demonstrates end-to-end kube-slint integration with hello-operator.
 //

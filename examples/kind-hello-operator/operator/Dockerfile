@@ -1,9 +1,7 @@
 FROM golang:1.25 AS builder
 WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -tags ignore -ldflags="-s -w" -o hello-operator ./operator/main.go
+COPY main.go .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o hello-operator .
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /src/hello-operator /hello-operator
