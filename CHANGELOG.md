@@ -5,6 +5,26 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-01
+
+### Added
+
+- `internal/gate`: summary `schemaVersion` 검증 — 비어 있거나 미지원 버전이면 `MeasurementStatus=unsupported_schema`, `GateResult=NO_GRADE`, `Reason=MEASUREMENT_SCHEMA_UNSUPPORTED` 반환
+- `pkg/slo/summary`: `SchemaVersion` 상수, `ValidateSchemaVersion()`, `Validate()`, `LoadFile()`, `WriteFile()` 공개 — 외부 도구가 별도 struct 없이 summary contract를 사용할 수 있도록 함
+- `docs/integration/summary-schema.md`: 최소·전체 JSON 예시, Go API 사용법, status 표, CLI contract
+- `internal/gate`: `runResultStatus()` — 엔진이 계산한 SLI 상태(`fail`/`block`→FAIL, `warn`→WARN, `skip` 무값→NO_GRADE)를 gate 평가에 반영; `result_status` check 카테고리 및 `RESULT_STATUS_FAIL` reason 추가
+- `pkg/slo/spec`: `CounterResetPolicy` 타입 (`warn`/`no_grade`/`fail`/`skip`) + `ComputeSpec.OnCounterReset` 필드 — ComputeDelta에서 delta<0 처리 정책을 SLI별로 설정 가능
+- `pkg/slo/evidence`: `RedactString()` / `RedactMap()` — Bearer 토큰, `token=`/`password=`/`secret=` 값 마스킹 유틸리티
+- `examples/consumer-specs/jumi-ah/specs.go`: JUMI Phase 1 handoff gRPC 클라이언트 카운터 및 K8s 스포너 라이프사이클 SLI 스펙 추가
+- `docs/curlpod-security.md`: 최소 RBAC, NetworkPolicy 예시, Pod 식별 레이블, cleanup 실패 대응 절차
+- `docs/verification-sources.md`: Tier 1(현재 2점 엔진)/Tier 2(엔진 확장 필요) source 모델 설계 경계 문서; `WindowFetcher` 인터페이스 초안
+
+### Changed
+
+- `pkg/slo/spec/jumi_ah_minimum.go`: `jumi_jobs_created_delta`, `jumi_fast_fail_trigger_delta` — `OnCounterReset: CounterResetNoGrade` 적용 (counter reset 시 promotion 차단)
+- `pkg/slo/fetch/curlpod`: `CurlPod.Run()` — 파드 삭제 실패를 조용히 무시하던 코드를 경고 로그 출력으로 교체 (namespace/podName/error/selector 포함)
+- `pkg/slo/engine`: 하드코딩된 `"slo.v3"` → `summary.SchemaVersion` 상수 참조
+
 ## [0.1.0] - 2026-05-11
 
 ### Added
@@ -37,5 +57,6 @@
 
 - `hack/slint_gate.py`: Python gate 프로토타입 삭제
 
-[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.0.1...v1.1.0
 [0.1.0]: https://github.com/HeaInSeo/kube-slint/releases/tag/v0.1.0
