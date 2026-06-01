@@ -38,13 +38,25 @@ func (c *CurlPod) Run(ctx context.Context, waitTimeout time.Duration, logsTimeou
 	waitCtx, waitCancel := context.WithTimeout(ctx, waitTimeout)
 	defer waitCancel()
 	if err := client.WaitDone(waitCtx, c.Namespace, podName, 2*time.Second); err != nil {
-		_ = client.DeletePodNoWait(ctx, c.Namespace, podName)
+		c.cleanupWithLog(ctx, client, podName)
 		return "", err
 	}
 
 	logCtx, logCancel := context.WithTimeout(ctx, logsTimeout)
 	defer logCancel()
 	out, err := client.Logs(logCtx, c.Namespace, podName)
-	_ = client.DeletePodNoWait(ctx, c.Namespace, podName)
+	c.cleanupWithLog(ctx, client, podName)
 	return out, err
+}
+
+// cleanupWithLog deletes the pod and logs a warning if deletion fails.
+// Cleanup failure is non-fatal but must be visible for manual remediation.
+func (c *CurlPod) cleanupWithLog(ctx context.Context, client *Client, podName string) {
+	if err := client.DeletePodNoWait(ctx, c.Namespace, podName); err != nil {
+		client.Logger.Logf(
+			"kube-slint [curlpod]: cleanup warning — failed to delete pod %s/%s: %v"+
+				" (pod may require manual cleanup; selector: %s)",
+			c.Namespace, podName, err, client.LabelSelector,
+		)
+	}
 }

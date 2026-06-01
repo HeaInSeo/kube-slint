@@ -35,3 +35,14 @@ type SnapshotFetcher interface {
 	// Session.Start()에서 호출되며, 실패해도 non-fatal (kube-slint safety-first 원칙).
 	PreFetch(ctx context.Context) error
 }
+
+// WindowFetcher is a future interface for sources that require a time range
+// rather than two discrete point-in-time snapshots.
+//
+// NOT YET IMPLEMENTED — requires engine extension beyond the current 2-point model.
+// Intended use cases: PromQL range queries, soak analysis, burn-rate, p95/p99 over window.
+// See docs/verification-sources.md for the design boundary.
+//
+// type WindowFetcher interface {
+// 	FetchRange(ctx context.Context, start, end time.Time) ([]Sample, error)
+// }
