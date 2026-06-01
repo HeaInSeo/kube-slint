@@ -138,6 +138,57 @@ func JUMIAHMinimumSpecs() []spec.SLISpec {
 			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`ah_gc_backlog_bytes`)},
 			Compute:     spec.ComputeSpec{Mode: spec.ComputeEnd},
 		},
+		// Phase 1: handoff gRPC client counters (JUMI → AH call layer)
+		{
+			ID: "jumi_handoff_resolve_delta", Title: "JUMI Handoff Resolve Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks how many handoff resolve calls JUMI issued to AH over gRPC.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_handoff_resolve_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		{
+			ID: "jumi_handoff_resolve_errors_delta", Title: "JUMI Handoff Resolve Errors Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks gRPC errors on the handoff resolve call path.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_handoff_resolve_errors_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		{
+			ID: "jumi_handoff_register_artifact_delta", Title: "JUMI Handoff Register Artifact Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks how many artifact registrations JUMI sent to AH over gRPC.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_handoff_register_artifact_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		// Phase 1: K8s spawner lifecycle counters
+		{
+			ID: "jumi_k8s_node_prepare_delta", Title: "JUMI K8s Node Prepare Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks how many K8s Job prepare calls JUMI issued during the window.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_k8s_node_prepare_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		{
+			ID: "jumi_k8s_node_start_delta", Title: "JUMI K8s Node Start Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks how many K8s Jobs JUMI started during the window.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_k8s_node_start_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		{
+			ID: "jumi_k8s_node_succeeded_delta", Title: "JUMI K8s Node Succeeded Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks K8s Jobs that reached Succeeded state during the window.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_k8s_node_succeeded_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
+		{
+			ID: "jumi_k8s_node_failed_delta", Title: "JUMI K8s Node Failed Delta",
+			Unit: "count", Kind: "delta_counter",
+			Description: "Tracks K8s Jobs that reached Failed state during the window.",
+			Inputs:      []spec.MetricRef{spec.UnsafePromKey(`jumi_k8s_node_failed_total`)},
+			Compute:     spec.ComputeSpec{Mode: spec.ComputeDelta},
+		},
 	}
 }
 

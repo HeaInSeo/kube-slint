@@ -35,3 +35,6 @@ bin/
 __pycache__/
 hack/__pycache__/
 hello-operator-ref
+
+# Build artifacts in repo root
+slint-gate
