@@ -15,7 +15,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Inputs: []MetricRef{
 				UnsafePromKey(`jumi_jobs_created_total`),
 			},
-			Compute: ComputeSpec{Mode: ComputeDelta},
+			Compute: ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
 		{
 			ID:          "jumi_fast_fail_trigger_delta",
@@ -26,7 +26,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Inputs: []MetricRef{
 				UnsafePromKey(`jumi_fast_fail_trigger_total`),
 			},
-			Compute: ComputeSpec{Mode: ComputeDelta},
+			Compute: ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
 		{
 			ID:          "jumi_artifacts_registered_delta",

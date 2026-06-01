@@ -112,12 +112,72 @@ func TestEvalSLI_DeltaNegative_Warn(t *testing.T) {
 	s := spec.SLISpec{
 		ID:      "neg_delta",
 		Inputs:  []spec.MetricRef{{Key: "m"}},
-		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta}, // default: warn
 	}
-	// end < start → 카운터 리셋 의심
 	result := evalSLI(s, map[string]float64{"m": 10}, map[string]float64{"m": 3})
 	assert.Equal(t, summary.StatusWarn, result.Status)
 	assert.Contains(t, result.Reason, "counter reset")
+	assert.NotNil(t, result.Value, "value preserved for warn policy")
+}
+
+func TestEvalSLI_DeltaNegative_CounterResetWarnExplicit(t *testing.T) {
+	s := spec.SLISpec{
+		ID:      "neg_delta_warn",
+		Inputs:  []spec.MetricRef{{Key: "m"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetWarn},
+	}
+	result := evalSLI(s, map[string]float64{"m": 10}, map[string]float64{"m": 3})
+	assert.Equal(t, summary.StatusWarn, result.Status)
+	assert.NotNil(t, result.Value)
+}
+
+func TestEvalSLI_DeltaNegative_CounterResetNoGrade(t *testing.T) {
+	s := spec.SLISpec{
+		ID:      "neg_delta_nograde",
+		Inputs:  []spec.MetricRef{{Key: "m"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetNoGrade},
+	}
+	result := evalSLI(s, map[string]float64{"m": 10}, map[string]float64{"m": 3})
+	assert.Equal(t, summary.StatusSkip, result.Status)
+	assert.Nil(t, result.Value, "value cleared so gate sees NO_GRADE")
+	assert.Contains(t, result.Reason, "no_grade")
+}
+
+func TestEvalSLI_DeltaNegative_CounterResetFail(t *testing.T) {
+	s := spec.SLISpec{
+		ID:      "neg_delta_fail",
+		Inputs:  []spec.MetricRef{{Key: "m"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetFail},
+	}
+	result := evalSLI(s, map[string]float64{"m": 10}, map[string]float64{"m": 3})
+	assert.Equal(t, summary.StatusFail, result.Status)
+	assert.NotNil(t, result.Value, "value preserved for fail policy")
+	assert.Contains(t, result.Reason, "fail policy")
+}
+
+func TestEvalSLI_DeltaNegative_CounterResetSkip(t *testing.T) {
+	s := spec.SLISpec{
+		ID:      "neg_delta_skip",
+		Inputs:  []spec.MetricRef{{Key: "m"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetSkip},
+	}
+	result := evalSLI(s, map[string]float64{"m": 10}, map[string]float64{"m": 3})
+	assert.Equal(t, summary.StatusSkip, result.Status)
+	assert.Nil(t, result.Value)
+	assert.Contains(t, result.Reason, "skip policy")
+}
+
+func TestEvalSLI_DeltaPositive_CounterResetPolicyIgnored(t *testing.T) {
+	// OnCounterReset has no effect when delta >= 0
+	s := spec.SLISpec{
+		ID:      "pos_delta",
+		Inputs:  []spec.MetricRef{{Key: "m"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetFail},
+	}
+	result := evalSLI(s, map[string]float64{"m": 3}, map[string]float64{"m": 10})
+	assert.Equal(t, summary.StatusPass, result.Status)
+	require.NotNil(t, result.Value)
+	assert.Equal(t, 7.0, *result.Value)
 }
 
 func TestEvalSLI_UnknownMode_Skip(t *testing.T) {

@@ -95,7 +95,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	rel.EvaluationStatus = statusComplete // 초기에는 완전함으로 설정, 누락 시 부분(Partial)으로 강등됨
 
 	sum := summary.Summary{
-		SchemaVersion: "slo.v3",
+		SchemaVersion: summary.SchemaVersion,
 		GeneratedAt:   time.Now(),
 		Config: summary.RunConfig{
 			RunID:      cfg.RunID,
@@ -196,7 +196,7 @@ func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
 
 func (e *Engine) emptySummary(cfg RunConfig, rel *summary.Reliability, warnings []string) *summary.Summary {
 	return &summary.Summary{
-		SchemaVersion: "slo.v3",
+		SchemaVersion: summary.SchemaVersion,
 		GeneratedAt:   time.Now(),
 		Config: summary.RunConfig{
 			RunID:         cfg.RunID,
@@ -259,13 +259,24 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	case spec.ComputeDelta:
 		value = valEnd - valStart
 		if value < 0 {
-			// v3: 카운터 초기화가 의심됨 (프로세스 재시작)
-			res.Value = &value
-			res.Status = summary.StatusWarn
-			res.Reason = "delta < 0 (counter reset suspected)"
-			// judge가 있으면 judge 결과로 덮어써버리므로,
-			// 이 경우 judge를 생략하는 정책을 택함.
-			return res // judge 생략
+			// Counter reset suspected: delegate to OnCounterReset policy.
+			switch s.Compute.OnCounterReset {
+			case spec.CounterResetFail:
+				res.Value = &value
+				res.Status = summary.StatusFail
+				res.Reason = "counter reset: delta < 0 (fail policy)"
+			case spec.CounterResetNoGrade:
+				res.Status = summary.StatusSkip
+				res.Reason = "counter reset: measurement unreliable (no_grade policy)"
+			case spec.CounterResetSkip:
+				res.Status = summary.StatusSkip
+				res.Reason = "counter reset: excluded (skip policy)"
+			default: // CounterResetWarn or ""
+				res.Value = &value
+				res.Status = summary.StatusWarn
+				res.Reason = "delta < 0 (counter reset suspected)"
+			}
+			return res // judge 생략 (모든 counter reset 케이스)
 		}
 	default:
 		res.Status = summary.StatusSkip

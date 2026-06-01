@@ -774,6 +774,61 @@ func TestEvaluate_Regression_BothZero_IsPass(t *testing.T) {
 	}
 }
 
+// --- schemaVersion validation tests ---
+
+func TestEvaluate_MeasurementEmptySchema_NoGrade(t *testing.T) {
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	s := makeMeasurement(map[string]float64{"reconcile_total_delta": 3}, "Complete")
+	s.SchemaVersion = ""
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Equal(t, "unsupported_schema", result.MeasurementStatus)
+	assert.Contains(t, result.Reasons, "MEASUREMENT_SCHEMA_UNSUPPORTED")
+}
+
+func TestEvaluate_MeasurementUnknownSchema_NoGrade(t *testing.T) {
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	s := makeMeasurement(map[string]float64{"reconcile_total_delta": 3}, "Complete")
+	s.SchemaVersion = "slint.summary.v4"
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Equal(t, "unsupported_schema", result.MeasurementStatus)
+	assert.Contains(t, result.Reasons, "MEASUREMENT_SCHEMA_UNSUPPORTED")
+}
+
+func TestEvaluate_MeasurementSupportedSchema_Evaluates(t *testing.T) {
+	dir := t.TempDir()
+	p := defaultPolicy()
+	p.Regression = map[string]any{"enabled": false}
+	policy := writePolicyFile(t, dir, p)
+	// makeMeasurement already sets SchemaVersion = "slo.v3"
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	assert.Equal(t, "ok", result.MeasurementStatus)
+}
+
 func TestEvaluate_PolicyKnownFieldsOnly_NoWarnings(t *testing.T) {
 	dir := t.TempDir()
 
@@ -789,4 +844,130 @@ func TestEvaluate_PolicyKnownFieldsOnly_NoWarnings(t *testing.T) {
 	})
 
 	assert.Empty(t, result.PolicyWarnings, "expected no warnings for a valid policy")
+}
+
+// --- SLIResult.Status propagation tests ---
+
+// makeResultsMeasurement builds a Summary from a slice of SLIResults directly.
+func makeResultsMeasurement(results []summary.SLIResult) summary.Summary {
+	return summary.Summary{
+		SchemaVersion: "slo.v3",
+		GeneratedAt:   time.Now(),
+		Results:       results,
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+}
+
+func ptr(v float64) *float64 { return &v }
+
+func TestEvaluate_ResultStatus_WarnProducesGateWarn(t *testing.T) {
+	// Engine-reported warn (e.g. counter reset) should surface as WARN even with no threshold.
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "churn_delta", Status: summary.StatusWarn, Reason: "delta < 0 (counter reset suspected)", Value: ptr(-3)},
+	}))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateWarn, result.GateResult)
+	var rsCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "result_status" {
+			rsCheck = c
+		}
+	}
+	assert.Equal(t, "warn", rsCheck.Status)
+	assert.Equal(t, "churn_delta", rsCheck.Metric)
+}
+
+func TestEvaluate_ResultStatus_FailProducesGateFail(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "reconcile_total", Status: summary.StatusFail, Reason: "rule fail: value >= 100", Value: ptr(50)},
+	}))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "RESULT_STATUS_FAIL")
+}
+
+func TestEvaluate_ResultStatus_BlockProducesGateFail(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "pipeline_blocked", Status: summary.StatusBlock, Reason: "upstream pipeline failure"},
+	}))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "RESULT_STATUS_FAIL")
+}
+
+func TestEvaluate_ResultStatus_SkipNoValueProducesNoGrade(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "missing_metric", Status: summary.StatusSkip, Reason: "missing input metrics", Value: nil},
+	}))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	var rsCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "result_status" {
+			rsCheck = c
+		}
+	}
+	assert.Equal(t, "no_grade", rsCheck.Status)
+}
+
+func TestEvaluate_ResultStatus_PassNoEffect(t *testing.T) {
+	// pass status should not add any result_status check
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "reconcile_total", Status: summary.StatusPass, Value: ptr(5)},
+	}))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	for _, c := range result.Checks {
+		assert.NotEqual(t, "result_status", c.Category, "pass status must not produce a result_status check")
+	}
 }

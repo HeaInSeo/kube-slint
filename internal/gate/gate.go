@@ -33,10 +33,11 @@ const (
 )
 
 const (
-	measOK           = "ok"
-	measMissing      = "missing"
-	measCorrupt      = "corrupt"
-	measInsufficient = "insufficient"
+	measOK                = "ok"
+	measMissing           = "missing"
+	measCorrupt           = "corrupt"
+	measInsufficient      = "insufficient"
+	measUnsupportedSchema = "unsupported_schema"
 )
 
 const (
@@ -60,6 +61,8 @@ const (
 	reasonBaselineCorrupt         = "BASELINE_CORRUPT"
 	reasonMeasInputMissing        = "MEASUREMENT_INPUT_MISSING"
 	reasonMeasInputCorrupt        = "MEASUREMENT_INPUT_CORRUPT"
+	reasonMeasSchemaUnsupported   = "MEASUREMENT_SCHEMA_UNSUPPORTED"
+	reasonResultStatusFail        = "RESULT_STATUS_FAIL"
 	reasonPolicyMissing           = "POLICY_MISSING"
 	reasonPolicyInvalid           = "POLICY_INVALID"
 	reasonReliabilityInsufficient = "RELIABILITY_INSUFFICIENT"
@@ -154,10 +157,11 @@ func Evaluate(req Request) *Summary {
 	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, failOn)
 	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
 	relWarn := runReliability(out, policy, measurement)
+	rsFailed, rsWarn, rsNoGrade := runResultStatus(out, measurement)
 
-	anyFailed := tFailed || rFailed
-	anyNoGrade := tNoGrade || rNoGrade
-	hasWarn := rWarn || relWarn || tWarn
+	anyFailed := tFailed || rFailed || rsFailed
+	anyNoGrade := tNoGrade || rNoGrade || rsNoGrade
+	hasWarn := rWarn || relWarn || tWarn || rsWarn
 
 	out.EvaluationStatus = computeEvalStatus(out.Checks, anyNoGrade)
 	out.GateResult = computeGateResult(anyFailed, hasWarn, anyNoGrade, out.BaselineStatus, policy.Regression.Enabled)
@@ -219,6 +223,9 @@ func initMeasurement(out *Summary, path string) *summary.Summary {
 	case measCorrupt:
 		out.MeasurementStatus = measCorrupt
 		addReason(&out.Reasons, reasonMeasInputCorrupt)
+	case measUnsupportedSchema:
+		out.MeasurementStatus = measUnsupportedSchema
+		addReason(&out.Reasons, reasonMeasSchemaUnsupported)
 	}
 	return s
 }
@@ -232,7 +239,7 @@ func initBaseline(out *Summary, path string) *summary.Summary {
 	case measMissing:
 		out.BaselineStatus = baseUnavailable
 		addReason(&out.Reasons, reasonBaselineUnavailable)
-	case measCorrupt:
+	case measCorrupt, measUnsupportedSchema:
 		out.BaselineStatus = baseCorrupt
 		addReason(&out.Reasons, reasonBaselineCorrupt)
 	default:
@@ -438,6 +445,51 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn b
 	return anyWarn
 }
 
+// runResultStatus propagates per-SLI status from the measurement into gate checks.
+//
+// Rules (no policy override in MVP):
+//
+//	fail / block → check "fail", failed=true, reason RESULT_STATUS_FAIL
+//	warn         → check "warn", anyWarn=true
+//	skip (value==nil) → check "no_grade", anyNoGrade=true
+//	pass         → no check added
+func runResultStatus(out *Summary, s *summary.Summary) (failed, anyWarn, anyNoGrade bool) {
+	if s == nil {
+		return
+	}
+	for _, r := range s.Results {
+		check := Check{
+			Name:     fmt.Sprintf("result-status:%s", r.ID),
+			Category: "result_status",
+			Metric:   r.ID,
+			Message:  r.Reason,
+		}
+		if r.Value != nil {
+			check.Observed = *r.Value
+		}
+
+		switch r.Status {
+		case summary.StatusFail, summary.StatusBlock:
+			check.Status = "fail"
+			addReason(&out.Reasons, reasonResultStatusFail)
+			failed = true
+		case summary.StatusWarn:
+			check.Status = "warn"
+			anyWarn = true
+		case summary.StatusSkip:
+			if r.Value != nil {
+				continue // skip with a value: threshold check handles it
+			}
+			check.Status = "no_grade"
+			anyNoGrade = true
+		default:
+			continue // pass: no check needed
+		}
+		out.Checks = append(out.Checks, check)
+	}
+	return
+}
+
 // --- result computation ---
 
 func computeEvalStatus(checks []Check, anyNoGrade bool) string {
@@ -555,6 +607,9 @@ func loadMeasurement(path string) (*summary.Summary, string) {
 	var s summary.Summary
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, measCorrupt
+	}
+	if err := summary.ValidateSchemaVersion(s); err != nil {
+		return nil, measUnsupportedSchema
 	}
 	return &s, measOK
 }

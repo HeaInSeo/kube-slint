@@ -41,9 +41,25 @@ const (
 	ComputeEnd ComputeMode = "end"
 )
 
+// CounterResetPolicy defines how ComputeDelta handles delta < 0 (suspected counter reset).
+type CounterResetPolicy string
+
+const (
+	// CounterResetWarn is the default: StatusWarn with reason, value preserved.
+	CounterResetWarn CounterResetPolicy = "warn"
+	// CounterResetNoGrade treats counter reset as measurement-unreliable: StatusSkip, value cleared.
+	// The gate interprets StatusSkip (no value) as NO_GRADE — blocks promotion without FAIL.
+	CounterResetNoGrade CounterResetPolicy = "no_grade"
+	// CounterResetFail treats counter reset as a hard failure: StatusFail, value preserved.
+	CounterResetFail CounterResetPolicy = "fail"
+	// CounterResetSkip silently excludes the SLI: StatusSkip, value cleared.
+	CounterResetSkip CounterResetPolicy = "skip"
+)
+
 // ComputeSpec 은 SLI 계산 방법을 설명함.
 type ComputeSpec struct {
-	Mode ComputeMode
+	Mode           ComputeMode
+	OnCounterReset CounterResetPolicy // only meaningful for ComputeDelta; default: CounterResetWarn
 }
 
 // Level 은 규칙 위반의 심각도를 정의함.

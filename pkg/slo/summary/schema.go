@@ -1,6 +1,43 @@
 package summary
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// SchemaVersion is the single supported summary schema version.
+// All measurement outputs must set schemaVersion to this value.
+const SchemaVersion = "slo.v3"
+
+// ValidateSchemaVersion returns an error if s.SchemaVersion is empty or not SchemaVersion.
+func ValidateSchemaVersion(s Summary) error {
+	if s.SchemaVersion == "" {
+		return fmt.Errorf("schemaVersion is empty")
+	}
+	if s.SchemaVersion != SchemaVersion {
+		return fmt.Errorf("unsupported schemaVersion %q (want %q)", s.SchemaVersion, SchemaVersion)
+	}
+	return nil
+}
+
+// Validate performs a comprehensive check of a Summary:
+// schemaVersion must be supported, generatedAt must be non-zero,
+// and every SLIResult must have a non-empty ID.
+// External tools should call this after loading a summary to ensure contract compliance.
+func Validate(s Summary) error {
+	if err := ValidateSchemaVersion(s); err != nil {
+		return err
+	}
+	if s.GeneratedAt.IsZero() {
+		return fmt.Errorf("generatedAt is zero")
+	}
+	for i, r := range s.Results {
+		if r.ID == "" {
+			return fmt.Errorf("results[%d].id is empty", i)
+		}
+	}
+	return nil
+}
 
 // Status 는 SLIResult의 정규화된 평가 상태임.
 type Status string

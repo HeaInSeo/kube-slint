@@ -2,6 +2,7 @@ package summary
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -9,6 +10,30 @@ import (
 // Writer 는 Summary 아티팩트를 대상 위치에 기록함.
 type Writer interface {
 	Write(path string, s Summary) error
+}
+
+// LoadFile reads a Summary from path, parses JSON, and validates the schema version.
+// Returns an error if the file is missing, not valid JSON, or has an unsupported schemaVersion.
+// External tools should use this instead of rolling their own JSON decode.
+func LoadFile(path string) (Summary, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Summary{}, fmt.Errorf("summary.LoadFile: %w", err)
+	}
+	var s Summary
+	if err := json.Unmarshal(data, &s); err != nil {
+		return Summary{}, fmt.Errorf("summary.LoadFile: invalid JSON: %w", err)
+	}
+	if err := ValidateSchemaVersion(s); err != nil {
+		return Summary{}, fmt.Errorf("summary.LoadFile: %w", err)
+	}
+	return s, nil
+}
+
+// WriteFile writes s to path as indented JSON using an atomic rename.
+// It is a package-level convenience wrapper around JSONFileWriter.
+func WriteFile(path string, s Summary) error {
+	return NewJSONFileWriter().Write(path, s)
 }
 
 // JSONFileWriter 는 요약을 JSON 파일로 기록함.
