@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-02
+
+### Added
+
+- `pkg/slo/fetch/k8sobject`: `K8sObjectFetcher` — `fetch.SnapshotFetcher` 구현체. kubectl list 기반으로 Pod/Job 오브젝트 수를 캡처하며 기존 2점 엔진 모델과 호환됨. `ExcludeSelector`로 curlpod 등 kube-slint 관리 리소스를 측정 대상에서 제외 가능
+- `K8sObjectFetcher` 계산 메트릭: `{prefix}_count` (총 오브젝트 수), `{prefix}_orphan_end` (ownerRef 없는 오브젝트), `{prefix}_ownerref_missing_end` (ownerRef UID가 현재 셋에 없는 오브젝트), `{prefix}_stuck_terminating_end` (설정 임계값 초과 Terminating 오브젝트)
+- `pkg/slo/spec/jumi_churn.go`: `JUMIChurnSpecs()` — JUMI K8s 오브젝트 churn 측정용 SLI 스펙 세트 (jobs/pods created delta, orphan, ownerref_missing, stuck_terminating 종단 게이지)
+
 ## [1.1.0] - 2026-06-01
 
 ### Added
@@ -57,6 +65,7 @@
 
 - `hack/slint_gate.py`: Python gate 프로토타입 삭제
 
-[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.0.1...v1.1.0
 [0.1.0]: https://github.com/HeaInSeo/kube-slint/releases/tag/v0.1.0
