@@ -11,15 +11,19 @@ import (
 )
 
 func main() {
-	// Subcommand routing: slint-gate init [flags]
-	if len(os.Args) > 1 && os.Args[1] == "init" {
-		if err := runInit(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "slint-gate init: %v\n", err)
-			os.Exit(1)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version", "--version", "-version":
+			fmt.Printf("slint-gate %s\n", Version)
+			return
+		case "init":
+			if err := runInit(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate init: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
-		return
 	}
-
 	runGate()
 }
 
