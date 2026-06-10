@@ -16,10 +16,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Clone the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -56,7 +56,7 @@ jobs:
       # 기준선 갱신은 별도 수동 작업: bench-current.txt → bench-baseline.txt로 rename 후 업로드
       # overwrite: true → 동일 이름 artifact가 이미 존재해도 재실행 시 덮어씀.
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-current
           path: bench-current.txt
