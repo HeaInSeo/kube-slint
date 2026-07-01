@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-02
+
+### Added
+
+- `test/e2e/harness/harness.go`: backward-compatibility shim — 기존 `test/e2e/harness` import path를 유지하면서 `pkg/slint` 타입·함수를 재노출
+- `NOTICE`, `SECURITY.md`, `THIRD_PARTY_LICENSES.md`: Apache 2.0 컴플라이언스 파일 추가
+- `docs/demo.md`: 심사위원 대상 PASS/FAIL/NO_GRADE 3단계 데모 가이드
+- `docs/competition-readiness-sprint.md`: 공모전 제출 전 완성도 체크리스트
+- `examples/kind-hello-operator/Makefile`: `CONTAINER_ENGINE`, `KIND_PROVIDER` 변수 추가 — Docker(기본) 또는 rootless Podman 선택 가능 (`CONTAINER_ENGINE=podman KIND_PROVIDER=podman make demo`)
+- `examples/kind-hello-operator/setup.sh`: cgroup v1 조기 감지 및 경고 메시지 출력, `KIND_PROVIDER` env 전달 지원
+- `examples/kind-hello-operator/README.md`: cgroup v2 호스트 요구사항 명시, Podman 사용법 추가
+
+### Changed
+
+- `pkg/slint/*`: `test/e2e/harness` 패키지를 `pkg/slint`로 이동 (공개 import path 확정)
+- CI: `golangci-lint-action@v9`, `actions/checkout@v6`, `actions/setup-go@v6`, `actions/upload-artifact@v7` 업그레이드
+- `examples/kind-hello-operator/operator/Dockerfile`: `GO111MODULE=off` 추가 (stdlib-only 빌드 안정화)
+- `examples/kind-hello-operator/e2e/e2e_test.go`: `--fail-on` 플래그 값을 `FAIL_OR_NOGRADE`로 수정
+
+### Fixed
+
+- `.gitignore`: `slint-gate-summary.json` 생성 artifact 제외 추가
+
 ## [1.2.0] - 2026-06-02
 
 ### Added
