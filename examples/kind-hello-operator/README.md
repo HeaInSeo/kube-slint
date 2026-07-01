@@ -19,14 +19,32 @@ make demo
 | 2. `sess.Start()` | kube-slint launches a curl pod to capture the pre-workload snapshot |
 | 3. Workload runs | `hello-operator` fires reconcile loops in the background |
 | 4. `sess.End()` | kube-slint captures the post-workload snapshot, computes deltas, writes `artifacts/sli-summary.json` |
-| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml`; exits 0 by default, exits 1 with `--fail-on FAIL` |
+| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml`; the demo uses `--fail-on FAIL_OR_NOGRADE` so missing measurement is not treated as promotion approval |
 
 ## Prerequisites
 
 - [kind](https://kind.sigs.k8s.io/) ≥ v0.22
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Docker](https://docs.docker.com/get-docker/) (for building the image)
+- Docker **or** Podman ≥ 4.0 (for building and loading the image)
 - Go 1.25+
+- **cgroup v2** on the host — kind ≥ v0.17 requires the unified cgroup hierarchy.
+  - Ubuntu 22.04+, Fedora 31+, macOS Docker Desktop: cgroup v2 by default.
+  - RHEL/CentOS 8 with cgroup v1: add `systemd.unified_cgroup_hierarchy=1` to the kernel command line and reboot.
+  - Verify: `stat /sys/fs/cgroup/cgroup.controllers` should succeed (file present = v2).
+
+### Running with Podman instead of Docker
+
+```bash
+# Podman must have cgroup v2 on the host (rootless or rootful both work).
+CONTAINER_ENGINE=podman KIND_PROVIDER=podman make demo
+```
+
+All `make` targets accept these two variables:
+
+| Variable | Default | Override |
+|---|---|---|
+| `CONTAINER_ENGINE` | `docker` | `podman` |
+| `KIND_PROVIDER` | *(Docker)* | `podman` |
 
 ## Manual steps
 
@@ -61,7 +79,7 @@ SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -tags kind -v -timeout 120s -run TestHell
 go run ../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
-  --fail-on FAIL
+  --fail-on FAIL_OR_NOGRADE
 
 # 8. Tear down
 kind delete cluster --name slint-demo

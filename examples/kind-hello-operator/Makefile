@@ -1,6 +1,12 @@
-CLUSTER_NAME ?= slint-demo
-NAMESPACE    ?= hello-system
-IMAGE_NAME   ?= hello-operator:dev
+CLUSTER_NAME       ?= slint-demo
+NAMESPACE          ?= hello-system
+IMAGE_NAME         ?= hello-operator:dev
+# Set to "podman" when Docker is not available (requires cgroup v2 on the host).
+CONTAINER_ENGINE   ?= docker
+# Set to "podman" to use the rootless Podman provider for kind.
+KIND_PROVIDER      ?=
+
+KIND      = $(if $(KIND_PROVIDER),KIND_EXPERIMENTAL_PROVIDER=$(KIND_PROVIDER) kind,kind)
 
 .PHONY: demo
 demo: cluster-up build-image load-image deploy run-test gate show-result teardown  ## Full automated demo (cluster → measure → gate → teardown)
@@ -10,15 +16,15 @@ demo-keep: cluster-up build-image load-image deploy run-test gate show-result  #
 
 .PHONY: cluster-up
 cluster-up:  ## Create kind cluster (reuses existing)
-	bash setup.sh
+	KIND_PROVIDER=$(KIND_PROVIDER) bash setup.sh
 
 .PHONY: build-image
-build-image:  ## Build hello-operator Docker image
-	docker build -t $(IMAGE_NAME) operator/
+build-image:  ## Build hello-operator image
+	$(CONTAINER_ENGINE) build -t $(IMAGE_NAME) operator/
 
 .PHONY: load-image
 load-image:  ## Load image into kind cluster
-	kind load docker-image $(IMAGE_NAME) --name $(CLUSTER_NAME)
+	$(KIND) load docker-image $(IMAGE_NAME) --name $(CLUSTER_NAME)
 
 .PHONY: deploy
 deploy:  ## Apply manifests and wait for hello-operator to be ready
@@ -36,7 +42,7 @@ gate:  ## Evaluate policy gate against the latest sli-summary.json
 	go run ../../cmd/slint-gate \
 	  --measurement-summary artifacts/sli-summary.json \
 	  --policy .slint/policy.yaml \
-	  --fail-on FAIL
+	  --fail-on FAIL_OR_NOGRADE
 
 .PHONY: show-result
 show-result:  ## Print a summary of the gate result
@@ -54,7 +60,7 @@ show-result:  ## Print a summary of the gate result
 
 .PHONY: teardown
 teardown:  ## Delete the kind cluster
-	kind delete cluster --name $(CLUSTER_NAME)
+	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
 .PHONY: clean
 clean:  ## Remove generated artifacts

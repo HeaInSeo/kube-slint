@@ -38,3 +38,7 @@ hello-operator-ref
 
 # Build artifacts in repo root
 slint-gate
+
+# Gate evaluation artifact (generated, not for version control)
+slint-gate-summary.json
+**/slint-gate-summary.json
