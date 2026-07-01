@@ -47,12 +47,12 @@ flowchart TD
 
 | Package path | Role |
 |---|---|
-| `pkg/slint` | Public API entry point. Re-exports `Session`, `SessionConfig`, `NewSession`, `DefaultSpecs`, `ReadServiceAccountToken`, and URL format constants. Consumers should import this package rather than `test/e2e/harness`. |
-| `test/e2e/harness` | Session implementation (`sessionImpl`). Owns `Start()`, `End()`, `Cleanup()`, `AddWarning()`, config discovery (`DiscoverConfig`), and the `curlPodFetcher` that bridges the harness to `pkg/slo/fetch`. |
+| `pkg/slint` | Public API entry point and consumer-facing session implementation. Owns `Session`, `SessionConfig`, `NewSession`, `DefaultSpecs`, token helpers, config discovery, cleanup, and the curlpod-backed fetcher bridge to `pkg/slo/fetch`. |
+| `test/e2e/harness` | Compatibility wrapper for the historical test/e2e import path. New consumers should import `pkg/slint`. |
 | `pkg/slo/spec` | Declarative SLI definition types: `SLISpec`, `MetricRef`, `ComputeSpec` (`delta` / `start` / `end`), `JudgeSpec`, `Rule`, `Op`, `Level`. No I/O, no Kubernetes dependencies. |
 | `pkg/slo/engine` | SLI computation core. `Engine.Execute()` calls `Fetch()` twice (start/end), iterates over `[]SLISpec`, evaluates per-spec delta or snapshot, runs judge rules, and calls `summary.Writer`. `ensureConfidenceScore()` computes a supplementary 0.0–1.0 reliability score. |
 | `pkg/slo/fetch` | `MetricsFetcher` interface (`Fetch(ctx, time) -> Sample`). `SnapshotFetcher` optional extension (`PreFetch(ctx)`). `InsideSnapshotFetch` utility. No Kubernetes dependencies at the interface level. |
-| `pkg/slo/fetch/curlpod` | (imported by harness) Executes `kubectl run` / `kubectl logs` to create a one-shot curl pod, scrape the operator's `/metrics` HTTPS endpoint, and return raw Prometheus text. |
+| `pkg/slo/fetch/curlpod` | Executes `kubectl run` / `kubectl logs` to create a one-shot curl pod, scrape the operator's `/metrics` HTTPS endpoint, and return raw Prometheus text. |
 | `pkg/slo/fetch/promtext` | Parses Prometheus text-format exposition into `map[string]float64`. Used by `curlPodFetcher.parsePrometheusText()`. |
 | `pkg/slo/summary` | Output schema types: `Summary`, `SLIResult`, `Reliability`, `RunConfig`, `Status`. `Writer` interface (`Write(path, Summary)`). `JSONFileWriter` default implementation. |
 | `internal/gate` | Policy evaluation. `Evaluate(Request)` loads policy + measurement + baseline, runs threshold checks (`runThresholds`), regression checks (`runRegression`), and reliability checks (`runReliability`). Returns a `gate.Summary` written to `slint-gate-summary.json`. |

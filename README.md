@@ -347,7 +347,7 @@ jobs:
         with:
           measurement-summary: artifacts/sli-summary.json   # default
           policy:              .slint/policy.yaml            # default
-          fail-on:             FAIL                          # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
+          fail-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **Inputs**

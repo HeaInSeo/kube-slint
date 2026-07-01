@@ -1,4 +1,4 @@
-package harness
+package slint
 
 import (
 	"context"
@@ -236,7 +236,7 @@ func (s *Session) ShouldWriteArtifacts() bool {
 func (s *Session) NextSummaryPath(filename string) (string, error) {
 	// s == nil 체크는 현재 구조상 예외적으로 필요하므로 포함됨.
 	if s == nil || s.impl == nil {
-		return "", fmt.Errorf("harness: session not initialized")
+		return "", fmt.Errorf("slint: session not initialized")
 	}
 
 	if strings.TrimSpace(s.impl.Config.ArtifactsDir) == "" {
@@ -384,7 +384,7 @@ func (s *Session) Start() {
 // End concludes the measurement session.
 func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	if s == nil || s.impl == nil {
-		return nil, fmt.Errorf("harness: session not initialized")
+		return nil, fmt.Errorf("slint: session not initialized")
 	}
 
 	if ctx == nil {
@@ -393,7 +393,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	started := s.impl.started
 	if started.IsZero() {
-		return nil, fmt.Errorf("harness: Start() was not called (RunID=%q TestCase=%q)", s.impl.RunID, s.impl.Config.TestCase)
+		return nil, fmt.Errorf("slint: Start() was not called (RunID=%q TestCase=%q)", s.impl.RunID, s.impl.Config.TestCase)
 
 	}
 

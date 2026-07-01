@@ -1,4 +1,4 @@
-package harness
+package slint
 
 import (
 	"strings"

@@ -388,7 +388,7 @@ jobs:
         with:
           measurement-summary: artifacts/sli-summary.json   # 기본값
           policy:              .slint/policy.yaml            # 기본값
-          fail-on:             FAIL                          # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
+          fail-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **입력값**

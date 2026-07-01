@@ -82,6 +82,7 @@ If formal skills are added later, keep them skeleton-only until the workflow is 
 
 - `kube-slint` is fixed as the product repo, not a standalone operator repo.
 - `hello-operator` is fixed as the canonical consumer validation repo.
+- `pkg/slint` is fixed as the consumer-facing session API and implementation owner; `test/e2e/harness` is compatibility-only.
 - `docs/DECISIONS.md` and `docs/project-status.yaml` are the top authority for Codex work here.
 - Historical and draft material remains useful, but below the accepted decision/status layer.
 

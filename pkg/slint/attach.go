@@ -1,4 +1,4 @@
-package harness
+package slint
 
 import (
 	"context"
@@ -77,21 +77,21 @@ func isEnabledByEnv() bool {
 func validateSessionConfigOrFail(cfg SessionConfig) {
 	if strings.TrimSpace(cfg.Namespace) == "" {
 		ginkgo.Fail(fmt.Sprintf(
-			"harness: invalid config: Namespace is required "+
+			"slint: invalid config: Namespace is required "+
 				"(Suite=%q TestCase=%q RunID=%q MetricsServiceName=%q SA=%q ArtifactsDir=%q)",
 			cfg.Suite, cfg.TestCase, cfg.RunID, cfg.MetricsServiceName, cfg.ServiceAccountName, cfg.ArtifactsDir,
 		))
 	}
 	if strings.TrimSpace(cfg.MetricsServiceName) == "" {
 		ginkgo.Fail(fmt.Sprintf(
-			"harness: invalid config: MetricsServiceName is required "+
+			"slint: invalid config: MetricsServiceName is required "+
 				"(Namespace=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
 			cfg.Namespace, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
 		))
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
 		ginkgo.Fail(fmt.Sprintf(
-			"harness: invalid config: Token is empty "+
+			"slint: invalid config: Token is empty "+
 				"(Namespace=%q MetricsServiceName=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
 			cfg.Namespace, cfg.MetricsServiceName, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
 		))

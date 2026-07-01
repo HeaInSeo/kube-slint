@@ -128,3 +128,14 @@ This file records architecture/product-direction decisions that define the proje
   - Go 단일 언어 스택으로 통합하여 Python 런타임/pyyaml 의존을 완전 제거한다.
   - `internal/gate` 단위 테스트로 게이트 로직의 회귀를 방어한다.
   - `--github-step-summary` 플래그로 Actions step summary 렌더링을 Go 바이너리 내부로 흡수한다.
+
+## D-013: pkg/slint owns the consumer-facing session API
+
+- Date: 2026-06-27
+- Status: Accepted, Implemented
+- Decision:
+  - `pkg/slint`가 `Session`, `SessionConfig`, `NewSession`, 기본 SLI specs, discovery, propagation, cleanup, and curlpod-backed session implementation의 소비자용 구현을 직접 소유한다.
+  - `test/e2e/harness`는 기존 내부/테스트 import 경로 호환성을 위한 얇은 wrapper로만 유지한다.
+- Rationale:
+  - 공개 라이브러리 API가 `test/e2e` 경로를 import하는 구조는 consumer 관점에서 미완성처럼 보이며, 공모전/오픈소스 온보딩 첫인상에 불리하다.
+  - 구현 소유권을 `pkg/slint`로 올려도 measurement failure와 policy gate 분리 원칙은 바뀌지 않는다.

@@ -8,7 +8,41 @@ Update this file at the **start and end** of every stage/task.
 ## Current Status: Stage (Post-RC) — Phase 6-d Go CLI Migration Complete
 
 **Branch:** `main`
-**Last updated:** 2026-04-30 (Go CLI migration + README full rewrite)
+**Last updated:** 2026-06-27 (competition readiness public API cleanup)
+
+### Competition Readiness Sprint — Public API Cleanup (IN PROGRESS)
+
+**완료 항목:**
+
+* [x] GitHub `origin/main` 최신 workflow 업데이트 fast-forward 반영
+* [x] `pkg/slint`가 소비자용 `Session`, `SessionConfig`, discovery, propagation, cleanup, curlpod-backed fetcher bridge 구현을 직접 소유하도록 이동
+* [x] `test/e2e/harness`는 과거 import 경로 호환용 wrapper로 축소
+* [x] `docs/DECISIONS.md` D-013 추가 및 architecture / competition submission 문서의 패키지 설명 갱신
+* [x] focused verification: `go test ./pkg/slint`, `go test ./test/e2e/harness`, `go test ./internal/gate`
+* [x] full feasible verification: `go test ./...`
+* [x] `THIRD_PARTY_LICENSES.md`, `NOTICE`, `SECURITY.md` 추가
+* [x] competition-facing examples and kind demo gate를 `FAIL_OR_NOGRADE`로 정렬
+* [x] `docs/demo.md`에 PASS / intentional FAIL / NO_GRADE 재현 경로 문서화
+* [x] 원격 장비에서 kube-slint 전체 Go 테스트 통과
+* [x] 원격 장비에서 별도 GitHub `hello-operator` mock consumer 검증 통과
+* [x] 원격 장비에서 별도 GitHub `hello-operator` 실제 kind E2E 통과
+* [x] 원격 장비에서 별도 GitHub `hello-operator` summary를 `slint-gate --fail-on FAIL_OR_NOGRADE`로 평가해 `PASS` 확인
+* [x] `test/e2e/harness` 호환 wrapper에 `DefaultSpecs` / `BaselineSpecs` 추가
+* [x] GitHub Actions Lint 기존 실패 원인 확인: `golangci-lint v2.1.0` 바이너리가 Go 1.25.5 target을 로드하지 못함
+* [x] lint toolchain을 `golangci-lint v2.12.2`로 올리고, 현재 유지 가능한 CI lint profile로 정렬
+
+**남은 항목:**
+
+* [ ] self-contained quickstart로 `cd examples/kind-hello-operator && make demo` 검증
+
+**원격 검증 메모:**
+
+* `hello-operator` GitHub HEAD: `f1a34a556e1a0bb39c824ea5dc7ff1f9942e017e`
+* 원격 장비: `seoy@100.123.80.48`
+* kind: `tilt-study`, `kindest/node:v1.30.0`
+* `hello-operator` 원격 임시 클론에서는 Dockerfile/`.dockerignore`와 제출용 SLI spec 제한을 검증용으로만 보정했다. 이 보정은 별도 `hello-operator` 저장소에 후속 통합이 필요하다.
+* 최신 kind node image는 원격 장비의 cgroup v1 환경에서 kubelet startup이 실패하므로, 해당 장비 검증은 v1.30.0으로 고정했다.
+* self-contained `examples/kind-hello-operator && make demo`는 같은 원격 장비에서 rootful Podman/cgroup-v1 kubelet QOS cgroup 오류로 완료되지 않았다. Docker 또는 cgroup-v2 runner에서 별도 확인이 필요하다.
 
 ---
 
@@ -24,7 +58,7 @@ Update this file at the **start and end** of every stage/task.
 * [x] `--github-step-summary` 플래그로 Actions step summary 렌더링 Go 내부 흡수
 * [x] `README.md` 전면 재작성 (영문, Quick Start / 플로우 다이어그램 / 상세 사용법 포함)
 * [x] `README(Kor).md` 전면 재작성 (한국어, 동일 구조 미러링)
-* [x] `golangci-lint v2.1.0` — 0 issues
+* [x] `golangci-lint v2.12.2` — pinned for Go 1.25.5 compatibility
 * [x] `DECISIONS.md` D-012 결정 추가
 * [x] GitHub push 완료 (커밋 3개: feat, ci, docs)
 

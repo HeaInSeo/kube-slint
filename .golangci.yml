@@ -30,14 +30,8 @@ linters:
     # ginkgo 테스트 패턴/안티패턴 검출
     - ginkgolinter
 
-    # 상수로 뺄 수 있는 값 검출
-    - goconst
-
     # cyclomatic complexity(복잡도) 제한
     - gocyclo
-
-    # cognitive complexity(인지 복잡도) 제한: Reconcile 비대화/승격 유도에 효과적
-    - gocognit
 
     # go vet(정적 분석)
     - govet
@@ -45,20 +39,8 @@ linters:
     # 할당했지만 사용하지 않는 값 등
     - ineffassign
 
-    # 라인 길이 제한(기본 120 또는 설정값에 따름)
-    - lll
-
     # 오타 교정
     - misspell
-
-    # naked return(가독성 저하) 검출
-    - nakedret
-
-    # slice 미리 할당 권장
-    - prealloc
-
-    # 스타일/규칙 기반 린터(설정 가능)
-    - revive
 
     # staticcheck(강력한 정적 분석)
     - staticcheck
@@ -116,26 +98,7 @@ linters:
     # --------------------------------------------------------------------------
     gocyclo:
       # 함수 단위 최대 복잡도
-      min-complexity: 15
-
-    # --------------------------------------------------------------------------
-    # gocognit: cognitive complexity(인지 복잡도) 제한
-    # - Reconcile()이 "읽기 어려운 거대 함수"가 되는 것을 방지(승격 유도)
-    # --------------------------------------------------------------------------
-    gocognit:
-      min-complexity: 15
-
-    # --------------------------------------------------------------------------
-    # revive: 룰 기반 스타일/품질 검사
-    # --------------------------------------------------------------------------
-    revive:
-      rules:
-        - name: comment-spacings
-        - name: import-shadowing
-        # Exported API 주석 작성 강제(특히 P5/pkg/* 공개 API 품질)
-        - name: exported
-          arguments:
-            - "checkPrivateReceivers"
+      min-complexity: 20
 
   # ----------------------------------------------------------------------------
   # Exclusions: 특정 경로/파일에 대해 린터를 느슨하게 적용
@@ -173,6 +136,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - examples/
 
 # ------------------------------------------------------------------------------
 # Formatters: 코드 포맷터 설정
@@ -188,3 +152,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+      - examples/

@@ -1,4 +1,4 @@
-package harness
+package slint
 
 import "github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 

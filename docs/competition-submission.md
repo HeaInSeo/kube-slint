@@ -100,8 +100,8 @@ E2E 테스트 세션
 
 | 패키지 | 역할 |
 |---|---|
-| `pkg/slint` | 공개 API 진입점 (Session, SessionConfig, DefaultSpecs, ReadServiceAccountToken) |
-| `test/e2e/harness` | Session 구현체, curlPodFetcher, 설정 자동 탐색 |
+| `pkg/slint` | 공개 API 진입점 및 Session 구현체 (Session, SessionConfig, DefaultSpecs, ReadServiceAccountToken, curlpod-backed fetcher bridge, 설정 자동 탐색) |
+| `test/e2e/harness` | 과거 test/e2e import 경로 호환용 wrapper |
 | `pkg/slo/spec` | SLISpec 선언 타입 (측정 대상, ComputeSpec, CounterResetPolicy, JudgeSpec) |
 | `pkg/slo/engine` | SLI 계산 코어 (delta/end-snapshot, CounterResetPolicy 적용, judge 규칙 평가) |
 | `pkg/slo/fetch` | MetricsFetcher / SnapshotFetcher 인터페이스; WindowFetcher 설계 초안 |
@@ -138,7 +138,7 @@ E2E 테스트 세션
 
 **오퍼레이터 무수정 원칙**: curl pod 방식은 단순히 편의 기능이 아니라 설계 원칙입니다. 오퍼레이터 코드에 어떤 의존성도 주입하지 않으므로, 라이브러리 버전 업그레이드가 오퍼레이터의 빌드에 영향을 줄 수 없습니다. controller-runtime을 go.mod에 포함하지 않는 것도 같은 이유입니다.
 
-**SnapshotFetcher 패턴**: curl pod은 항상 현재 상태의 `/metrics`를 반환합니다. `Start()`와 `End()` 사이의 시간 간격을 올바르게 측정하려면 `Start()` 시점의 스냅샷을 캐시해야 합니다. `SnapshotFetcher.PreFetch()` 인터페이스는 이 타이밍 문제를 fetcher 구현 내부로 캡슐화하여, engine이나 harness의 상위 코드에는 영향을 주지 않습니다. `K8sObjectFetcher`도 동일한 패턴으로 엔진 변경 없이 오브젝트 churn 측정을 추가합니다.
+**SnapshotFetcher 패턴**: curl pod은 항상 현재 상태의 `/metrics`를 반환합니다. `Start()`와 `End()` 사이의 시간 간격을 올바르게 측정하려면 `Start()` 시점의 스냅샷을 캐시해야 합니다. `SnapshotFetcher.PreFetch()` 인터페이스는 이 타이밍 문제를 fetcher 구현 내부로 캡슐화하여, engine이나 session 상위 코드에는 영향을 주지 않습니다. `K8sObjectFetcher`도 동일한 패턴으로 엔진 변경 없이 오브젝트 churn 측정을 추가합니다.
 
 **신뢰도 점수**: 측정 결과의 수치만 보고하는 것이 아니라, 그 수치가 얼마나 신뢰할 수 있는지를 0.0–1.0 `confidenceScore`로 함께 보고합니다. 스크랩 지연, start/end skew, 누락 입력, 생략된 SLI 항목이 있을 때 점수가 자동으로 감점됩니다.
 
@@ -253,7 +253,7 @@ fail_on:
   with:
     measurement-summary: artifacts/sli-summary.json
     policy:              .slint/policy.yaml
-    fail-on:             FAIL
+    fail-on:             FAIL_OR_NOGRADE
 ```
 
 ### CLI 직접 실행
@@ -267,7 +267,7 @@ go run ./cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --baseline docs/baselines/current.json \
-  --fail-on FAIL \
+  --fail-on FAIL_OR_NOGRADE \
   --github-step-summary
 ```
 
@@ -295,7 +295,7 @@ go run ./cmd/slint-gate \
 
 | 항목 | 설명 |
 |---|---|
-| K8sObjectFetcher E2E 연결 | harness에 `newK8sObjectFetcher` 연결 코드 추가 — bori 통합 시나리오 확정 후 진행 |
+| K8sObjectFetcher E2E 연결 | `pkg/slint` session 경로에 `K8sObjectFetcher` 연결 코드 추가 — bori 통합 시나리오 확정 후 진행 |
 | PromQL range query 지원 | Tier 2 소스 모델(WindowFetcher) 구현 — 엔진 확장 설계 후 진행 (`docs/verification-sources.md` 참조) |
 | Helm chart | Kustomize 없이 Helm으로 RBAC 및 설정 패키지 배포 |
 | 다중 클러스터 지원 | 여러 kubeconfig 컨텍스트에 대한 병렬 측정 |
