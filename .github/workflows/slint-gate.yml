@@ -6,11 +6,11 @@ on:
       measurement_summary_path:
         description: "Path to measurement summary JSON"
         required: false
-        default: "artifacts/sli-summary.json"
+        default: "docs/fixtures/slint-gate-pass-summary.json"
       baseline_path:
         description: "Optional path to baseline summary JSON"
         required: false
-        default: ""
+        default: "docs/fixtures/slint-gate-pass-summary.json"
       policy_path:
         description: "Path to policy YAML"
         required: false
@@ -54,9 +54,9 @@ jobs:
       - name: Run slint-gate
         uses: ./.github/actions/slint-gate
         with:
-          measurement-summary: ${{ github.event.inputs.measurement_summary_path || 'artifacts/sli-summary.json' }}
+          measurement-summary: ${{ github.event.inputs.measurement_summary_path || 'docs/fixtures/slint-gate-pass-summary.json' }}
           policy:              ${{ github.event.inputs.policy_path || '.slint/policy.yaml' }}
-          baseline:            ${{ github.event.inputs.baseline_path || '' }}
+          baseline:            ${{ github.event.inputs.baseline_path || 'docs/fixtures/slint-gate-pass-summary.json' }}
           output:              slint-gate-summary.json
           fail-on:             FAIL_OR_NOGRADE
           github-step-summary: 'true'

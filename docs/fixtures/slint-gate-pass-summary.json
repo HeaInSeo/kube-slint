@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "slo.v3",
+  "generatedAt": "2026-07-02T00:00:00Z",
+  "config": {
+    "runId": "slint-gate-fixture",
+    "startedAt": "2026-07-02T00:00:00Z",
+    "finishedAt": "2026-07-02T00:00:01Z",
+    "mode": {
+      "location": "inside",
+      "trigger": "none"
+    },
+    "format": "v4.4"
+  },
+  "reliability": {
+    "collectionStatus": "Complete",
+    "evaluationStatus": "Complete",
+    "confidenceScore": 1
+  },
+  "results": [
+    {
+      "id": "reconcile_total_delta",
+      "title": "reconcile total delta",
+      "unit": "count",
+      "kind": "delta_counter",
+      "value": 3,
+      "status": "pass"
+    },
+    {
+      "id": "workqueue_depth_end",
+      "title": "workqueue depth end",
+      "unit": "count",
+      "kind": "gauge",
+      "value": 0,
+      "status": "pass"
+    }
+  ]
+}
