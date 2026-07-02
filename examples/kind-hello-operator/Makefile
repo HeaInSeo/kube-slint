@@ -28,7 +28,9 @@ load-image:  ## Load image into kind cluster
 
 .PHONY: deploy
 deploy:  ## Apply manifests and wait for hello-operator to be ready
-	kubectl apply -f manifests/
+	kubectl apply -f manifests/namespace.yaml
+	kubectl apply -f manifests/rbac.yaml
+	kubectl apply -f manifests/deployment.yaml
 	kubectl -n $(NAMESPACE) rollout status deployment/hello-operator --timeout=90s
 
 .PHONY: run-test
