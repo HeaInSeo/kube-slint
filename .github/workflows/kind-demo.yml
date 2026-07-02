@@ -1,0 +1,74 @@
+name: kind demo (hello-operator)
+
+# Runs the full make demo cycle: kind cluster → build → deploy → SLI measure → gate.
+# ubuntu-latest has Docker + cgroup v2, so no CONTAINER_ENGINE override is needed.
+
+on:
+  push:
+    paths:
+      - "examples/kind-hello-operator/**"
+      - "pkg/slint/**"
+      - "pkg/slo/**"
+      - "internal/gate/**"
+      - "cmd/slint-gate/**"
+  pull_request:
+    paths:
+      - "examples/kind-hello-operator/**"
+      - "pkg/slint/**"
+      - "pkg/slo/**"
+      - "internal/gate/**"
+      - "cmd/slint-gate/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kind-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    name: make demo (kind + hello-operator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: examples/kind-hello-operator
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install kind
+        run: |
+          curl -Lo /usr/local/bin/kind \
+            https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+          chmod +x /usr/local/bin/kind
+          kind version
+
+      - name: Run demo (cluster → measure → gate)
+        run: make demo-keep
+
+      - name: Show gate result
+        run: |
+          echo "gate_result: $(jq -r '.gate_result' slint-gate-summary.json)"
+          jq '{gate_result, evaluation_status, measurement_status}' slint-gate-summary.json
+
+      - name: Upload SLI artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sli-artifacts
+          path: |
+            examples/kind-hello-operator/artifacts/sli-summary*.json
+            examples/kind-hello-operator/slint-gate-summary.json
+
+      - name: Teardown cluster
+        if: always()
+        run: kind delete cluster --name slint-demo || true
