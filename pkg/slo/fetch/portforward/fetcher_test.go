@@ -80,6 +80,29 @@ func TestFetch_ReturnsCacheOnFirstCall(t *testing.T) {
 	assert.Equal(t, callsAfterPreFetch+1, callCount, "second Fetch must call HTTP")
 }
 
+func TestFetch_PropagatesPreFetchErrorOnFirstCall(t *testing.T) {
+	f := &Fetcher{startErr: fmt.Errorf("boom")}
+
+	_, err := f.Fetch(context.Background(), time.Now())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prefetch start snapshot failed")
+}
+
+func TestWaitReady_RequiresHTTP200(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "not ready", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	f := &Fetcher{localPort: portFrom(srv)}
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+
+	err := f.waitReady(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not ready")
+}
+
 func TestFreePort_ReturnsValidPort(t *testing.T) {
 	port, err := freePort()
 	require.NoError(t, err)

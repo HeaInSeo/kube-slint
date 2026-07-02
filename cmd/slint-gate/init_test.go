@@ -157,8 +157,10 @@ func TestRunInit_EmitRBAC(t *testing.T) {
 
 	body := string(data)
 	assert.Contains(t, body, "ServiceAccount")
-	assert.Contains(t, body, "ClusterRole")
-	assert.Contains(t, body, "ClusterRoleBinding")
+	assert.Contains(t, body, "kind: Role")
+	assert.Contains(t, body, "kind: RoleBinding")
+	assert.NotContains(t, body, "ClusterRole")
+	assert.NotContains(t, body, "ClusterRoleBinding")
 	assert.Contains(t, body, "my-ns")
 	assert.Contains(t, body, "kube-slint-scraper")
 }
@@ -173,5 +175,6 @@ func TestRunInit_EmitRBAC_NoNamespace(t *testing.T) {
 	require.NoError(t, err)
 
 	data, _ := os.ReadFile(rbacOut)
-	assert.Contains(t, string(data), "ClusterRoleBinding")
+	assert.Contains(t, string(data), "kind: RoleBinding")
+	assert.Contains(t, string(data), "<YOUR_NAMESPACE>")
 }

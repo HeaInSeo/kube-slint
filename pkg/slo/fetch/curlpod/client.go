@@ -38,7 +38,7 @@ func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 	return &Client{
 		Logger:                slo.NewLogger(logger),
 		Runner:                r,
-		Image:                 "curlimages/curl:latest",
+		Image:                 "curlimages/curl:8.11.0",
 		LabelSelector:         PodLabelSelector,
 		PodNamePrefix:         "curl-metrics",
 		ServiceURLFormat:      "https://%s.%s.svc:8443/metrics",
@@ -54,6 +54,10 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	if c.Runner == nil {
 		c.Runner = kubeutil.DefaultRunner{}
 	}
+	// Compatibility: Token remains in the public call signature, but the pod
+	// reads its own mounted ServiceAccount token so secrets do not enter
+	// kubectl args, PodSpec command strings, or command logs.
+	_ = token
 
 	// 이전 curl-metrics 파드 최선(best-effort) 정리
 	_ = c.CleanupByLabel(ctx, ns)
@@ -67,7 +71,8 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	}
 
 	curlCmd := fmt.Sprintf(`set -euo pipefail;
-curl %s -sS --fail-with-body -H "Authorization: Bearer %s" "%s";`, insecureFlag, token, metricsURL)
+TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)";
+curl %s -sS --fail-with-body -H "Authorization: Bearer ${TOKEN}" "%s";`, insecureFlag, metricsURL)
 
 	// Build pod labels from LabelSelector so that CleanupByLabel and
 	// runCleanupActions (which use the same selector) can find these pods.

@@ -2,13 +2,17 @@ current_stage: "Phase 6-d Go CLI Migration"
 roadmap_percent: 80
 roadmap_status: "post_rc"
 current_focus:
+  - "Post-RC hardening sprint is active: secret containment, RBAC scope reduction, gate validation, and measurement lifecycle fixes"
+  - "curlpod bearer token command exposure removed; command runner redaction applied"
+  - "slint-gate policy/CLI enum validation and NO_GRADE severity priority hardened"
   - "hack/slint_gate.py removed; cmd/slint-gate Go binary is the sole operational gate path"
   - "internal/gate package provides tested gate evaluation logic (89.2% coverage)"
   - "pkg/slint now owns the consumer-facing Session implementation; test/e2e/harness remains a compatibility wrapper"
   - "README.md and README(Kor).md fully rewritten and in sync"
-  - "Track the PreFetch/Start contract as an explicit operating risk after RC approval"
+  - "Track remaining PreFetch/Start edge cases and direction-aware regression as post-RC hardening follow-ups"
   - "Carry schema expansion candidates such as reconcile_error_ratio as post-RC policy/measurement work"
 next_milestone: "Post-RC hardening: cmd/slint-gate integration tests, baseline update workflow automation"
+active_hardening_sprint: "post-rc-secret-rbac-gate-lifecycle"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"

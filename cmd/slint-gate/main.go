@@ -42,6 +42,12 @@ func runGate() {
 			"  FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures")
 	flag.Parse()
 
+	failOnValue := strings.ToUpper(strings.TrimSpace(*failOn))
+	if !isValidFailOn(failOnValue) {
+		fmt.Fprintf(os.Stderr, "invalid --fail-on: %s\n", *failOn)
+		os.Exit(2)
+	}
+
 	result := gate.Evaluate(gate.Request{
 		MeasurementPath: *measurementPath,
 		PolicyPath:      *policyPath,
@@ -62,9 +68,18 @@ func runGate() {
 		}
 	}
 
-	if shouldFailOn(result.GateResult, strings.ToUpper(strings.TrimSpace(*failOn))) {
+	if shouldFailOn(result.GateResult, failOnValue) {
 		fmt.Fprintf(os.Stderr, "slint-gate: exit 1 (gate_result=%s, fail-on=%s)\n", result.GateResult, *failOn)
 		os.Exit(1)
+	}
+}
+
+func isValidFailOn(failOn string) bool {
+	switch failOn {
+	case "NEVER", "", "FAIL", "FAIL_OR_WARN", "FAIL_OR_NOGRADE", "FAIL_WARN_OR_NOGRADE":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -84,6 +99,13 @@ func shouldFailOn(gateResult, failOn string) bool {
 	default:
 		return false
 	}
+}
+
+func mdCell(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "|", "\\|")
+	return s
 }
 
 func writeJSON(path string, v any) error {
@@ -138,7 +160,7 @@ func renderGitHubStepSummary(result *gate.Summary) error {
 				obs = fmt.Sprintf("%v", c.Observed)
 			}
 			fmt.Fprintf(&sb, "| %s | %s | %s | %s | %s | %s | %s |\n",
-				c.Name, c.Category, c.Status, c.Metric, obs, c.Expected, c.Message)
+				mdCell(c.Name), mdCell(c.Category), mdCell(c.Status), mdCell(c.Metric), mdCell(obs), mdCell(c.Expected), mdCell(c.Message))
 		}
 	}
 

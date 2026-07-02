@@ -3,6 +3,8 @@ package slint
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSanitizeFilename(t *testing.T) {
@@ -71,4 +73,26 @@ func TestSanitizeFilename(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSanitizeKubernetesLabelValue(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "  ", want: "unknown"},
+		{name: "selector delimiters", in: "run/id, one", want: "run-id--one"},
+		{name: "trim invalid edges", in: "...run...", want: "run"},
+		{name: "unicode", in: "실행-1", want: "1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, SanitizeKubernetesLabelValue(tc.in))
+		})
+	}
+
+	long := SanitizeKubernetesLabelValue(strings.Repeat("a", 80))
+	assert.Len(t, long, 63)
 }

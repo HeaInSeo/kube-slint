@@ -65,16 +65,14 @@ go get github.com/HeaInSeo/kube-slint
 ```go
 import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-token, _ := slint.ReadServiceAccountToken(slint.DefaultTokenPath)
-
 sess := slint.NewSession(slint.SessionConfig{
     Namespace:             "my-operator-system",
     MetricsServiceName:    "my-operator-controller-manager-metrics-service",
-    Token:                 token,
+    ServiceAccountName:    "kube-slint-scraper",
     ArtifactsDir:          "artifacts",
     Specs:                 slint.DefaultSpecs(),
     TLSInsecureSkipVerify: true,
-    CurlImage:             "my-registry/curlimages/curl:latest",
+    CurlImage:             "my-registry/curlimages/curl:8.11.0",
 })
 sess.Start()
 // ... E2E 시나리오 실행 ...
@@ -162,8 +160,9 @@ sess := slint.NewSession(slint.SessionConfig{
     // /metrics를 노출하는 쿠버네티스 서비스 이름
     MetricsServiceName: "my-operator-controller-manager-metrics-service",
 
-    // ServiceAccount 토큰 (아래 "Token 온보딩" 참조)
-    Token: token,
+    // 임시 curl pod가 사용할 ServiceAccount
+    // bearer token은 kubectl args에 넣지 않고 pod 내부 mounted token을 읽습니다.
+    ServiceAccountName: "kube-slint-scraper",
 
     // sli-summary.json이 작성될 디렉토리
     ArtifactsDir: "artifacts",
@@ -173,7 +172,7 @@ sess := slint.NewSession(slint.SessionConfig{
 
     // 실클러스터 설정
     TLSInsecureSkipVerify: true,
-    CurlImage:             "my-registry/curlimages/curl:latest",
+    CurlImage:             "my-registry/curlimages/curl:8.11.0",
 })
 
 sess.Start()
@@ -181,7 +180,7 @@ sess.Start()
 sess.End(ctx)
 ```
 
-**RBAC 주의사항:** 하네스는 curl 기반 페처를 사용하여 메트릭 엔드포인트를 스크랩하기 위한 임시 파드를 생성합니다. 오퍼레이터의 ServiceAccount는 대상 네임스페이스에서 `pods: create` 권한을 보유해야 합니다.
+**RBAC 주의사항:** 하네스는 curl 기반 페처를 사용하여 메트릭 엔드포인트를 스크랩하기 위한 임시 파드를 생성합니다. `slint-gate init --emit-rbac rbac.yaml`은 대상 네임스페이스 안에 필요한 ServiceAccount, Role, RoleBinding을 생성하는 매니페스트를 출력합니다.
 
 **출력:** `sess.End(ctx)` 호출 시 두 파일이 작성됩니다:
 - `artifacts/sli-summary.<runID>.<testcase>.json` — 감사 추적용 unique 파일
@@ -189,9 +188,9 @@ sess.End(ctx)
 
 ---
 
-### 2a. Token 온보딩
+### 2a. Token 처리
 
-`pkg/slint`는 ServiceAccount 토큰 읽기 헬퍼를 제공합니다:
+기본 curl pod 경로는 pod 내부의 mounted ServiceAccount token을 직접 읽습니다. 따라서 bearer token이 `kubectl` 인자나 Pod command에 직접 들어가지 않습니다. `pkg/slint`의 token 읽기 헬퍼는 호환용 API로 유지됩니다:
 
 ```go
 import "github.com/HeaInSeo/kube-slint/pkg/slint"
@@ -203,7 +202,7 @@ token, err := slint.ReadServiceAccountToken(slint.DefaultTokenPath)
 token, err := slint.ReadServiceAccountTokenFromEnv("SLINT_TOKEN", slint.DefaultTokenPath)
 ```
 
-토큰은 curl pod이 오퍼레이터 `/metrics` HTTPS 엔드포인트에 연결할 때 `Authorization: Bearer` 헤더로 사용됩니다.
+새 코드에서는 이 값을 curl pod command에 삽입하지 않습니다.
 
 **HTTP 엔드포인트 사용 시 (기본 포트 8443 → 8080 변경):**
 
@@ -253,7 +252,7 @@ go run ./cmd/slint-gate [flags]
 | `FAIL_OR_NOGRADE` | `FAIL` 또는 `NO_GRADE`일 때 exit 1 |
 | `FAIL_WARN_OR_NOGRADE` | `FAIL`, `WARN`, `NO_GRADE` 모두 exit 1 |
 
-**종료 동작:** 기본값(`NEVER`)에서는 항상 0으로 종료합니다. `--fail-on FAIL` 이상을 지정하면 해당 조건에서 exit 1이 반환됩니다.
+**종료 동작:** 기본값(`NEVER`)에서는 항상 0으로 종료합니다. `--fail-on FAIL` 이상을 지정하면 해당 조건에서 exit 1이 반환됩니다. 알 수 없는 `--fail-on` 값은 즉시 거부됩니다.
 
 **정책 파일 (`.slint/policy.yaml`)**
 
@@ -399,7 +398,7 @@ jobs:
 | `policy` | `.slint/policy.yaml` | 정책 YAML 경로 |
 | `baseline` | `` | 선택적 기준선 경로 |
 | `output` | `slint-gate-summary.json` | 게이트 결과 출력 경로 |
-| `fail-on` | `FAIL` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
+| `fail-on` | `FAIL_OR_NOGRADE` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
 | `github-step-summary` | `true` | Markdown 요약 테이블 출력 여부 |
 | `upload-artifact` | `true` | 게이트 결과 아티팩트 업로드 여부 |
 

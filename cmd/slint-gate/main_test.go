@@ -170,3 +170,13 @@ func TestRenderGitHubStepSummary_CheckWithNilObserved(t *testing.T) {
 	// nil observed → 빈 셀로 렌더링
 	assert.True(t, strings.Contains(string(data), "| c |"))
 }
+
+func TestIsValidFailOn(t *testing.T) {
+	assert.True(t, isValidFailOn("NEVER"))
+	assert.True(t, isValidFailOn("FAIL_OR_NOGRADE"))
+	assert.False(t, isValidFailOn("FAIL_OR_NO_GRADE"))
+}
+
+func TestMarkdownCellEscapesTableBreaks(t *testing.T) {
+	assert.Equal(t, "a\\|b c", mdCell("a|b\nc"))
+}

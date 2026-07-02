@@ -65,16 +65,14 @@ go get github.com/HeaInSeo/kube-slint
 ```go
 import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-token, _ := slint.ReadServiceAccountTokenFromEnv("SLINT_SA_TOKEN", slint.DefaultTokenPath)
-
 sess := slint.NewSession(slint.SessionConfig{
     Namespace:             "my-operator-system",
     MetricsServiceName:    "my-operator-controller-manager-metrics-service",
-    Token:                 token,
+    ServiceAccountName:    "kube-slint-scraper",
     ArtifactsDir:          "artifacts",
     Specs:                 slint.DefaultSpecs(),
     TLSInsecureSkipVerify: true,
-    CurlImage:             "my-registry/curlimages/curl:latest",
+    CurlImage:             "my-registry/curlimages/curl:8.11.0",
 })
 sess.Start()
 // ... run your E2E scenario ...
@@ -155,9 +153,6 @@ Pass `mySpecs` as the `Specs` field in `SessionConfig`.
 ```go
 import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
-// Read token from env var first, fall back to mounted ServiceAccount file
-token, _ := slint.ReadServiceAccountTokenFromEnv("SLINT_SA_TOKEN", slint.DefaultTokenPath)
-
 sess := slint.NewSession(slint.SessionConfig{
     // Target namespace where your operator runs
     Namespace: "my-operator-system",
@@ -165,8 +160,9 @@ sess := slint.NewSession(slint.SessionConfig{
     // Name of the Kubernetes Service exposing /metrics
     MetricsServiceName: "my-operator-controller-manager-metrics-service",
 
-    // ServiceAccount token for curl Authorization header
-    Token: token,
+    // ServiceAccount used by the temporary curl pod.
+    // The pod reads its own mounted token; the bearer token is not embedded in kubectl args.
+    ServiceAccountName: "kube-slint-scraper",
 
     // Directory where sli-summary.json will be written
     ArtifactsDir: "artifacts",
@@ -176,7 +172,7 @@ sess := slint.NewSession(slint.SessionConfig{
 
     // Real-cluster settings
     TLSInsecureSkipVerify: true,
-    CurlImage:             "my-registry/curlimages/curl:latest",
+    CurlImage:             "my-registry/curlimages/curl:8.11.0",
 })
 
 sess.Start()
@@ -184,7 +180,7 @@ sess.Start()
 sess.End(ctx)
 ```
 
-**RBAC note:** The harness creates a temporary curl pod to scrape the metrics endpoint. The operator's ServiceAccount must have `pods: create` permission in the target namespace. Run `slint-gate init --emit-rbac rbac.yaml` to scaffold the required ServiceAccount, ClusterRole, and binding.
+**RBAC note:** The harness creates a temporary curl pod to scrape the metrics endpoint. Run `slint-gate init --emit-rbac rbac.yaml` to scaffold the required ServiceAccount, Role, and RoleBinding in the target namespace.
 
 **Output:** `sess.End(ctx)` writes two files:
 - `artifacts/sli-summary.<runID>.<testcase>.json` — unique audit file
@@ -217,7 +213,7 @@ go run ./cmd/slint-gate [flags]
 | `--github-step-summary` | false | Write markdown to `$GITHUB_STEP_SUMMARY` for GitHub Actions |
 | `--fail-on` | `NEVER` | Exit 1 when gate result meets this level: `NEVER` \| `FAIL` \| `FAIL_OR_WARN` \| `FAIL_OR_NOGRADE` \| `FAIL_WARN_OR_NOGRADE` |
 
-**Exit behavior:** The binary exits 0 by default (`--fail-on NEVER`). Pass `--fail-on FAIL` (or stricter) to exit 1 on a policy violation. The GitHub Actions wrapper handles this automatically via its `fail-on` input — you do not need to set `--fail-on` when using the composite action.
+**Exit behavior:** The binary exits 0 by default (`--fail-on NEVER`). Pass `--fail-on FAIL` (or stricter) to exit 1 on a policy violation. Unknown `--fail-on` values are rejected. The GitHub Actions wrapper handles this automatically via its `fail-on` input.
 
 **Policy file (`.slint/policy.yaml`)**
 
@@ -358,7 +354,7 @@ jobs:
 | `policy` | `.slint/policy.yaml` | Path to policy YAML |
 | `baseline` | `` | Optional baseline summary path |
 | `output` | `slint-gate-summary.json` | Output path for gate result |
-| `fail-on` | `FAIL` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
+| `fail-on` | `FAIL_OR_NOGRADE` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
 | `github-step-summary` | `true` | Append Markdown table to step summary |
 | `upload-artifact` | `true` | Upload gate result as artifact |
 

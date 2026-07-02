@@ -70,10 +70,11 @@ const (
 
 // Policy is the deserialized .slint/policy.yaml.
 type Policy struct {
-	Thresholds  []ThresholdRule `yaml:"thresholds"`
-	Regression  RegressionCfg   `yaml:"regression"`
-	Reliability ReliabilityCfg  `yaml:"reliability"`
-	FailOn      []string        `yaml:"fail_on"`
+	SchemaVersion string          `yaml:"schema_version"`
+	Thresholds    []ThresholdRule `yaml:"thresholds"`
+	Regression    RegressionCfg   `yaml:"regression"`
+	Reliability   ReliabilityCfg  `yaml:"reliability"`
+	FailOn        []string        `yaml:"fail_on"`
 }
 
 // ThresholdRule is a single absolute threshold check.
@@ -330,7 +331,7 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 	switch out.BaselineStatus {
 	case baseAbsentFirst:
 		addReason(&out.Reasons, reasonBaselineAbsentFirstRun)
-		return false, true, true
+		return false, true, false
 	case baseUnavailable, baseCorrupt:
 		return false, false, true
 	}
@@ -511,12 +512,12 @@ func computeGateResult(failed, hasWarn, hasNoGrade bool, baselineStatus string, 
 	switch {
 	case failed:
 		return GateFail
+	case hasNoGrade:
+		return GateNoGrade
 	case hasWarn:
 		return GateWarn
 	case baselineStatus == baseAbsentFirst && regrEnabled:
 		return GateWarn
-	case hasNoGrade:
-		return GateNoGrade
 	default:
 		return GatePass
 	}
@@ -568,7 +569,31 @@ func loadPolicy(path string) (*Policy, string, []string) {
 	if err := yaml.Unmarshal(data, &p); err != nil {
 		return nil, policyInvalid, warnings
 	}
+	if err := validatePolicy(p); err != nil {
+		warnings = append(warnings, err.Error())
+		return nil, policyInvalid, warnings
+	}
 	return &p, policyOK, warnings
+}
+
+func validatePolicy(p Policy) error {
+	if strings.TrimSpace(p.SchemaVersion) != "slint.policy.v1" {
+		return fmt.Errorf("unsupported schema_version %q (want slint.policy.v1)", p.SchemaVersion)
+	}
+	for _, item := range p.FailOn {
+		v := normalizeFailOn(item)
+		if v == "" {
+			continue
+		}
+		if !allowedPolicyFailOn[v] {
+			return fmt.Errorf("unsupported fail_on value %q", item)
+		}
+	}
+	minLevel := strings.ToLower(strings.TrimSpace(p.Reliability.MinLevel))
+	if minLevel != "" && minLevel != "partial" && minLevel != "complete" {
+		return fmt.Errorf("unsupported reliability.min_level %q", p.Reliability.MinLevel)
+	}
+	return nil
 }
 
 // collectUnknownPolicyKeys walks the top-level mapping node and returns
@@ -632,13 +657,25 @@ func resultValueMap(s *summary.Summary) map[string]float64 {
 func makeFailOn(policy *Policy) map[string]bool {
 	result := map[string]bool{}
 	for _, item := range policy.FailOn {
-		result[item] = true
+		item = normalizeFailOn(item)
+		if item != "" {
+			result[item] = true
+		}
 	}
 	if len(result) == 0 {
 		result["threshold_miss"] = true
 		result["regression_detected"] = true
 	}
 	return result
+}
+
+var allowedPolicyFailOn = map[string]bool{
+	"threshold_miss":      true,
+	"regression_detected": true,
+}
+
+func normalizeFailOn(v string) string {
+	return strings.ToLower(strings.TrimSpace(v))
 }
 
 func reliabilityRank(status string) int {

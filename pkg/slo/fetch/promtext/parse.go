@@ -23,6 +23,7 @@ import (
 func ParseTextToMap(r io.Reader) (map[string]float64, error) {
 	out := map[string]float64{}
 	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 1024), 1024*1024)
 
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())

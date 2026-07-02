@@ -139,3 +139,15 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - 공개 라이브러리 API가 `test/e2e` 경로를 import하는 구조는 consumer 관점에서 미완성처럼 보이며, 공모전/오픈소스 온보딩 첫인상에 불리하다.
   - 구현 소유권을 `pkg/slint`로 올려도 measurement failure와 policy gate 분리 원칙은 바뀌지 않는다.
+
+## D-014: Post-RC hardening prioritizes secret containment and conservative gate semantics
+
+- Date: 2026-07-02
+- Status: Accepted
+- Decision:
+  - Post-RC hardening의 최우선 순위는 curlpod bearer token 노출 제거, command log redaction, namespace-scoped RBAC, 그리고 `NO_GRADE`가 CI gate에서 명확히 다뤄지는 보수적 판정 흐름이다.
+  - 계측 실패는 D-002에 따라 테스트 실패와 직접 동일시하지 않는다. 대신 summary/gate 모델에서 `measurement_status=insufficient` 또는 `gate_result=NO_GRADE`로 드러내고, CI 실패 여부는 `fail-on` 정책이 결정한다.
+  - 알 수 없는 policy/CLI enum 값은 조용히 무시하지 않고 invalid input으로 처리한다.
+- Rationale:
+  - kube-slint는 운영 SLI guardrail이므로 token 노출, 과도한 RBAC, 측정 불충분의 PASS 오인 가능성은 correctness feature보다 먼저 줄여야 한다.
+  - 동시에 best-effort measurement 철학을 유지하려면 계측 실패와 policy violation의 책임 경계를 계속 분리해야 한다.

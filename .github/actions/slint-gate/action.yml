@@ -1,7 +1,7 @@
 name: slint-gate
 description: >
   Evaluate a kube-slint policy gate against a sli-summary.json produced by
-  the kube-slint harness. Fails the job on FAIL (or optionally WARN).
+  the kube-slint harness. Fails the job on FAIL or NO_GRADE by default.
   Requires Go to be installed in the calling workflow (actions/setup-go).
 
 inputs:
@@ -28,12 +28,12 @@ inputs:
   fail-on:
     description: >
       Gate result level that fails the job.
-      FAIL                 — only hard violations fail (default).
+      FAIL                 — only hard violations fail.
       FAIL_OR_WARN         — treat WARN as a failure too.
-      FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure.
+      FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure (default).
       FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures.
     required: false
-    default: FAIL
+    default: FAIL_OR_NOGRADE
 
   github-step-summary:
     description: Append a Markdown result table to $GITHUB_STEP_SUMMARY
@@ -145,10 +145,8 @@ runs:
             fi
             ;;
           *)
-            if [ "${GATE_RESULT}" = "FAIL" ]; then
-              echo "::error::slint-gate FAIL — policy violation detected."
-              exit 1
-            fi
+            echo "::error::invalid fail-on value: ${FAIL_ON}"
+            exit 2
             ;;
         esac
 

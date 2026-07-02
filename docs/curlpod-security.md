@@ -36,7 +36,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["services", "endpoints"]
-    verbs: ["get", "list"]
+    verbs: ["get"]
 ```
 
 ### ServiceAccount for the harness (CI runner)
@@ -50,7 +50,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["create", "delete", "get", "list", "watch"]
+    verbs: ["create", "delete", "get", "list"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]

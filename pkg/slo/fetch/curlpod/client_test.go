@@ -1,8 +1,13 @@
 package curlpod
 
 import (
+	"context"
 	"encoding/json"
+	"os/exec"
+	"strings"
 	"testing"
+
+	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
 
 func TestParseSelectorToLabels(t *testing.T) {
@@ -80,5 +85,36 @@ func TestParseSelectorToLabels_JSONSafe(t *testing.T) {
 	}
 	if out["app"] != "curl-metrics" {
 		t.Errorf("unexpected value for app: %q", out["app"])
+	}
+}
+
+type captureRunner struct {
+	commands []string
+}
+
+func (r *captureRunner) Run(_ context.Context, _ slo.Logger, cmd *exec.Cmd) (string, error) {
+	r.commands = append(r.commands, strings.Join(cmd.Args, " "))
+	return "", nil
+}
+
+func TestRunOnce_DoesNotEmbedProvidedTokenInCommand(t *testing.T) {
+	r := &captureRunner{}
+	c := New(nil, r)
+	c.Image = "curlimages/curl:8.11.0"
+
+	_, err := c.RunOnce(context.Background(), "ns", "super-secret-token", "metrics-svc", "scraper")
+	if err != nil {
+		t.Fatalf("RunOnce returned error: %v", err)
+	}
+
+	if len(r.commands) == 0 {
+		t.Fatal("expected captured kubectl commands")
+	}
+	all := strings.Join(r.commands, "\n")
+	if strings.Contains(all, "super-secret-token") {
+		t.Fatalf("provided token leaked into command args: %s", all)
+	}
+	if !strings.Contains(all, "/var/run/secrets/kubernetes.io/serviceaccount/token") {
+		t.Fatalf("expected pod command to read mounted service account token: %s", all)
 	}
 }

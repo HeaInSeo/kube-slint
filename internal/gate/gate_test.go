@@ -19,14 +19,16 @@ const categoryThreshold = "threshold"
 // --- fixtures ---
 
 type policyFixture struct {
-	Thresholds  []map[string]any `yaml:"thresholds"`
-	Regression  map[string]any   `yaml:"regression"`
-	Reliability map[string]any   `yaml:"reliability"`
-	FailOn      []string         `yaml:"fail_on"`
+	SchemaVersion string           `yaml:"schema_version"`
+	Thresholds    []map[string]any `yaml:"thresholds"`
+	Regression    map[string]any   `yaml:"regression"`
+	Reliability   map[string]any   `yaml:"reliability"`
+	FailOn        []string         `yaml:"fail_on"`
 }
 
 func defaultPolicy() policyFixture {
 	return policyFixture{
+		SchemaVersion: "slint.policy.v1",
 		Thresholds: []map[string]any{
 			{"name": "reconcile_min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
 			{"name": "workqueue_max", "metric": "workqueue_depth_end", "operator": "<=", "value": 5},
@@ -39,6 +41,9 @@ func defaultPolicy() policyFixture {
 
 func writePolicyFile(t *testing.T, dir string, p policyFixture) string {
 	t.Helper()
+	if p.SchemaVersion == "" {
+		p.SchemaVersion = "slint.policy.v1"
+	}
 	data, err := yaml.Marshal(p)
 	require.NoError(t, err)
 	path := filepath.Join(dir, "policy.yaml")
@@ -443,6 +448,44 @@ func TestEvaluate_PolicyInvalidYAML(t *testing.T) {
 	assert.Contains(t, result.Reasons, "POLICY_INVALID")
 }
 
+func TestEvaluate_PolicyUnsupportedSchemaVersion(t *testing.T) {
+	dir := t.TempDir()
+	p := defaultPolicy()
+	p.SchemaVersion = "slint.policy.v0"
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
+func TestEvaluate_PolicyInvalidFailOn(t *testing.T) {
+	dir := t.TempDir()
+	p := defaultPolicy()
+	p.FailOn = []string{"threshold-miss"}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
 func TestEvaluate_BaselinePath_Set_InputRefs(t *testing.T) {
 	dir := t.TempDir()
 	policy := writePolicyFile(t, dir, defaultPolicy())
@@ -486,10 +529,11 @@ func TestEvaluate_NoThresholds_RegressionDisabled_Pass(t *testing.T) {
 	// 정책에 threshold 없고 regression disabled → reliability check만 통과하면 PASS
 	dir := t.TempDir()
 	p := policyFixture{
-		Thresholds:  []map[string]any{},
-		Regression:  map[string]any{"enabled": false},
-		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
+		SchemaVersion: "slint.policy.v1",
+		Thresholds:    []map[string]any{},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		FailOn:        []string{"threshold_miss"},
 	}
 	policy := writePolicyFile(t, dir, p)
 	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(

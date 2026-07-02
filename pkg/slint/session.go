@@ -2,6 +2,8 @@ package slint
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -154,10 +156,18 @@ func applySessionBaseDefaults(cfg SessionConfig) SessionConfig {
 
 	runID := strings.TrimSpace(cfg.RunID)
 	if runID == "" {
-		runID = fmt.Sprintf("local-%d", cfg.Now().Unix())
+		runID = defaultRunID(cfg.Now())
 	}
 	cfg.RunID = runID
 	return cfg
+}
+
+func defaultRunID(t time.Time) string {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("local-%d", t.UnixNano())
+	}
+	return fmt.Sprintf("local-%d-%s", t.UnixNano(), hex.EncodeToString(b[:]))
 }
 
 func discoverAndApplyConfig(cfg SessionConfig) SessionConfig {
@@ -323,7 +333,7 @@ func shouldRunCleanup(mode string, enabled, hasFailed bool) bool {
 }
 
 func runCleanupActions(ctx context.Context, ns, runID string) {
-	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", runID)
+	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", SanitizeKubernetesLabelValue(runID))
 
 	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
 	out, err := cmd.CombinedOutput()
@@ -412,6 +422,9 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	fetcher := s.impl.fetcher
 	if fetcher == nil {
 		fetcher = newCurlPodFetcher(s.impl)
+	}
+	if sf, ok := fetcher.(interface{ Stop() }); ok {
+		defer sf.Stop()
 	}
 
 	eng := engine.New(fetcher, s.impl.writer, nil)

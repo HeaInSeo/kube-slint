@@ -47,6 +47,7 @@ type Fetcher struct {
 	localPort  int
 	cancel     context.CancelFunc
 	startCache *fetch.Sample
+	startErr   error
 	fetchCount int
 }
 
@@ -64,7 +65,7 @@ func (f *Fetcher) Start(ctx context.Context) error {
 		remote = defaultRemotePort
 	}
 
-	pfCtx, cancel := context.WithCancel(ctx)
+	pfCtx, cancel := context.WithCancel(context.Background())
 	f.cancel = cancel
 
 	target := fmt.Sprintf("svc/%s", f.ServiceName)
@@ -107,9 +108,11 @@ func (f *Fetcher) PreFetch(ctx context.Context) error {
 	}
 	s, err := f.scrape(ctx)
 	if err != nil {
+		f.startErr = err
 		return err
 	}
 	f.startCache = &s
+	f.startErr = nil
 	return nil
 }
 
@@ -119,6 +122,10 @@ func (f *Fetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, error)
 	if f.fetchCount == 0 && f.startCache != nil {
 		f.fetchCount++
 		return *f.startCache, nil
+	}
+	if f.fetchCount == 0 && f.startErr != nil {
+		f.fetchCount++
+		return fetch.Sample{}, fmt.Errorf("prefetch start snapshot failed: %w", f.startErr)
 	}
 	f.fetchCount++
 	return f.scrape(ctx)
@@ -179,8 +186,11 @@ func (f *Fetcher) waitReady(ctx context.Context) error {
 		}
 		resp, err := httpClient.Do(req)
 		if err == nil {
+			status := resp.StatusCode
 			_ = resp.Body.Close()
-			return nil
+			if status == http.StatusOK {
+				return nil
+			}
 		}
 		select {
 		case <-readyCtx.Done():

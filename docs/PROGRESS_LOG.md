@@ -10,6 +10,35 @@ Update this file at the **start and end** of every stage/task.
 **Branch:** `main`
 **Last updated:** 2026-06-27 (competition readiness public API cleanup)
 
+### Post-RC Hardening Sprint — Security, Lifecycle, and Gate Semantics (IN PROGRESS)
+
+**Started:** 2026-07-02
+
+**Source of truth:**
+
+* `docs/DECISIONS.md` D-014
+* `docs/post-rc-hardening-design.md`
+* `docs/post-rc-hardening-sprint.md`
+
+**완료 항목:**
+
+* [x] 외부 리뷰에서 확인된 token/RBAC/prefetch/gate 리스크를 post-RC hardening 설계로 정리
+* [x] measurement failure는 테스트 실패와 동일시하지 않고 `NO_GRADE`/insufficient로 드러낸다는 기존 결정과 정렬
+* [x] curlpod bearer token command 노출 제거
+* [x] Runner command log redaction 적용
+* [x] `slint-gate init --emit-rbac` 기본 RBAC를 Role/RoleBinding으로 축소
+* [x] CLI/policy enum 검증 및 `NO_GRADE` 우선순위 보정
+* [x] GitHub Action / repo workflow 기본 `fail-on`을 `FAIL_OR_NOGRADE`로 강화
+* [x] port-forward lifecycle와 PreFetch 실패 전파 보정
+* [x] 기본 RunID를 nanosecond + random suffix로 강화하고 Kubernetes label selector 값을 sanitize
+* [x] Prometheus text parser scanner limit 확장
+
+**진행/남은 항목:**
+
+* [ ] direction-aware regression policy 설계/구현
+* [ ] ownerRef metric semantics 재검토
+* [ ] Docker/curl image digest pinning 정책 결정
+
 ### Competition Readiness Sprint — Public API Cleanup (IN PROGRESS)
 
 **완료 항목:**

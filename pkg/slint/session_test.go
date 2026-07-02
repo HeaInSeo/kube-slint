@@ -43,7 +43,7 @@ func TestSession_AutoRunID(t *testing.T) {
 	}
 
 	sess := NewSession(cfg)
-	assert.Equal(t, "local-1704103200", sess.impl.RunID)
+	assert.Regexp(t, `^local-1704103200000000000-[0-9a-f]{8}$`, sess.impl.RunID)
 }
 
 func TestSession_End(t *testing.T) {
