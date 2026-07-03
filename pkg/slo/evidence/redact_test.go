@@ -58,6 +58,53 @@ func TestRedactString(t *testing.T) {
 			input: "token=abc Authorization: Bearer xyz",
 			want:  "token=[REDACTED] Authorization: Bearer [REDACTED]",
 		},
+		// Regression cases for N3: JSON-quoted, CLI-flag, and YAML/plain-colon
+		// forms weren't covered before — only "Bearer ..." and "key=value".
+		{
+			name:  "JSON-quoted token field",
+			input: `{"status":{"token":"eyJhbGciOiJSUzI1NiJ9.abc"}}`,
+			want:  `{"status":{"token":"[REDACTED]"}}`,
+		},
+		{
+			name:  "JSON-quoted token field with spacing",
+			input: `{"token" : "abc123secret"}`,
+			want:  `{"token" : "[REDACTED]"}`,
+		},
+		{
+			name:  "JSON-quoted clientSecret field",
+			input: `{"clientSecret":"hunter2"}`,
+			want:  `{"clientSecret":"[REDACTED]"}`,
+		},
+		{
+			name:  "--token flag with space",
+			input: "kubectl --token abc123secret get pods",
+			want:  "kubectl --token [REDACTED] get pods",
+		},
+		{
+			name:  "--client-key-data flag with =",
+			input: "--client-key-data=LS0tLS1CRUdJTg==",
+			want:  "--client-key-data=[REDACTED]",
+		},
+		{
+			name:  "--certificate-authority-data flag",
+			input: "--certificate-authority-data LS0tLS1CRUdJTg==",
+			want:  "--certificate-authority-data [REDACTED]",
+		},
+		{
+			name:  "YAML plain-colon token field (embedded kubeconfig)",
+			input: "token: eyJhbGciOiJSUzI1NiJ9.abc",
+			want:  "token: [REDACTED]",
+		},
+		{
+			name:  "YAML plain-colon client-key-data field",
+			input: "client-key-data: LS0tLS1CRUdJTg==",
+			want:  "client-key-data: [REDACTED]",
+		},
+		{
+			name:  "serviceAccountToken key=value form",
+			input: "serviceAccountToken=eyJhbGciOiJSUzI1NiJ9.abc",
+			want:  "serviceAccountToken=[REDACTED]",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

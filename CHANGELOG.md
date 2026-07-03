@@ -17,6 +17,11 @@
 - `examples/kind-hello-operator/manifests/rbac.yaml`: `ClusterRole`/`ClusterRoleBinding` → 네임스페이스 스코프 `Role`/`RoleBinding`으로 변경 (`slint-gate init --emit-rbac` 템플릿과 정합).
 - `pkg/slo/fetch/promtext`: bare-name 메트릭 합산 로직(`Aggregate`/`ParseTextToMapWithAggregates`)을 curlpod fetcher 전용 코드에서 공용 패키지로 이동하여 curlpod/portforward fetcher가 동일한 metric 의미를 갖도록 통일. 실제 unlabeled series가 있으면 덮어쓰지 않고, histogram bucket(`le` 레이블)/summary quantile(`quantile` 레이블)은 합산 대상에서 제외하도록 개선.
 
+### Security
+
+- `pkg/slo/evidence/redact.go`: 시크릿 redaction 패턴이 `Bearer <token>`/`key=value` 형태 외에 JSON-quoted(`"token": "..."`), CLI 플래그(`--token`, `--client-key-data`, `--certificate-authority-data`), YAML/plain-colon(`token: ...`) 형태도 커버하도록 확장. `serviceAccountToken`/`clientSecret` 키도 추가로 커버.
+- `pkg/kubeutil/token.go`: `requestServiceAccountTokenOnce`가 TokenRequest 응답 JSON 파싱 실패 시 원문 body를 그대로 에러에 포함하던 것을 redact 후 포함하도록 수정 — 손상/잘림된 응답에 남아있는 실제 토큰 조각이 재시도마다 로그로 새는 경로를 차단.
+
 ## [1.3.0] - 2026-07-02
 
 ### Added

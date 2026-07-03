@@ -213,4 +213,35 @@ Closed in a follow-up pass, same day:
    `quantile` label heuristic covers the common case without it) and the
    `strings.Fields`-based parser's inability to handle label values
    containing spaces (mapping table item P0-FETCH-004 / F4) — both remain
-   open, deferred alongside N3/N5/N6/R6.
+   open, deferred alongside N5/N6/R6.
+
+## Sprint Plan follow-up (N3)
+
+9. **N3 — redaction pattern coverage gap for JSON-shaped and flag-shaped
+   secrets.** `evidence.RedactString` only matched `Bearer <token>` and
+   `key=value` (token/password/passwd/secret) — a JSON-shaped
+   `"token": "..."` never matched (no `=` delimiter), nor did `--token`/
+   `--client-key-data`/`--certificate-authority-data` CLI flags or plain
+   YAML-style `token: ...` (e.g. embedded kubeconfig content). A concrete
+   leak path existed in `pkg/kubeutil/token.go`'s
+   `requestServiceAccountTokenOnce`: on JSON parse failure it embedded the raw
+   response body (`body=%q`) in the returned error, and
+   `ServiceAccountToken`'s poll loop logs every failed attempt via
+   `logger.Logf` — so a partial/truncated TokenRequest response (which can
+   still contain a real `"token":"..."` fragment) would have its token logged
+   on every retry until success. Fix:
+   - extended `redactPatterns` → `redactRules` (regex + per-rule replacement
+     template, since the JSON-quoted form needs a closing-delimiter group) to
+     cover JSON-quoted key/value pairs, `--token`/`--certificate-authority-data`/
+     `--client-key-data` flags, and plain colon (YAML-shaped) key/value pairs,
+     also adding `serviceAccountToken`/`clientSecret` to the covered key names
+     (closing the design decision's §11.3 list);
+   - the JSON-quoted pattern's closing quote is optional so a truncated value
+     (cut off mid-token, no closing `"`) is still redacted to EOF instead of
+     being left untouched by a strict match;
+   - `requestServiceAccountTokenOnce` now redacts the body before embedding it
+     in the parse-failure error.
+
+   Not in scope for this pass: `kubeconfig` as a bare signal word (the actual
+   secret fields it contains — `token`, `client-key-data`,
+   `certificate-authority-data` — are now covered directly).
