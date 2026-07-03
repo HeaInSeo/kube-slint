@@ -51,6 +51,21 @@ func TestPrintDiagnostics_PolicyMissing(t *testing.T) {
 	assert.Contains(t, out, "slint-gate init")
 }
 
+func TestPrintDiagnostics_PolicyInvalid_MentionsSchemaVersion(t *testing.T) {
+	// Regression test for N4: schema_version is now a strictly validated
+	// field (see internal/gate/gate.go validatePolicy), so a missing/wrong
+	// schema_version is a common cause of POLICY_INVALID. The hint must call
+	// this out explicitly instead of only mentioning YAML syntax/operators.
+	result := &gate.Summary{
+		GateResult: gate.GateNoGrade,
+		Reasons:    []string{"POLICY_INVALID"},
+	}
+	out := capturePrintDiagnostics(result)
+	assert.Contains(t, out, "POLICY_INVALID")
+	assert.Contains(t, out, "schema_version")
+	assert.Contains(t, out, "slint.policy.v1")
+}
+
 func TestPrintDiagnostics_ThresholdMiss(t *testing.T) {
 	result := &gate.Summary{
 		GateResult: gate.GateFail,

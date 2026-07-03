@@ -162,8 +162,29 @@ gaps. This sprint closes the highest-risk residual gaps in dependency order.
    explicitly on the curl pod override.
 
 Deferred to a later pass (unchanged from the mapping table below): N3
-(redaction pattern coverage for JSON-shaped tokens), N4 (schema_version
-diagnostic hint + CHANGELOG note), N5 (`Session.End` unconditional `Stop()`
-contract), N6 (workflow demo-fixture default labeling), R3 (fetcher metric
-normalization unification), R5 (example RBAC still cluster-scoped), R6
+(redaction pattern coverage for JSON-shaped tokens), N5 (`Session.End`
+unconditional `Stop()` contract), N6 (workflow demo-fixture default
+labeling), R3 (fetcher metric normalization unification), R6
 (`internal/gate` → `pkg/gate`, engine stdout hygiene).
+
+## Sprint Plan follow-up (N4, R5)
+
+Closed in a follow-up pass, same day:
+
+6. **N4 — `POLICY_INVALID` diagnostic hint didn't mention `schema_version`.**
+   `validatePolicy` strictly requires `schema_version: "slint.policy.v1"`
+   (rejecting missing/old values as `policy_status=invalid`), but
+   `cmd/slint-gate/diagnose.go`'s `POLICY_INVALID` hint only talked about YAML
+   syntax and unsupported operators. A user upgrading from a policy.yaml
+   without `schema_version` would see `POLICY_INVALID` with no hint pointing
+   at the actual cause. Fix: added an explicit `schema_version: slint.policy.v1`
+   hint (plus `fail_on`/`reliability.min_level` hints) to the diagnostic entry.
+
+7. **R5 — example RBAC was still cluster-scoped.** The
+   `slint-gate init --emit-rbac` template already emits a namespaced
+   `Role`/`RoleBinding`, but `examples/kind-hello-operator/manifests/rbac.yaml`
+   still defined a `ClusterRole`/`ClusterRoleBinding`, contradicting the
+   namespace-scoped-by-default decision above and the fixed init template.
+   Fix: converted the example to a namespaced `Role`/`RoleBinding` in
+   `hello-system`, keeping the existing ServiceAccount name (`kube-slint`)
+   referenced by `e2e_test.go`/`Makefile` unchanged.

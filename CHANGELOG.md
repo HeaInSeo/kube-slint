@@ -13,6 +13,8 @@
 - `pkg/slint/sweep.go`: orphan sweep 제외 셀렉터(`slint-run-id!=...`)가 다른 셀렉터들과 동일하게 `SanitizeKubernetesLabelValue`를 거침.
 - `pkg/slint/attach.go`: `SessionConfig.Token`이 비어 있어도 더 이상 테스트가 실패하지 않음 — 기본 curlpod fetcher는 pod에 마운트된 ServiceAccount 토큰을 사용하므로 `Token` 필드는 커스텀 Fetcher를 위한 호환성 필드로만 남음.
 - `pkg/slo/fetch/curlpod/client.go`: 생성되는 curl pod PodSpec에 `automountServiceAccountToken: true`를 명시 — ServiceAccount 기본값에 의존하지 않음.
+- `cmd/slint-gate/diagnose.go`: `POLICY_INVALID` 진단 힌트에 `schema_version`/`fail_on`/`reliability.min_level` 원인을 명시 (기존에는 YAML 문법과 operator만 언급해 원인을 못 찾기 쉬웠음).
+- `examples/kind-hello-operator/manifests/rbac.yaml`: `ClusterRole`/`ClusterRoleBinding` → 네임스페이스 스코프 `Role`/`RoleBinding`으로 변경 (`slint-gate init --emit-rbac` 템플릿과 정합).
 
 ## [1.3.0] - 2026-07-02
 

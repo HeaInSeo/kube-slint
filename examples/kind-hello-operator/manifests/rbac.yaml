@@ -1,5 +1,7 @@
 # kube-slint scrapes metrics by launching a curl pod in the target namespace.
-# This ServiceAccount + ClusterRole gives curl pods the minimum permissions needed.
+# This ServiceAccount + namespace-scoped Role gives curl pods the minimum
+# permissions needed, confined to the hello-system namespace (no cluster-wide
+# binding — see docs/post-rc-hardening-design.md RBAC scope decision).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -8,9 +10,10 @@ metadata:
 ---
 # curl pods need to GET pods/exec and pods (to launch and track the curl pod).
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: kube-slint-scraper
+  namespace: hello-system
 rules:
   - apiGroups: [""]
     resources: ["pods"]
@@ -23,12 +26,13 @@ rules:
     verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: kube-slint-scraper
+  namespace: hello-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: kube-slint-scraper
 subjects:
   - kind: ServiceAccount

@@ -43,6 +43,9 @@ var diagMessages = map[string]diagEntry{
 		summary: "policy.yaml 파일이 올바르지 않습니다.",
 		hints: []string{
 			"YAML 문법 오류가 없는지 확인하세요: cat .slint/policy.yaml",
+			"schema_version 필드가 있는지, 정확히 \"slint.policy.v1\"인지 확인하세요 (누락되거나 다른 값이면 무효 처리됩니다):\n    schema_version: slint.policy.v1",
+			"fail_on 필드에 지원되지 않는 값이 있는지 확인하세요. 지원 값: threshold_miss, regression_detected",
+			"reliability.min_level 필드가 partial 또는 complete인지 확인하세요.",
 			"operator 필드에 지원되지 않는 연산자(예: !=)가 있는지 확인하세요.",
 			"지원 연산자: <=, >=, <, >, ==",
 		},
