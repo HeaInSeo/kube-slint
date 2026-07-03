@@ -87,6 +87,12 @@ type sessionImpl struct {
 	fetcher fetch.MetricsFetcher
 	writer  summary.Writer
 
+	// ownsFetcher is true when the session itself constructs the fetcher
+	// (SessionConfig.Fetcher was nil). Only a session-owned fetcher's Stop()
+	// is called from End() — a caller-supplied fetcher may be shared across
+	// multiple sessions/scopes, and the caller is responsible for its lifecycle.
+	ownsFetcher bool
+
 	started   time.Time
 	hasFailed bool
 }
@@ -130,9 +136,10 @@ func NewSession(cfg SessionConfig) *Session {
 		RunID: cfg.RunID,
 		Tags:  mergedTags,
 
-		specs:   resolvedSpecs,
-		fetcher: cfg.Fetcher,
-		writer:  w,
+		specs:       resolvedSpecs,
+		fetcher:     cfg.Fetcher,
+		ownsFetcher: cfg.Fetcher == nil,
+		writer:      w,
 	}
 
 	if cfg.CurlImage != "" {
@@ -431,8 +438,13 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	if fetcher == nil {
 		fetcher = newCurlPodFetcher(s.impl)
 	}
-	if sf, ok := fetcher.(interface{ Stop() }); ok {
-		defer sf.Stop()
+	// Only stop a fetcher the session itself created. A caller-supplied
+	// fetcher (SessionConfig.Fetcher) may be reused across multiple
+	// sessions/scopes, and its lifecycle is the caller's responsibility.
+	if s.impl.ownsFetcher {
+		if sf, ok := fetcher.(interface{ Stop() }); ok {
+			defer sf.Stop()
+		}
 	}
 
 	eng := engine.New(fetcher, s.impl.writer, nil)

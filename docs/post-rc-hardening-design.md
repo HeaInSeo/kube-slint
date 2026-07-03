@@ -245,3 +245,24 @@ Closed in a follow-up pass, same day:
    Not in scope for this pass: `kubeconfig` as a bare signal word (the actual
    secret fields it contains — `token`, `client-key-data`,
    `certificate-authority-data` — are now covered directly).
+
+## Sprint Plan follow-up (N5, N6)
+
+10. **N5 — `Session.End()` unconditionally stopped any `Stop()`-capable
+    fetcher.** `interface{ Stop() }` detection in `End()` ran regardless of
+    whether the session itself created the fetcher or the caller supplied one
+    via `SessionConfig.Fetcher`. A caller managing a long-lived
+    `portforward.Fetcher` across multiple sessions would have their connection
+    killed by the first `End()`. Fix: `sessionImpl` now tracks `ownsFetcher`
+    (true when `SessionConfig.Fetcher` was nil, i.e. the session constructs
+    its own `curlPodFetcher`), and `End()` only calls `Stop()` when
+    `ownsFetcher` is true.
+
+11. **N6 — workflow_dispatch defaults silently point at an always-PASS
+    fixture.** `.github/workflows/slint-gate.yml`'s `measurement_summary_path`/
+    `baseline_path` default to the same
+    `docs/fixtures/slint-gate-pass-summary.json`, so an unmodified dispatch
+    run is a demo/smoke check of the action itself, not a real evaluation of
+    this repo. Fix: added an explicit comment at the top of the workflow and
+    reworded the two input descriptions to say the default is a demo fixture
+    that always PASSes and must be overridden for a real gate run.

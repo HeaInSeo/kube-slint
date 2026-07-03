@@ -84,6 +84,41 @@ func (m *mockFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, er
 	}, nil
 }
 
+// stoppableMockFetcher implements Stop() so tests can observe whether
+// Session.End() calls it.
+type stoppableMockFetcher struct {
+	mockFetcher
+	stopCalls int
+}
+
+func (f *stoppableMockFetcher) Stop() {
+	f.stopCalls++
+}
+
+func TestSession_End_DoesNotStopCallerSuppliedFetcher(t *testing.T) {
+	// Regression test for N5: a fetcher supplied via SessionConfig.Fetcher may
+	// be reused across multiple sessions/scopes, so End() must not stop it —
+	// only a fetcher the session itself constructs should be stopped.
+	f := &stoppableMockFetcher{}
+	cfg := SessionConfig{
+		Namespace: "ns",
+		TestCase:  "test",
+		Fetcher:   f,
+	}
+	sess := NewSession(cfg)
+	assert.False(t, sess.impl.ownsFetcher)
+
+	sess.Start()
+	_, err := sess.End(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, f.stopCalls, "caller-supplied fetcher must not be stopped by End()")
+}
+
+func TestNewSession_OwnsFetcher_WhenNoneSupplied(t *testing.T) {
+	sess := NewSession(SessionConfig{Namespace: "ns"})
+	assert.True(t, sess.impl.ownsFetcher)
+}
+
 // mockSnapshotFetcher 는 fetch.SnapshotFetcher 를 구현하는 테스트용 fetcher임.
 type mockSnapshotFetcher struct {
 	mockFetcher

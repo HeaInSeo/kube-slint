@@ -1,14 +1,20 @@
+# NOTE: the workflow_dispatch defaults below point at a fixture that always
+# evaluates to PASS (docs/fixtures/slint-gate-pass-summary.json used as both
+# measurement and baseline). This is a demo/smoke check of the slint-gate
+# action itself — it does not evaluate this repo's own operator/service. To
+# gate a real measurement, override measurement_summary_path/baseline_path
+# when dispatching the workflow.
 name: slint-gate
 
 on:
   workflow_dispatch:
     inputs:
       measurement_summary_path:
-        description: "Path to measurement summary JSON"
+        description: "Path to measurement summary JSON (default is a demo fixture that always PASSes — override for a real gate run)"
         required: false
         default: "docs/fixtures/slint-gate-pass-summary.json"
       baseline_path:
-        description: "Optional path to baseline summary JSON"
+        description: "Optional path to baseline summary JSON (default is the same demo fixture — override for a real gate run)"
         required: false
         default: "docs/fixtures/slint-gate-pass-summary.json"
       policy_path:

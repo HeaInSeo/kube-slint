@@ -16,6 +16,8 @@
 - `cmd/slint-gate/diagnose.go`: `POLICY_INVALID` 진단 힌트에 `schema_version`/`fail_on`/`reliability.min_level` 원인을 명시 (기존에는 YAML 문법과 operator만 언급해 원인을 못 찾기 쉬웠음).
 - `examples/kind-hello-operator/manifests/rbac.yaml`: `ClusterRole`/`ClusterRoleBinding` → 네임스페이스 스코프 `Role`/`RoleBinding`으로 변경 (`slint-gate init --emit-rbac` 템플릿과 정합).
 - `pkg/slo/fetch/promtext`: bare-name 메트릭 합산 로직(`Aggregate`/`ParseTextToMapWithAggregates`)을 curlpod fetcher 전용 코드에서 공용 패키지로 이동하여 curlpod/portforward fetcher가 동일한 metric 의미를 갖도록 통일. 실제 unlabeled series가 있으면 덮어쓰지 않고, histogram bucket(`le` 레이블)/summary quantile(`quantile` 레이블)은 합산 대상에서 제외하도록 개선.
+- `pkg/slint/session.go`: `Session.End()`가 세션이 직접 생성한 fetcher에만 `Stop()`을 호출함 — `SessionConfig.Fetcher`로 사용자가 직접 공급한(여러 세션에서 재사용할 수 있는) fetcher는 더 이상 첫 `End()` 호출로 강제 종료되지 않음.
+- `.github/workflows/slint-gate.yml`: `workflow_dispatch` 기본값이 항상 PASS하는 데모 fixture를 가리킨다는 점을 주석과 input 설명에 명시.
 
 ### Security
 
