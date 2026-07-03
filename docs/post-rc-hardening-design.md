@@ -266,3 +266,43 @@ Closed in a follow-up pass, same day:
     this repo. Fix: added an explicit comment at the top of the workflow and
     reworded the two input descriptions to say the default is a demo fixture
     that always PASSes and must be overridden for a real gate run.
+
+## Sprint Plan follow-up (R6)
+
+12. **R6 — `internal/gate` → `pkg/gate`, plus the fallout that move touches.**
+    Section 6.1/6.2 above call for gate evaluation logic to live in a public
+    package so CLI/CI/future MCP consumers (and any external Go module) can
+    reuse the exact same `Evaluate()` — an `internal/` package is invisible
+    outside this module. Moved `internal/gate/*.go` to `pkg/gate/*.go`
+    (package name and code unchanged, only the import path). Updated every
+    importer: `cmd/slint-gate/main.go`, `cmd/slint-gate/diagnose.go`, and both
+    packages' test files. This move has three knock-on effects that would
+    otherwise have silently broken CI or the Docker build:
+    - `.golangci.yml` had a `dupl`/`lll` lint exclusion scoped to `path:
+      internal/*` (added when `internal/gate`'s duplicate-shaped
+      threshold/regression check functions and long test-fixture lines were
+      written) — updated to `path: pkg/gate/*` so `golangci-lint` doesn't
+      newly flag that pre-existing, intentionally-exempted code once it's no
+      longer under `internal/`;
+    - `.github/workflows/kind-demo.yml` and `.github/workflows/slint-gate.yml`
+      had `paths:` triggers on `internal/gate/**` — updated to `pkg/gate/**`
+      so future gate-only changes still trigger those workflows;
+    - `Dockerfile` had `COPY internal/ internal/`, which would now fail
+      outright (`internal/` no longer exists) — removed the line (`pkg/` is
+      already copied and now includes the gate package).
+
+    Verified locally end-to-end before pushing: `go build ./...`, `go vet
+    ./...`, `gofmt -l .` (clean), `go mod tidy` (no `go.mod`/`go.sum` drift),
+    `go test ./... -coverprofile cover.out` (all green), `make test-e2e`,
+    `make lint` using the exact CI-pinned `golangci-lint v2.12.2` (0 issues),
+    `make lint-config`, and a `podman build -f Dockerfile .` (succeeds).
+
+    The engine/library stdout-hygiene half of this item (docs section 6.4)
+    was addressed opportunistically in the same pass: `pkg/slint/session.go`
+    and `pkg/slint/sweep.go`'s diagnostic `fmt.Printf`/`fmt.Println` calls
+    (discovery, cleanup, prefetch, orphan-sweep messages) now write to
+    `os.Stderr` instead of stdout, so stdout stays available for
+    machine-readable output — the actual concern the design doc raises for a
+    future MCP stdio JSON-RPC transport. `internal/gate`/`pkg/slo/**` were
+    already stdout-clean (confirmed in the original review), so this only
+    touched `pkg/slint`.

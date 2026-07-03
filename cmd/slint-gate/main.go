@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/HeaInSeo/kube-slint/internal/gate"
+	"github.com/HeaInSeo/kube-slint/pkg/gate"
 )
 
 func main() {

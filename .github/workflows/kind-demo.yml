@@ -9,14 +9,14 @@ on:
       - "examples/kind-hello-operator/**"
       - "pkg/slint/**"
       - "pkg/slo/**"
-      - "internal/gate/**"
+      - "pkg/gate/**"
       - "cmd/slint-gate/**"
   pull_request:
     paths:
       - "examples/kind-hello-operator/**"
       - "pkg/slint/**"
       - "pkg/slo/**"
-      - "internal/gate/**"
+      - "pkg/gate/**"
       - "cmd/slint-gate/**"
   workflow_dispatch:
 

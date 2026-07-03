@@ -7,8 +7,8 @@
 
 ### Changed
 
-- `internal/gate/gate.go`: `reliability.collectionStatus == "Failed"`는 `reliability.required` 설정과 무관하게 무조건 `NO_GRADE`로 승격됨 (기존에는 threshold 규칙이 없고 `reliability.required: false`이면 조용히 `PASS`가 나올 수 있었음). 새 reason 코드 `COLLECTION_FAILED` 추가.
-- `internal/gate/gate.go`: regression 검사가 metric 방향(threshold rule의 `operator`)을 인식함 — `<=`/`<`는 lower-is-better, `>=`/`>`는 higher-is-better로 취급하여 개선(improvement)을 더 이상 회귀로 오탐하지 않음. 방향을 알 수 없는 연산자(`==` 등)는 기존 대칭 tolerance 검사를 유지.
+- `pkg/gate/gate.go`: `reliability.collectionStatus == "Failed"`는 `reliability.required` 설정과 무관하게 무조건 `NO_GRADE`로 승격됨 (기존에는 threshold 규칙이 없고 `reliability.required: false`이면 조용히 `PASS`가 나올 수 있었음). 새 reason 코드 `COLLECTION_FAILED` 추가.
+- `pkg/gate/gate.go`: regression 검사가 metric 방향(threshold rule의 `operator`)을 인식함 — `<=`/`<`는 lower-is-better, `>=`/`>`는 higher-is-better로 취급하여 개선(improvement)을 더 이상 회귀로 오탐하지 않음. 방향을 알 수 없는 연산자(`==` 등)는 기존 대칭 tolerance 검사를 유지.
 - `pkg/slint/session.go`, `pkg/slint/fetcher_curlpod.go`: curl-pod 기반 fetch(`PreFetch`/`Fetch`)의 외부 context timeout이 더 이상 `ScrapeTimeout`(2분)으로 `WaitPodDoneTimeout`(5분)+`LogsTimeout`을 무효화하지 않음 — `WaitPodDoneTimeout+LogsTimeout+여유`로 계산.
 - `pkg/slint/sweep.go`: orphan sweep 제외 셀렉터(`slint-run-id!=...`)가 다른 셀렉터들과 동일하게 `SanitizeKubernetesLabelValue`를 거침.
 - `pkg/slint/attach.go`: `SessionConfig.Token`이 비어 있어도 더 이상 테스트가 실패하지 않음 — 기본 curlpod fetcher는 pod에 마운트된 ServiceAccount 토큰을 사용하므로 `Token` 필드는 커스텀 Fetcher를 위한 호환성 필드로만 남음.
@@ -18,6 +18,7 @@
 - `pkg/slo/fetch/promtext`: bare-name 메트릭 합산 로직(`Aggregate`/`ParseTextToMapWithAggregates`)을 curlpod fetcher 전용 코드에서 공용 패키지로 이동하여 curlpod/portforward fetcher가 동일한 metric 의미를 갖도록 통일. 실제 unlabeled series가 있으면 덮어쓰지 않고, histogram bucket(`le` 레이블)/summary quantile(`quantile` 레이블)은 합산 대상에서 제외하도록 개선.
 - `pkg/slint/session.go`: `Session.End()`가 세션이 직접 생성한 fetcher에만 `Stop()`을 호출함 — `SessionConfig.Fetcher`로 사용자가 직접 공급한(여러 세션에서 재사용할 수 있는) fetcher는 더 이상 첫 `End()` 호출로 강제 종료되지 않음.
 - `.github/workflows/slint-gate.yml`: `workflow_dispatch` 기본값이 항상 PASS하는 데모 fixture를 가리킨다는 점을 주석과 input 설명에 명시.
+- `internal/gate` → `pkg/gate`: gate 평가 로직을 공개 패키지로 이동 — 같은 모듈 밖의 소비자(향후 MCP 서버 등)가 CLI와 동일한 gate 판단 로직을 재사용할 수 있게 됨. import 경로만 바뀌었고 동작은 동일. `.golangci.yml`의 `internal/*` dupl/lll 예외 규칙을 `pkg/gate/*`로, 관련 워크플로우의 path filter(`internal/gate/**`)를 `pkg/gate/**`로 갱신. `Dockerfile`의 이제 존재하지 않는 `COPY internal/ internal/` 라인 제거.
 
 ### Security
 

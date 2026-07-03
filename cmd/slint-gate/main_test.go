@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/HeaInSeo/kube-slint/internal/gate"
+	"github.com/HeaInSeo/kube-slint/pkg/gate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

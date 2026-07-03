@@ -114,11 +114,11 @@ linters:
           - lll
         path: api/*
 
-      # internal/ 아래는 중복(dupl) 및 라인 길이(lll) 예외
+      # pkg/gate/ 아래는 중복(dupl) 및 라인 길이(lll) 예외 (구 internal/gate)
       - linters:
           - dupl
           - lll
-        path: internal/*
+        path: pkg/gate/*
 
       # e2e에서는 ginkgo dot import를 허용 (staticcheck ST1001만 예외)
       - linters:

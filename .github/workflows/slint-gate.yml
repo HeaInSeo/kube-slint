@@ -26,14 +26,14 @@ on:
       - ".github/workflows/slint-gate.yml"
       - ".github/actions/slint-gate/**"
       - "cmd/slint-gate/**"
-      - "internal/gate/**"
+      - "pkg/gate/**"
       - ".slint/**"
   push:
     paths:
       - ".github/workflows/slint-gate.yml"
       - ".github/actions/slint-gate/**"
       - "cmd/slint-gate/**"
-      - "internal/gate/**"
+      - "pkg/gate/**"
       - ".slint/**"
 
 permissions:

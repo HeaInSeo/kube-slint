@@ -110,7 +110,7 @@ E2E 테스트 세션
 | `pkg/slo/fetch/k8sobject` | K8sObjectFetcher — kubectl list 기반 오브젝트 수 캡처; ExcludeSelector 지원 |
 | `pkg/slo/summary` | 출력 스키마 타입 + SchemaVersion 상수 + LoadFile/WriteFile/Validate 공개 API |
 | `pkg/slo/evidence` | RedactString / RedactMap — 토큰·패스워드 마스킹 유틸리티 |
-| `internal/gate` | policy 평가 (schemaVersion 검증, result_status, threshold, regression, reliability) |
+| `pkg/gate` | policy 평가 (schemaVersion 검증, result_status, threshold, regression, reliability) |
 | `cmd/slint-gate` | CLI 진입점 (`--fail-on`, `--github-step-summary`, `init` 서브커맨드) |
 | `.github/actions/slint-gate` | GitHub Composite Action; 4단계 fail-on 지원 |
 | `pkg/kubeutil` | 클러스터 유틸리티 (토큰, RBAC, WaitForReady, PollUntil) |

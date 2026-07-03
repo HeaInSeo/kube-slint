@@ -23,7 +23,7 @@ flowchart TD
     J --> K["slint-gate CLI\ncmd/slint-gate"]
     L[".slint/policy.yaml"] --> K
     M["baseline/sli-summary.json\n(optional)"] --> K
-    K --> N["internal/gate.Evaluate()\n— threshold / regression /\nreliability checks"]
+    K --> N["gate.Evaluate()\n— threshold / regression /\nreliability checks"]
     N --> O["slint-gate-summary.json\ngate_result: PASS | WARN | FAIL | NO_GRADE"]
 
     O --> P{{"GitHub Actions\n.github/actions/slint-gate"}}
@@ -55,7 +55,7 @@ flowchart TD
 | `pkg/slo/fetch/curlpod` | Executes `kubectl run` / `kubectl logs` to create a one-shot curl pod, scrape the operator's `/metrics` HTTPS endpoint, and return raw Prometheus text. |
 | `pkg/slo/fetch/promtext` | Parses Prometheus text-format exposition into `map[string]float64`. Used by `curlPodFetcher.parsePrometheusText()`. |
 | `pkg/slo/summary` | Output schema types: `Summary`, `SLIResult`, `Reliability`, `RunConfig`, `Status`. `Writer` interface (`Write(path, Summary)`). `JSONFileWriter` default implementation. |
-| `internal/gate` | Policy evaluation. `Evaluate(Request)` loads policy + measurement + baseline, runs threshold checks (`runThresholds`), regression checks (`runRegression`), and reliability checks (`runReliability`). Returns a `gate.Summary` written to `slint-gate-summary.json`. |
+| `pkg/gate` | Policy evaluation (formerly `internal/gate`; moved to `pkg/` so external consumers can reuse the gate logic directly). `Evaluate(Request)` loads policy + measurement + baseline, runs threshold checks (`runThresholds`), regression checks (`runRegression`), and reliability checks (`runReliability`). Returns a `gate.Summary` written to `slint-gate-summary.json`. |
 | `cmd/slint-gate` | CLI entry point. Parses flags (`--measurement-summary`, `--policy`, `--baseline`, `--output`, `--fail-on`, `--github-step-summary`), calls `gate.Evaluate()`, writes output, optionally renders `$GITHUB_STEP_SUMMARY` markdown, and exits with code 1 if `shouldFailOn()` returns true. Subcommand `slint-gate init` scaffolds `.slint/policy.yaml`. |
 | `.github/actions/slint-gate` | GitHub Composite Action. Runs `go run ./cmd/slint-gate` with action inputs, uploads `slint-gate-summary.json` as a workflow artifact, exposes outputs (`gate-result`, `evaluation-status`, `summary-path`), and enforces `fail-on` via a shell case statement. |
 | `pkg/kubeutil` | Cluster utilities: `ReadServiceAccountToken`, `WaitForReady`, `PollUntil`, RBAC scaffolding (`--emit-rbac`), Prometheus Operator helpers. |

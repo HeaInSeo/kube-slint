@@ -71,7 +71,7 @@ pkg/slo/spec             ← SLI 스펙 정의 (BaselineV3Specs)
 pkg/slo/summary          ← 표준 JSON 출력 스키마
 pkg/slo/fetch            ← MetricsFetcher 인터페이스 + curlpod/portforward 구현
 
-internal/gate            ← policy 평가 (threshold/regression/reliability)
+pkg/gate                 ← policy 평가 (threshold/regression/reliability), 구 internal/gate
 cmd/slint-gate           ← CLI entrypoint
 .github/actions/slint-gate ← GitHub Composite Action
 ```

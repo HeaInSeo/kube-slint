@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HeaInSeo/kube-slint/internal/gate"
+	"github.com/HeaInSeo/kube-slint/pkg/gate"
 )
 
 // diagEntry는 하나의 reason 코드에 대한 진단 항목이다.

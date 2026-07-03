@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -144,7 +145,7 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 		return res, err
 	}
 	if len(lines) == 0 {
-		fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n",
+		fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s :: no orphan resources detected\n",
 			res.Apply.ModeEffective, ns, runID)
 		finalizeSweepResult(&res)
 		return res, nil
@@ -189,7 +190,7 @@ func appendSkipGuard(res *SweepResult) {
 	res.Summary.SkippedByReason["missing_guard"]++
 	warnMsg := "skip - missing namespace or run-id for safety guard"
 	res.Warnings = append(res.Warnings, warnMsg)
-	fmt.Printf("kube-slint [orphan-sweep]: %s\n", warnMsg)
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: %s\n", warnMsg)
 }
 
 func normalizeSweepMode(modeReq string, res *SweepResult) {
@@ -206,7 +207,7 @@ func normalizeSweepMode(modeReq string, res *SweepResult) {
 		fallbackReason = "invalid_mode"
 		warnMsg := fmt.Sprintf("invalid mode %q provided, falling back to report-only", modeReq)
 		res.Warnings = append(res.Warnings, warnMsg)
-		fmt.Printf("kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
+		fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
 	}
 
 	res.Apply.ModeEffective = modeEff
@@ -252,7 +253,7 @@ func evaluateSweepCandidate(
 	if err != nil {
 		warnMsg := fmt.Sprintf("failed to parse creation timestamp for pod %s: %v", name, err)
 		res.Warnings = append(res.Warnings, warnMsg)
-		fmt.Printf("kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
+		fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: warning - %s\n", warnMsg)
 		if opts.MaxAge > 0 {
 			appendSkipReason(res, &item, "timestamp_parse_failed")
 			return
@@ -292,30 +293,30 @@ func appendSkipReason(res *SweepResult, item *SweepItem, reason string) {
 
 func printSweepSummary(
 	res *SweepResult, ns, runID string, opts OrphanSweepOptions, targetNames []string, hitLimit int) {
-	fmt.Printf("kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n",
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: mode=%s ns=%s run-id=%s limit=%d maxAge=%v\n",
 		res.Apply.ModeEffective, ns, runID, opts.Limit, opts.MaxAge)
-	fmt.Printf("kube-slint [orphan-sweep]: detected %d matching orphan(s) ", res.Summary.Evaluated)
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: detected %d matching orphan(s) ", res.Summary.Evaluated)
 	if hitLimit > 0 {
-		fmt.Printf("(processing %d, skipping %d due to limit)\n", len(targetNames), hitLimit)
+		fmt.Fprintf(os.Stderr, "(processing %d, skipping %d due to limit)\n", len(targetNames), hitLimit)
 	} else {
-		fmt.Printf("(processing all)\n")
+		fmt.Fprintf(os.Stderr, "(processing all)\n")
 	}
 }
 
 func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res *SweepResult) error {
 	if res.Apply.ModeEffective != modeDelete {
 		if len(targetNames) > 0 {
-			fmt.Printf("kube-slint [orphan-sweep]: report-only mode, skipped deletion of %v\n", targetNames)
-			fmt.Printf("kube-slint [orphan-sweep]: to delete, set option mode='delete'\n")
+			fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: report-only mode, skipped deletion of %v\n", targetNames)
+			fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: to delete, set option mode='delete'\n")
 		}
 		return nil
 	}
 	if len(targetNames) == 0 {
-		fmt.Printf("kube-slint [orphan-sweep]: no targets to delete\n")
+		fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: no targets to delete\n")
 		return nil
 	}
 
-	fmt.Printf("kube-slint [orphan-sweep]: proceeding with individual deletion for %d orphan(s)...\n", len(targetNames))
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: proceeding with individual deletion for %d orphan(s)...\n", len(targetNames))
 	var hasError bool
 
 	itemIdx := make(map[string]int)
@@ -346,6 +347,6 @@ func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res
 	if hasError {
 		return fmt.Errorf("some orphan deletions failed, check result for details")
 	}
-	fmt.Printf("kube-slint [orphan-sweep]: deletion complete\n")
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: deletion complete\n")
 	return nil
 }

@@ -180,19 +180,19 @@ func defaultRunID(t time.Time) string {
 func discoverAndApplyConfig(cfg SessionConfig) SessionConfig {
 	discoveredCfg, source, err := DiscoverConfig("")
 	if err != nil {
-		fmt.Printf("kube-slint [discovery]: warning - %v\n", err)
+		fmt.Fprintf(os.Stderr, "kube-slint [discovery]: warning - %v\n", err)
 	}
 
 	cfg.ConfigSourceType = source.Type
 	cfg.ConfigSourcePath = source.Path
 
 	if source.Disabled {
-		fmt.Println("kube-slint [discovery]: discovery disabled via SLINT_DISABLE_DISCOVERY")
+		fmt.Fprintln(os.Stderr, "kube-slint [discovery]: discovery disabled via SLINT_DISABLE_DISCOVERY")
 	} else {
 		if source.Path != "" {
-			fmt.Printf("kube-slint [discovery]: resolved config source type=%s path=%s\n", source.Type, source.Path)
+			fmt.Fprintf(os.Stderr, "kube-slint [discovery]: resolved config source type=%s path=%s\n", source.Type, source.Path)
 		} else {
-			fmt.Printf("kube-slint [discovery]: resolved config source type=%s\n", source.Type)
+			fmt.Fprintf(os.Stderr, "kube-slint [discovery]: resolved config source type=%s\n", source.Type)
 		}
 	}
 
@@ -307,7 +307,7 @@ func (s *Session) Cleanup(ctx context.Context) {
 	runID := s.impl.RunID
 
 	if ns == "" || runID == "" {
-		fmt.Printf("kube-slint [cleanup]: skip cleanup - missing namespace or run-id (ns=%q, runID=%q)\n", ns, runID)
+		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: skip cleanup - missing namespace or run-id (ns=%q, runID=%q)\n", ns, runID)
 		return
 	}
 
@@ -328,11 +328,11 @@ func shouldRunCleanup(mode string, enabled, hasFailed bool) bool {
 	}
 
 	if mode == "on-success" && hasFailed {
-		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test failed\n", mode)
+		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: skip cleanup - mode is %s and test failed\n", mode)
 		return false
 	}
 	if mode == "on-failure" && !hasFailed {
-		fmt.Printf("kube-slint [cleanup]: skip cleanup - mode is %s and test succeeded\n", mode)
+		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: skip cleanup - mode is %s and test succeeded\n", mode)
 		return false
 	}
 
@@ -345,11 +345,11 @@ func runCleanupActions(ctx context.Context, ns, runID string) {
 	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("kube-slint [cleanup]: failed for run-id %s: %v (output: %s)\n", runID, err, string(out))
+		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: failed for run-id %s: %v (output: %s)\n", runID, err, string(out))
 	} else {
 		outStr := strings.TrimSpace(string(out))
 		if outStr != "" {
-			fmt.Printf("kube-slint [cleanup]: success for run-id %s: %s\n", runID, outStr)
+			fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: success for run-id %s: %s\n", runID, outStr)
 		}
 	}
 }
@@ -391,7 +391,7 @@ func (s *Session) Start() {
 		ctx, cancel := context.WithTimeout(context.Background(), s.impl.podRunTimeout())
 		defer cancel()
 		if err := sf.PreFetch(ctx); err != nil {
-			fmt.Printf("kube-slint [prefetch]: warning - start snapshot failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "kube-slint [prefetch]: warning - start snapshot failed: %v\n", err)
 		}
 	}
 }
@@ -495,7 +495,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	// 병렬/멀티 테스트에서는 --measurement-summary 로 uniquePath를 명시할 것.
 	if staticPath != "" && sum != nil {
 		if writeErr := s.impl.writer.Write(staticPath, *sum); writeErr != nil {
-			fmt.Printf("kube-slint [session]: warning - static alias write failed: %v\n", writeErr)
+			fmt.Fprintf(os.Stderr, "kube-slint [session]: warning - static alias write failed: %v\n", writeErr)
 		}
 	}
 
