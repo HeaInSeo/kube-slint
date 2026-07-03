@@ -118,3 +118,54 @@ func TestRunOnce_DoesNotEmbedProvidedTokenInCommand(t *testing.T) {
 		t.Fatalf("expected pod command to read mounted service account token: %s", all)
 	}
 }
+
+type argsCaptureRunner struct {
+	args []string
+}
+
+func (r *argsCaptureRunner) Run(_ context.Context, _ slo.Logger, cmd *exec.Cmd) (string, error) {
+	r.args = cmd.Args
+	return "", nil
+}
+
+func TestRunOnce_PodOverrides_SetsAutomountServiceAccountTokenAndIsValidJSON(t *testing.T) {
+	// Regression test for N2: since the pod reads its own mounted SA token
+	// instead of a caller-supplied token, automountServiceAccountToken must be
+	// explicitly requested rather than relying on the ServiceAccount's default
+	// (which may have automount disabled).
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+	c.Image = "curlimages/curl:8.11.0"
+
+	_, err := c.RunOnce(context.Background(), "ns", "", "metrics-svc", "scraper-sa")
+	if err != nil {
+		t.Fatalf("RunOnce returned error: %v", err)
+	}
+
+	var overridesJSON string
+	for i, a := range r.args {
+		if a == "--overrides" && i+1 < len(r.args) {
+			overridesJSON = r.args[i+1]
+			break
+		}
+	}
+	if overridesJSON == "" {
+		t.Fatalf("expected --overrides argument, got args: %v", r.args)
+	}
+
+	var overrides struct {
+		Spec struct {
+			ServiceAccountName           string `json:"serviceAccountName"`
+			AutomountServiceAccountToken bool   `json:"automountServiceAccountToken"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		t.Fatalf("--overrides is not valid JSON: %v\n%s", err, overridesJSON)
+	}
+	if overrides.Spec.ServiceAccountName != "scraper-sa" {
+		t.Fatalf("unexpected serviceAccountName: %q", overrides.Spec.ServiceAccountName)
+	}
+	if !overrides.Spec.AutomountServiceAccountToken {
+		t.Fatal("expected automountServiceAccountToken=true so the pod can read its own SA token")
+	}
+}

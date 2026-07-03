@@ -381,12 +381,20 @@ func (s *Session) Start() {
 	// fetcher가 SnapshotFetcher를 구현하면 시작 스냅샷을 미리 캡처함 (Gap G 해소).
 	// 구현하지 않는 fetcher(Mock, httptest 등)는 그대로 동작하며 영향을 받지 않음.
 	if sf, ok := s.impl.fetcher.(fetch.SnapshotFetcher); ok {
-		ctx, cancel := context.WithTimeout(context.Background(), s.impl.ScrapeTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), s.impl.podRunTimeout())
 		defer cancel()
 		if err := sf.PreFetch(ctx); err != nil {
 			fmt.Printf("kube-slint [prefetch]: warning - start snapshot failed: %v\n", err)
 		}
 	}
+}
+
+// podRunTimeout returns the outer deadline for a curl-pod-backed fetch
+// (schedule + wait-until-terminal + log fetch). It must never be shorter than
+// WaitPodDoneTimeout+LogsTimeout, otherwise those sub-timeouts are silently
+// overridden by an earlier outer deadline (see docs/post-rc-hardening-design.md R4).
+func (impl *sessionImpl) podRunTimeout() time.Duration {
+	return impl.WaitPodDoneTimeout + impl.LogsTimeout + 30*time.Second
 }
 
 // End는 측정을 완료함.

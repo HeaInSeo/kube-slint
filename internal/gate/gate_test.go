@@ -197,7 +197,33 @@ func TestEvaluate_WithBaseline_AllPass(t *testing.T) {
 func TestEvaluate_WithBaseline_RegressionFail(t *testing.T) {
 	dir := t.TempDir()
 	policy := writePolicyFile(t, dir, defaultPolicy())
-	// current: reconcile_total_delta doubled (100% increase → exceeds 5% tolerance)
+	// current: reconcile_total_delta halved (50% decrease → exceeds 5% tolerance).
+	// reconcile_total_delta is a ">=" (higher-is-better) metric, so a decrease is
+	// the regressing direction, not an increase.
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0},
+		"Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 6, "workqueue_depth_end": 0},
+		"Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "REGRESSION_DETECTED")
+}
+
+func TestEvaluate_WithBaseline_RegressionFail_ImprovementIsNotRegression(t *testing.T) {
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	// current: reconcile_total_delta doubled (100% increase). reconcile_total_delta
+	// is a ">=" (higher-is-better) metric, so this is an improvement, not a regression.
 	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
 		map[string]float64{"reconcile_total_delta": 6, "workqueue_depth_end": 0},
 		"Complete",
@@ -213,8 +239,8 @@ func TestEvaluate_WithBaseline_RegressionFail(t *testing.T) {
 		BaselinePath:    baseline,
 	})
 
-	assert.Equal(t, gate.GateFail, result.GateResult)
-	assert.Contains(t, result.Reasons, "REGRESSION_DETECTED")
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	assert.NotContains(t, result.Reasons, "REGRESSION_DETECTED")
 }
 
 func TestEvaluate_WithBaseline_WithinTolerance(t *testing.T) {
@@ -277,6 +303,54 @@ func TestEvaluate_ReliabilityRequired_BelowMinimum(t *testing.T) {
 
 	assert.Equal(t, gate.GateWarn, result.GateResult)
 	assert.Contains(t, result.Reasons, "RELIABILITY_INSUFFICIENT")
+}
+
+func TestEvaluate_CollectionFailed_NoGrade_EvenWithoutReliabilityRequired(t *testing.T) {
+	// Regression test for R1: a summary whose CollectionStatus is "Failed" must
+	// never silently resolve to PASS, even when the policy has no threshold
+	// rules and reliability.required is false — a measurement that never
+	// completed cannot support a trustworthy gate decision.
+	dir := t.TempDir()
+	p := policyFixture{
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{}, "Failed",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Contains(t, result.Reasons, "COLLECTION_FAILED")
+}
+
+func TestEvaluate_CollectionFailed_OutranksWarn(t *testing.T) {
+	// COLLECTION_FAILED (NO_GRADE) must outrank a concurrent WARN-level check.
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 10},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"regression_detected"}, // threshold_miss absent → would be WARN on its own
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 0}, "Failed",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
 }
 
 func TestEvaluate_MetricMissing_NoGrade(t *testing.T) {
@@ -727,12 +801,13 @@ func TestEvaluate_RegressionFail_NotInFailOn_IsWarn(t *testing.T) {
 		FailOn:      []string{"threshold_miss"}, // regression_detected intentionally absent
 	}
 	policy := writePolicyFile(t, dir, p)
-	// 100% increase → exceeds 5% tolerance
+	// 50% decrease → exceeds 5% tolerance. reconcile_total_delta is ">=" (higher
+	// is better), so a decrease is the regressing direction.
 	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
-		map[string]float64{"reconcile_total_delta": 6}, "Complete",
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
 	))
 	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
-		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+		map[string]float64{"reconcile_total_delta": 6}, "Complete",
 	))
 
 	result := gate.Evaluate(gate.Request{

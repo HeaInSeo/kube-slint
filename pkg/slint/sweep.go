@@ -135,7 +135,7 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 	res.Request.ModeRequested = opts.Mode
 	normalizeSweepMode(opts.Mode, &res)
 
-	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", runID)
+	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id!=%s", SanitizeKubernetesLabelValue(runID))
 	res.Request.Selector = labelSelector
 
 	lines, err := listOrphanCandidates(ctx, ns, labelSelector)

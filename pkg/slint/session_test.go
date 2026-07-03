@@ -35,6 +35,16 @@ func TestNewSession(t *testing.T) {
 	assert.NotNil(t, sess.impl.writer)
 }
 
+func TestSessionImpl_PodRunTimeout_NeverShorterThanWaitPlusLogs(t *testing.T) {
+	// Regression test for R4: the outer context deadline for a curl-pod-backed
+	// fetch must not be shorter than WaitPodDoneTimeout+LogsTimeout, otherwise
+	// those sub-timeouts are silently overridden by an earlier outer deadline.
+	sess := NewSession(SessionConfig{Namespace: "ns"})
+	got := sess.impl.podRunTimeout()
+	want := sess.impl.WaitPodDoneTimeout + sess.impl.LogsTimeout
+	assert.Greater(t, got, want)
+}
+
 func TestSession_AutoRunID(t *testing.T) {
 	now := time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)
 	cfg := SessionConfig{

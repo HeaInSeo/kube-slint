@@ -100,6 +100,7 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer ${TOKEN}" "%s";`, insecur
   },
   "spec":{
     "serviceAccountName":"%s",
+    "automountServiceAccountToken": true,
     "restartPolicy":"Never",
     "containers":[{
       "name":"curl",

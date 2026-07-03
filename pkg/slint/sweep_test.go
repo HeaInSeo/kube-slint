@@ -54,6 +54,24 @@ func fakeExecCommand(ctx context.Context, command string, args ...string) *exec.
 	return cmd
 }
 
+func TestSweepOrphansWithResult_SelectorUsesSanitizedRunID(t *testing.T) {
+	// Regression test for N1: the sweep exclusion selector must use the same
+	// sanitized RunID as the pod labels/cleanup selector, otherwise a RunID
+	// containing label-unsafe characters produces an invalid kubectl selector
+	// and orphan sweep silently stops working for that run.
+	execCommandContext = fakeExecCommand
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	sess := NewSession(SessionConfig{Namespace: "ns", RunID: "run id!"})
+	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
+		Enabled: true,
+		Mode:    modeReportOnly,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "app.kubernetes.io/managed-by=kube-slint,slint-run-id!=run-id", res.Request.Selector)
+}
+
 func TestSweepDeletes_SuccessCount(t *testing.T) {
 	execCommandContext = fakeExecCommand
 	defer func() { execCommandContext = exec.CommandContext }()

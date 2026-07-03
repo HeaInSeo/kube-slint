@@ -66,6 +66,7 @@ const (
 	reasonPolicyMissing           = "POLICY_MISSING"
 	reasonPolicyInvalid           = "POLICY_INVALID"
 	reasonReliabilityInsufficient = "RELIABILITY_INSUFFICIENT"
+	reasonCollectionFailed        = "COLLECTION_FAILED"
 )
 
 // Policy is the deserialized .slint/policy.yaml.
@@ -157,11 +158,11 @@ func Evaluate(req Request) *Summary {
 
 	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, failOn)
 	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
-	relWarn := runReliability(out, policy, measurement)
+	relWarn, relNoGrade := runReliability(out, policy, measurement)
 	rsFailed, rsWarn, rsNoGrade := runResultStatus(out, measurement)
 
 	anyFailed := tFailed || rFailed || rsFailed
-	anyNoGrade := tNoGrade || rNoGrade || rsNoGrade
+	anyNoGrade := tNoGrade || rNoGrade || rsNoGrade || relNoGrade
 	hasWarn := rWarn || relWarn || tWarn || rsWarn
 
 	out.EvaluationStatus = computeEvalStatus(out.Checks, anyNoGrade)
@@ -379,9 +380,16 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 		return c, false, false, true
 	}
 
-	// baseline=0, current≠0: unquantifiable regression from zero.
+	// baseline=0, current≠0: unquantifiable percent change from zero.
 	// Guard here to prevent math.Inf(1) from reaching JSON encoding.
 	if baseVal == 0 && curVal != 0 {
+		if higherIsBetter(rule.Operator) {
+			// e.g. reconcile rate going from 0 to nonzero is an improvement, not a regression.
+			c.Status = "pass"
+			c.Observed = "baseline_zero_current_nonzero"
+			c.Message = "baseline is zero; current improved from zero"
+			return c, false, false, false
+		}
 		c.Status = "fail"
 		c.Observed = "baseline_zero_current_nonzero"
 		c.Message = "regression detected: baseline is zero, current is non-zero"
@@ -395,7 +403,7 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 	d := deltaPct(curVal, baseVal)
 	c.Observed = d
 
-	if math.Abs(d) > tolerancePct {
+	if isRegression(d, tolerancePct, rule.Operator) {
 		c.Status = "fail"
 		c.Message = "regression detected"
 		c.pendingReasons = []string{reasonRegressionDetected}
@@ -410,7 +418,48 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 	return c, false, false, false
 }
 
-func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn bool) {
+// isRegression reports whether a percent change d from baseline to current is a
+// regression, given tolerancePct and the metric's improvement direction inferred
+// from the paired threshold rule's operator. Metrics without a recognized
+// direction (e.g. "==") fall back to a symmetric tolerance check.
+func isRegression(d, tolerancePct float64, operator string) bool {
+	switch {
+	case lowerIsBetter(operator):
+		return d > tolerancePct
+	case higherIsBetter(operator):
+		return d < -tolerancePct
+	default:
+		return math.Abs(d) > tolerancePct
+	}
+}
+
+func lowerIsBetter(operator string) bool {
+	switch strings.TrimSpace(operator) {
+	case "<=", "<", "=<":
+		return true
+	default:
+		return false
+	}
+}
+
+func higherIsBetter(operator string) bool {
+	switch strings.TrimSpace(operator) {
+	case ">=", ">", "=>":
+		return true
+	default:
+		return false
+	}
+}
+
+// runReliability checks the measurement's collection reliability against policy.
+//
+// A CollectionStatus of "Failed" means the measurement never actually
+// completed (both fetch attempts failed or the start snapshot never
+// happened) — this can never support a trustworthy PASS/WARN/FAIL decision,
+// so it is promoted to NO_GRADE unconditionally, regardless of
+// reliability.required. reliability.required only governs the softer
+// Partial-vs-Complete minimum-level check, which remains warn-only.
+func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn, anyNoGrade bool) {
 	minLevel := strings.ToLower(strings.TrimSpace(policy.Reliability.MinLevel))
 	if minLevel == "" {
 		minLevel = "partial"
@@ -435,6 +484,15 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn b
 		Message:  "reliability requirement satisfied",
 	}
 
+	if strings.EqualFold(collectionStatus, "Failed") {
+		check.Status = "no_grade"
+		check.Message = "collection failed; measurement is not trustworthy"
+		addReason(&out.Reasons, reasonCollectionFailed)
+		out.MeasurementStatus = measInsufficient
+		out.Checks = append(out.Checks, check)
+		return false, true
+	}
+
 	if policy.Reliability.Required && reliabilityRank(collectionStatus) < requiredRank {
 		check.Status = "warn"
 		check.Message = "reliability below required level"
@@ -443,7 +501,7 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn b
 		anyWarn = true
 	}
 	out.Checks = append(out.Checks, check)
-	return anyWarn
+	return anyWarn, false
 }
 
 // runResultStatus propagates per-SLI status from the measurement into gate checks.

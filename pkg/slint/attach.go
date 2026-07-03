@@ -89,13 +89,10 @@ func validateSessionConfigOrFail(cfg SessionConfig) {
 			cfg.Namespace, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
 		))
 	}
-	if strings.TrimSpace(cfg.Token) == "" {
-		ginkgo.Fail(fmt.Sprintf(
-			"slint: invalid config: Token is empty "+
-				"(Namespace=%q MetricsServiceName=%q Suite=%q TestCase=%q RunID=%q SA=%q)",
-			cfg.Namespace, cfg.MetricsServiceName, cfg.Suite, cfg.TestCase, cfg.RunID, cfg.ServiceAccountName,
-		))
-	}
+	// Note: Token is intentionally not required. The default curlpod fetcher
+	// reads its bearer token from the pod's own mounted ServiceAccount token
+	// file rather than from cfg.Token (see docs/post-rc-hardening-design.md).
+	// cfg.Token remains available for callers supplying a custom Fetcher.
 }
 
 func fillSessionDefaults(cfg SessionConfig) SessionConfig {

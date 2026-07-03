@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `internal/gate/gate.go`: `reliability.collectionStatus == "Failed"`는 `reliability.required` 설정과 무관하게 무조건 `NO_GRADE`로 승격됨 (기존에는 threshold 규칙이 없고 `reliability.required: false`이면 조용히 `PASS`가 나올 수 있었음). 새 reason 코드 `COLLECTION_FAILED` 추가.
+- `internal/gate/gate.go`: regression 검사가 metric 방향(threshold rule의 `operator`)을 인식함 — `<=`/`<`는 lower-is-better, `>=`/`>`는 higher-is-better로 취급하여 개선(improvement)을 더 이상 회귀로 오탐하지 않음. 방향을 알 수 없는 연산자(`==` 등)는 기존 대칭 tolerance 검사를 유지.
+- `pkg/slint/session.go`, `pkg/slint/fetcher_curlpod.go`: curl-pod 기반 fetch(`PreFetch`/`Fetch`)의 외부 context timeout이 더 이상 `ScrapeTimeout`(2분)으로 `WaitPodDoneTimeout`(5분)+`LogsTimeout`을 무효화하지 않음 — `WaitPodDoneTimeout+LogsTimeout+여유`로 계산.
+- `pkg/slint/sweep.go`: orphan sweep 제외 셀렉터(`slint-run-id!=...`)가 다른 셀렉터들과 동일하게 `SanitizeKubernetesLabelValue`를 거침.
+- `pkg/slint/attach.go`: `SessionConfig.Token`이 비어 있어도 더 이상 테스트가 실패하지 않음 — 기본 curlpod fetcher는 pod에 마운트된 ServiceAccount 토큰을 사용하므로 `Token` 필드는 커스텀 Fetcher를 위한 호환성 필드로만 남음.
+- `pkg/slo/fetch/curlpod/client.go`: 생성되는 curl pod PodSpec에 `automountServiceAccountToken: true`를 명시 — ServiceAccount 기본값에 의존하지 않음.
+
 ## [1.3.0] - 2026-07-02
 
 ### Added

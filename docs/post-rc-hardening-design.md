@@ -106,3 +106,64 @@ Unknown values should produce `policy_status=invalid`, `gate_result=NO_GRADE`, o
 - Unit tests for `fail-on` validation and `NO_GRADE` severity priority.
 - `go test ./pkg/kubeutil ./pkg/slo/fetch/curlpod ./cmd/slint-gate ./internal/gate`.
 - If toolchain permits, `go test ./...`.
+
+## Sprint Plan (2026-07-03)
+
+A second-round review against the code that landed the items above (`fa4bab7`,
+`55b625c`) confirmed most of them are done, and found a small set of residual
+gaps. This sprint closes the highest-risk residual gaps in dependency order.
+
+1. **R1 — `CollectionStatus=Failed` must never silently resolve to `PASS`.**
+   Today, `runReliability` only warns when `reliability.required: true`. A
+   policy with no threshold rules and `reliability.required: false` (or
+   unset-and-false) can reach `computeGateResult` with `failed=false,
+   hasWarn=false, hasNoGrade=false` even though the underlying measurement
+   never completed, and get `PASS`. Fix: collection failure becomes an
+   unconditional `NO_GRADE`, independent of `reliability.required`.
+
+2. **R4 — PreFetch/scrape context timeout must not cap the pod-wait timeout
+   it's supposed to bound.** `Session.Start()` wraps `PreFetch` in a context
+   built from `ScrapeTimeout` (2m), then passes that context into
+   `CurlPod.Run(ctx, WaitPodDoneTimeout=5m, LogsTimeout=2m)`, which derives its
+   own wait/log sub-timeouts from `ctx` via `context.WithTimeout` — so the
+   inherited 2m deadline silently overrides the 5m wait budget. Once R1 ships,
+   every prefetch that legitimately needs more than 2m to schedule will surface
+   as a hard gate `NO_GRADE` instead of being swallowed, so this is bundled
+   with R1 rather than deferred. Fix: derive the outer context for pod-backed
+   fetch calls (both `PreFetch` and the steady-state `Fetch`) from
+   `WaitPodDoneTimeout + LogsTimeout + margin`, not `ScrapeTimeout`.
+
+3. **R2 — regression checks must be direction-aware.** `evalRegressionCheck`
+   currently flags any `abs(deltaPercent) > tolerance`, so an improvement
+   (e.g. a 30% latency reduction) is flagged as a "regression" exactly like a
+   real regression. Fix: reuse the paired threshold rule's `operator`
+   (`<=`/`<` = lower-is-better, `>=`/`>` = higher-is-better) to decide which
+   direction counts as a regression; unknown/`==` operators keep the existing
+   symmetric check. This avoids the policy schema extension flagged as an open
+   risk above, since the direction signal already exists on the threshold rule.
+
+4. **N1 — orphan sweep selector must use the sanitized RunID.** `sweep.go`'s
+   `slint-run-id!=<runID>` exclusion selector uses the raw RunID while the pod
+   labels themselves (and the plain cleanup path) use
+   `SanitizeKubernetesLabelValue(runID)`. For any RunID that sanitization
+   actually changes, the sweep selector becomes syntactically invalid and
+   orphan sweep stops working for that RunID. Fix: sanitize consistently.
+
+5. **N2 — dead `Token` requirement / implicit `automountServiceAccountToken`.**
+   `curlpod.Client.RunOnce` now discards the caller-supplied token and reads
+   the pod's own mounted ServiceAccount token instead, but
+   `validateSessionConfigOrFail` still hard-fails the test if
+   `SessionConfig.Token` is empty, forcing new users to mint a token that is
+   never used. Separately, the generated PodSpec relies on the
+   ServiceAccount's default `automountServiceAccountToken`, so a SA with
+   automount disabled breaks the new token path with no clear signal. Fix:
+   drop the `Token`-required validation (field stays for compatibility per the
+   design decision above) and set `automountServiceAccountToken: true`
+   explicitly on the curl pod override.
+
+Deferred to a later pass (unchanged from the mapping table below): N3
+(redaction pattern coverage for JSON-shaped tokens), N4 (schema_version
+diagnostic hint + CHANGELOG note), N5 (`Session.End` unconditional `Stop()`
+contract), N6 (workflow demo-fixture default labeling), R3 (fetcher metric
+normalization unification), R5 (example RBAC still cluster-scoped), R6
+(`internal/gate` → `pkg/gate`, engine stdout hygiene).

@@ -81,7 +81,7 @@ func (f *curlPodFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample,
 		return cached, nil
 	}
 
-	podCtx, cancel := context.WithTimeout(ctx, f.impl.ScrapeTimeout)
+	podCtx, cancel := context.WithTimeout(ctx, f.impl.podRunTimeout())
 	defer cancel()
 
 	raw, err := f.pod.Run(podCtx, f.impl.WaitPodDoneTimeout, f.impl.LogsTimeout)
