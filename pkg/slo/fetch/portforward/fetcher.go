@@ -157,7 +157,7 @@ func (f *Fetcher) scrape(ctx context.Context) (fetch.Sample, error) {
 		)
 	}
 
-	values, err := promtext.ParseTextToMap(resp.Body)
+	values, err := promtext.ParseTextToMapWithAggregates(resp.Body)
 	if err != nil {
 		return fetch.Sample{}, fmt.Errorf("portforward: parse metrics: %w", err)
 	}

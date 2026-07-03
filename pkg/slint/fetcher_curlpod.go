@@ -101,18 +101,5 @@ func (f *curlPodFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample,
 }
 
 func parsePrometheusText(raw string) (map[string]float64, error) {
-	base, err := promtext.ParseTextToMap(strings.NewReader(raw))
-	if err != nil {
-		return nil, err
-	}
-
-	out := map[string]float64{}
-	for key, val := range base {
-		out[key] = val
-		if idx := strings.Index(key, "{"); idx > 0 {
-			name := key[:idx]
-			out[name] = out[name] + val
-		}
-	}
-	return out, nil
+	return promtext.ParseTextToMapWithAggregates(strings.NewReader(raw))
 }

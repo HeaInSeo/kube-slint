@@ -15,6 +15,7 @@
 - `pkg/slo/fetch/curlpod/client.go`: 생성되는 curl pod PodSpec에 `automountServiceAccountToken: true`를 명시 — ServiceAccount 기본값에 의존하지 않음.
 - `cmd/slint-gate/diagnose.go`: `POLICY_INVALID` 진단 힌트에 `schema_version`/`fail_on`/`reliability.min_level` 원인을 명시 (기존에는 YAML 문법과 operator만 언급해 원인을 못 찾기 쉬웠음).
 - `examples/kind-hello-operator/manifests/rbac.yaml`: `ClusterRole`/`ClusterRoleBinding` → 네임스페이스 스코프 `Role`/`RoleBinding`으로 변경 (`slint-gate init --emit-rbac` 템플릿과 정합).
+- `pkg/slo/fetch/promtext`: bare-name 메트릭 합산 로직(`Aggregate`/`ParseTextToMapWithAggregates`)을 curlpod fetcher 전용 코드에서 공용 패키지로 이동하여 curlpod/portforward fetcher가 동일한 metric 의미를 갖도록 통일. 실제 unlabeled series가 있으면 덮어쓰지 않고, histogram bucket(`le` 레이블)/summary quantile(`quantile` 레이블)은 합산 대상에서 제외하도록 개선.
 
 ## [1.3.0] - 2026-07-02
 

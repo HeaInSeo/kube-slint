@@ -164,8 +164,7 @@ gaps. This sprint closes the highest-risk residual gaps in dependency order.
 Deferred to a later pass (unchanged from the mapping table below): N3
 (redaction pattern coverage for JSON-shaped tokens), N5 (`Session.End`
 unconditional `Stop()` contract), N6 (workflow demo-fixture default
-labeling), R3 (fetcher metric normalization unification), R6
-(`internal/gate` → `pkg/gate`, engine stdout hygiene).
+labeling), R6 (`internal/gate` → `pkg/gate`, engine stdout hygiene).
 
 ## Sprint Plan follow-up (N4, R5)
 
@@ -188,3 +187,30 @@ Closed in a follow-up pass, same day:
    Fix: converted the example to a namespaced `Role`/`RoleBinding` in
    `hello-system`, keeping the existing ServiceAccount name (`kube-slint`)
    referenced by `e2e_test.go`/`Makefile` unchanged.
+
+## Sprint Plan follow-up (R3)
+
+8. **R3 — curlpod and portforward fetchers disagreed on metric semantics.**
+   `pkg/slint/fetcher_curlpod.go`'s `parsePrometheusText` synthesized a
+   bare-name key summing every labeled series for a metric (so specs can
+   reference `reconcile_total` instead of every
+   `reconcile_total{controller="..."}` combination), but
+   `pkg/slo/fetch/portforward/fetcher.go` called `promtext.ParseTextToMap`
+   directly and never got that aggregate — so a bare-name-keyed spec that
+   worked under curlpod silently went `missing`/`NO_GRADE` under portforward
+   for the exact same target. Fix: moved the aggregation into a shared
+   `promtext.Aggregate`/`ParseTextToMapWithAggregates` (pkg/slo/fetch/promtext),
+   used by both fetchers. While moving it, also closed two aggregation traps
+   the original curlpod-only version didn't guard against:
+   - a real unlabeled series with the same name as an aggregated one is left
+     untouched instead of being summed into (avoids double counting when an
+     exporter emits both a plain total and a per-label breakdown);
+   - series carrying an `le` (histogram bucket) or `quantile` (summary
+     quantile) label are excluded from aggregation, since those are
+     cumulative/positional and summing them is meaningless.
+
+   Not in scope for this pass: full `# TYPE` comment parsing (the `le`/
+   `quantile` label heuristic covers the common case without it) and the
+   `strings.Fields`-based parser's inability to handle label values
+   containing spaces (mapping table item P0-FETCH-004 / F4) — both remain
+   open, deferred alongside N3/N5/N6/R6.
