@@ -22,6 +22,9 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "analyze-dataplane":
+			runAnalyzeDataplane(os.Args[2:])
+			return
 		}
 	}
 	runGate()

@@ -36,8 +36,10 @@ __pycache__/
 hack/__pycache__/
 hello-operator-ref
 
-# Build artifacts in repo root
-slint-gate
+# Build artifacts in repo root (anchored: a bare "slint-gate" pattern also
+# matched the cmd/slint-gate source directory, forcing -f on every new file
+# added under it)
+/slint-gate
 
 # Gate evaluation artifact (generated, not for version control)
 slint-gate-summary.json
