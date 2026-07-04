@@ -52,10 +52,13 @@ func TestRegistry_ListIsSortedByID(t *testing.T) {
 	assert.Equal(t, []string{"KSL-DP-001", "KSL-DP-002", "KSL-DP-003"}, []string{list[0].ID, list[1].ID, list[2].ID})
 }
 
-func TestDefaultRegistry_HasAllSixChecks(t *testing.T) {
+func TestDefaultRegistry_HasExpectedChecks(t *testing.T) {
+	// KSL-DP-003 (probe wiring) and KSL-DP-005 (resource requests/limits) are
+	// deliberately excluded — kube-linter's no-liveness-probe/no-readiness-probe
+	// and unset-cpu-requirements/unset-memory-requirements already cover them.
 	r := service.DefaultRegistry()
 	list := r.List()
-	require := []string{"KSL-DP-001", "KSL-DP-002", "KSL-DP-003", "KSL-DP-004", "KSL-DP-005", "KSL-DP-006"}
+	require := []string{"KSL-DP-001", "KSL-DP-002", "KSL-DP-004", "KSL-DP-006"}
 	got := make([]string, len(list))
 	for i, c := range list {
 		got[i] = c.ID

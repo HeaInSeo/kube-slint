@@ -67,11 +67,11 @@ func TestAnalyzeDataplane_EndToEnd_JSONAndSARIFWritten(t *testing.T) {
 	require.NoError(t, err)
 	var gotReport report.Report
 	require.NoError(t, json.Unmarshal(jsonData, &gotReport))
-	assert.Equal(t, 1, gotReport.Summary.ErrorCount)
+	assert.Equal(t, 0, gotReport.Summary.ErrorCount)
 	assert.Equal(t, 3, gotReport.Summary.WarningCount)
 
 	sarifData, err := os.ReadFile(sarifPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(sarifData), "sarif-schema-2.1.0")
-	assert.Contains(t, string(sarifData), "KSL-DP-003")
+	assert.Contains(t, string(sarifData), "KSL-DP-004")
 }

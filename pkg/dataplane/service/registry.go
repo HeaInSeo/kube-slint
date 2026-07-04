@@ -1,8 +1,16 @@
 // Package service implements the "dataplane-service" static-analysis
-// profile: 6 checks over a pkg/dataplane.Bundle covering the observability
-// contract for Deployment/StatefulSet/DaemonSet-shaped workloads (metrics
-// port, liveness/readiness probe conventions, metrics Service/ServiceMonitor
-// wiring, resource requests/limits, terminationGracePeriodSeconds).
+// profile: checks over a pkg/dataplane.Bundle covering observability-contract
+// concerns for Deployment/StatefulSet/DaemonSet-shaped workloads that are
+// NOT already covered by established Kubernetes manifest linters (kube-linter,
+// polaris, kubeaudit) — metrics port naming, probe HTTP path convention,
+// metrics Service/ServiceMonitor wiring, and terminationGracePeriodSeconds.
+//
+// Deliberately NOT included: generic "probe missing" and "resource
+// requests/limits unset" checks — kube-linter's no-liveness-probe,
+// no-readiness-probe, unset-cpu-requirements, and unset-memory-requirements
+// already cover that ground well; duplicating them here would just be
+// reinventing an existing, actively-maintained tool. Pair kube-slint with
+// kube-linter (or similar) for that class of check.
 package service
 
 import (
@@ -76,16 +84,14 @@ func (r *Registry) List() []CheckDef {
 	return out
 }
 
-// DefaultRegistry builds a fresh Registry with all 6 dataplane-service
-// checks registered. Callers own the returned instance — there is no
-// package-level global registry.
+// DefaultRegistry builds a fresh Registry with all dataplane-service checks
+// registered. Callers own the returned instance — there is no package-level
+// global registry.
 func DefaultRegistry() *Registry {
 	r := NewRegistry()
 	r.MustRegister(metricsPortCheck())
 	r.MustRegister(probePathCheck())
-	r.MustRegister(probeWiringCheck())
 	r.MustRegister(serviceWiringCheck())
-	r.MustRegister(resourcesCheck())
 	r.MustRegister(gracePeriodCheck())
 	return r
 }

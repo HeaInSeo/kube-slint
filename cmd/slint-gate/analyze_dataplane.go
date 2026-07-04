@@ -15,9 +15,14 @@ const analyzeDataplaneUsage = `Usage: slint-gate analyze-dataplane [flags] <mani
 
 Statically analyzes a directory of Kubernetes YAML manifests (Deployment/
 StatefulSet/DaemonSet/Service/ServiceMonitor) for observability-contract
-compliance: metrics port, /livez /readyz probe paths, probe wiring, metrics
-Service/ServiceMonitor wiring, resource requests/limits, and explicit
+compliance: metrics port naming, /livez /readyz probe path convention,
+metrics Service/ServiceMonitor wiring, and explicit
 terminationGracePeriodSeconds.
+
+This intentionally does not check for missing probes or missing resource
+requests/limits — pair this with kube-linter (or similar) for that, rather
+than duplicating its no-liveness-probe/no-readiness-probe/
+unset-cpu-requirements/unset-memory-requirements checks here.
 
 Note: <manifest-dir> is a positional argument and must come AFTER all flags
 (standard Go flag-parsing behavior — parsing stops at the first non-flag

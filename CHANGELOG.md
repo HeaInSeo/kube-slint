@@ -7,14 +7,18 @@
 
 ### Added
 
-- `slint-gate analyze-dataplane <manifest-dir>`: new static analyzer for the "dataplane-service" observability contract — reads a directory of Kubernetes YAML manifests (no live cluster) and checks: metrics port exposure (`KSL-DP-001`), `/readyz`/`/livez` probe path convention (`KSL-DP-002`), readiness/liveness probe wiring (`KSL-DP-003`), metrics Service/ServiceMonitor wiring (`KSL-DP-004`), resource requests/limits presence (`KSL-DP-005`), and explicit `terminationGracePeriodSeconds` (`KSL-DP-006`). Outputs JSON, SARIF 2.1.0, and a GitHub Actions step summary via `--output-json`/`--output-sarif`/`--github-step-summary`; `--fail-on none|error|warning` controls exit code. CLI-only in this pass — no GitHub composite Action wiring yet.
+- `slint-gate analyze-dataplane <manifest-dir>`: new static analyzer for the "dataplane-service" observability contract — reads a directory of Kubernetes YAML manifests (no live cluster) and checks: metrics port naming (`KSL-DP-001`), `/readyz`/`/livez` probe path convention (`KSL-DP-002`), metrics Service/ServiceMonitor wiring (`KSL-DP-004`), and explicit `terminationGracePeriodSeconds` (`KSL-DP-006`). Outputs JSON, SARIF 2.1.0, and a GitHub Actions step summary via `--output-json`/`--output-sarif`/`--github-step-summary`; `--fail-on none|error|warning` controls exit code. CLI-only in this pass — no GitHub composite Action wiring yet.
 - `pkg/report`: new generic Finding/Report model (rule ID, severity, message, location) reusable by future dataplane profiles (e.g. a v1.6.0 `dataplane-job` summary gate), plus `WriteJSON`/`WriteSARIF`/`WriteGitHubStepSummary` output writers.
 - `pkg/dataplane`: shared, kind-agnostic manifest model (Deployment/StatefulSet/DaemonSet unified as one `Workload` shape, plus `Service`/`ServiceMonitor`) and `LoadDir` directory loader — hand-rolled local structs on top of the existing `gopkg.in/yaml.v3` dependency, no new `k8s.io/**`/`sigs.k8s.io/**` dependency added. `.golangci.yml` gained a `depguard` rule enforcing this for `pkg/dataplane/**`/`pkg/report/**`, mirroring the existing `pkg/slo` core-boundary rule.
-- `pkg/dataplane/service`: the 6 dataplane-service checks + a `spec.Registry`-shaped check registry.
+- `pkg/dataplane/service`: the dataplane-service checks + a `spec.Registry`-shaped check registry.
 
 ### Fixed
 
 - `.gitignore`: a bare `slint-gate` pattern unintentionally matched the `cmd/slint-gate` source directory (not just an accidental root-level binary build), forcing `git add -f` on every new file under it. Anchored to `/slint-gate`.
+
+### Removed
+
+- `KSL-DP-003` (probe wiring) and `KSL-DP-005` (resource requests/limits) checks — confirmed exact duplicates of kube-linter's actively-maintained `no-liveness-probe`/`no-readiness-probe` and `unset-cpu-requirements`/`unset-memory-requirements` checks. `analyze-dataplane` now only implements checks not already covered by established manifest linters; pair it with kube-linter (or similar) for probe/resource hygiene.
 
 ## [1.4.0] - 2026-07-04
 
