@@ -160,9 +160,10 @@ This file records architecture/product-direction decisions that define the proje
   - 8 -> 9 -> 10 quality roadmap work is tracked as a non-runtime planning and
     guardrail workstream unless an implementation task explicitly says
     otherwise.
-  - The quality roadmap contracts live in `docs/quality-roadmap-sprint-plan.md`,
-    `docs/quality-roadmap-ticket-backlog.md`, and the related security,
-    schema, test matrix, release, and UX documents.
+  - The quality roadmap contracts live in `docs/quality-roadmap.md`,
+    `docs/quality-roadmap-implementation-handoff.md`,
+    `docs/security-model.md`, `docs/gate-contract.md`,
+    `docs/test-strategy.md`, and `docs/release-devex-plan.md`.
   - `hack/quality-guardrails.sh` and
     `.github/workflows/quality-guardrails.yml` are accepted as CI-backed drift
     detection for identity, security, RBAC, schema, and gate-contract wording.

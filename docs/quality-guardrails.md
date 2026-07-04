@@ -38,23 +38,24 @@ bash hack/quality-guardrails.sh
   Prometheus replacement, or functional test framework replacement.
 - User-facing wording must keep the distinction between tests and measurement.
 
+### Canonical Planning Docs
+
+The quality roadmap planning surface is intentionally small:
+
+- `docs/quality-roadmap.md`
+- `docs/quality-roadmap-implementation-handoff.md`
+- `docs/security-model.md`
+- `docs/gate-contract.md`
+- `docs/test-strategy.md`
+- `docs/release-devex-plan.md`
+
 ### Security
 
 - `SECURITY.md` must describe the current in-pod ServiceAccount token path.
 - `SECURITY.md` must not reintroduce stale wording that says the token is
   command-line visible in generated pod specs.
-- Sprint 1 security specification files must exist:
-  - `docs/security-defaults.md`
-  - `docs/dangerous-options.md`
-  - `docs/security/service-url-format.md`
-  - `docs/security/token-handling.md`
-  - `docs/security/rbac-model.md`
-  - `docs/guardrails/security-patterns.md`
-  - `.semgrep/rules-plan.md`
-  - `docs/quality-roadmap-sprint-summary.md`
-  - `docs/quality-roadmap-implementation-handoff.md`
-- The quality roadmap must keep ServiceURLFormat external-host handling as a
-  Priority 0 default-deny policy.
+- `docs/security-model.md` must keep ServiceURLFormat external-host handling
+  as a Priority 0 default-deny policy.
 - Dangerous opt-in options must be visibly named as dangerous.
 
 ### RBAC
@@ -83,19 +84,6 @@ bash hack/quality-guardrails.sh
 
 - The GitHub Action default `fail-on` must include `NO_GRADE`.
 - The repo's `slint-gate` workflow must use `FAIL_OR_NOGRADE`.
-- Sprint 2 schema and fixture planning files must exist:
-  - `docs/spec/summary-schema.md`
-  - `docs/spec/policy-schema.md`
-  - `docs/spec/gate-result-semantics.md`
-  - `docs/test-matrix/bad-fixtures.md`
-  - `testdata-plan/bad-fixtures/README.md`
-- Sprint 3 external-readiness planning files must exist:
-  - `docs/test-matrix/kind-e2e.md`
-  - `docs/test-matrix/e2e-acceptance.md`
-  - `docs/release/release-policy.md`
-  - `docs/integrations/github-action.md`
-  - `docs/README-structure.md`
-  - `docs/ux/failure-catalog.md`
 - The quality roadmap must preserve conservative gate priority:
 
 ```text
@@ -122,6 +110,6 @@ Add a check only when one of these is true:
 - The repo source of truth explicitly requires the contract.
 - The check prevents stale documentation from contradicting current behavior.
 
-For proposed future behavior, add a ticket in
-`docs/quality-roadmap-ticket-backlog.md` first. Do not fail CI on a future
-contract until implementation and documentation are aligned.
+For proposed future behavior, add a task in
+`docs/quality-roadmap-implementation-handoff.md` first. Do not fail CI on a
+future contract until implementation and documentation are aligned.

@@ -57,35 +57,33 @@ check_source_of_truth() {
     "decision log separates measurement failure from test failure"
   require_grep 'D-008: slint-gate is a separate policy evaluation layer' docs/DECISIONS.md \
     "decision log keeps slint-gate as separate policy layer"
+  require_grep 'D-015: Quality roadmap contracts are CI-guarded planning inputs' docs/DECISIONS.md \
+    "decision log accepts quality roadmap CI-guarded planning contracts"
   require_grep 'status_path = Path\("docs/project-status.yaml"\)' .github/workflows/roadmap-status.yml \
     "roadmap-status workflow reads docs/project-status.yaml"
+}
+
+check_canonical_docs() {
+  echo "== canonical docs guardrails =="
+  require_file docs/quality-roadmap.md
+  require_file docs/quality-roadmap-implementation-handoff.md
+  require_file docs/security-model.md
+  require_file docs/gate-contract.md
+  require_file docs/test-strategy.md
+  require_file docs/release-devex-plan.md
+  require_file docs/quality-guardrails.md
+
+  require_grep 'Progress: 100%' docs/quality-roadmap.md \
+    "quality roadmap reports complete planning progress"
+  require_grep 'operator-first, dataplane-aware shift-left operational SLI' docs/quality-roadmap.md \
+    "quality roadmap uses accepted product framing"
+  require_grep 'Priority 0 Task 1: ServiceURLFormat Default-Deny Validator' docs/quality-roadmap-implementation-handoff.md \
+    "implementation handoff includes ServiceURLFormat validator task"
 }
 
 check_security_contract() {
   echo "== security guardrails =="
   require_file SECURITY.md
-  require_file docs/security-defaults.md
-  require_file docs/dangerous-options.md
-  require_file docs/security/service-url-format.md
-  require_file docs/security/token-handling.md
-  require_file docs/security/rbac-model.md
-  require_file docs/guardrails/security-patterns.md
-  require_file docs/spec/summary-schema.md
-  require_file docs/spec/policy-schema.md
-  require_file docs/spec/gate-result-semantics.md
-  require_file docs/test-matrix/bad-fixtures.md
-  require_file docs/test-matrix/kind-e2e.md
-  require_file docs/test-matrix/e2e-acceptance.md
-  require_file docs/release/release-policy.md
-  require_file docs/integrations/github-action.md
-  require_file docs/README-structure.md
-  require_file docs/ux/failure-catalog.md
-  require_file testdata-plan/bad-fixtures/README.md
-  require_file .semgrep/rules-plan.md
-  require_file docs/quality-roadmap-sprint-plan.md
-  require_file docs/quality-roadmap-sprint-summary.md
-  require_file docs/quality-roadmap-ticket-backlog.md
-  require_file docs/quality-roadmap-implementation-handoff.md
 
   require_grep 'curl pod path, the pod reads its own mounted' SECURITY.md \
     "SECURITY.md documents in-pod token read path"
@@ -96,25 +94,17 @@ check_security_contract() {
   reject_grep 'token is currently command-line visible|passed to curl as an `Authorization: Bearer \.\.\.` header in the pod command' SECURITY.md \
     "SECURITY.md has no stale token-in-command limitation"
 
-  require_grep 'dangerouslyAllowExternalMetricsURL' docs/quality-roadmap-sprint-plan.md \
-    "quality plan requires explicit dangerous external URL opt-in naming"
-  require_grep 'ServiceURLFormat default-deny policy for external hosts' docs/quality-roadmap-sprint-plan.md \
-    "quality plan prioritizes ServiceURLFormat default-deny policy"
-  require_grep 'D-015: Quality roadmap contracts are CI-guarded planning inputs' docs/DECISIONS.md \
-    "decision log accepts quality roadmap CI-guarded planning contracts"
-  require_grep 'Progress: 100%' docs/quality-roadmap-sprint-summary.md \
-    "sprint summary reports current progress"
-  require_grep 'Default-Deny Patterns' docs/security-defaults.md \
-    "security defaults document default-deny patterns"
-  require_grep 'Any option that allows behavior rejected by the default security policy must[[:space:]]*$' docs/dangerous-options.md \
-    "dangerous option naming policy defines the rule"
-  require_grep 'begin with `dangerously`' docs/dangerous-options.md \
-    "dangerous option naming policy requires dangerously prefix"
-  require_grep 'Default mode accepts only cluster-local metrics hosts' docs/quality-roadmap-ticket-backlog.md \
-    "ticket backlog keeps cluster-local ServiceURLFormat requirement"
-  require_grep 'never send Authorization material to an external host' docs/security/service-url-format.md \
+  require_grep 'Default-Deny Patterns' docs/security-model.md \
+    "security model documents default-deny patterns"
+  require_grep 'Any option that allows behavior rejected by the default security policy must' docs/security-model.md \
+    "security model defines dangerous option rule"
+  require_grep 'begin with `dangerously`' docs/security-model.md \
+    "security model requires dangerously prefix"
+  require_grep 'Default mode accepts only cluster-local metrics hosts' docs/security-model.md \
+    "security model keeps cluster-local ServiceURLFormat requirement"
+  require_grep 'never send Authorization material to an external host' docs/security-model.md \
     "ServiceURLFormat policy blocks external Authorization material"
-  require_grep 'Token material never appears in command logs' docs/security/token-handling.md \
+  require_grep 'Token material never appears in command logs' docs/security-model.md \
     "token handling policy blocks command-log token exposure"
 }
 
@@ -126,7 +116,7 @@ check_rbac_contract() {
     "slint-gate init default RBAC template does not emit ClusterRoleBinding"
   require_grep 'assert.NotContains\(t, body, "ClusterRoleBinding"\)' cmd/slint-gate/init_test.go \
     "unit test guards against default ClusterRoleBinding regression"
-  require_grep 'Default generated RBAC must not use' docs/security/rbac-model.md \
+  require_grep 'Default generated RBAC must not use' docs/security-model.md \
     "RBAC model documents default cluster-wide RBAC rejection"
 }
 
@@ -160,62 +150,58 @@ check_gate_contract() {
     "GitHub Action default fail-on includes NO_GRADE"
   require_grep 'fail-on:[[:space:]]+FAIL_OR_NOGRADE' .github/workflows/slint-gate.yml \
     "slint-gate workflow uses FAIL_OR_NOGRADE"
-  require_grep 'FAIL > NO_GRADE > WARN > FIRST_RUN_WARNING > PASS' docs/quality-roadmap-sprint-plan.md \
-    "quality plan documents conservative gate priority"
-  require_grep 'Invalid schema version cannot produce PASS' docs/spec/summary-schema.md \
+  require_grep 'FAIL > NO_GRADE > WARN > FIRST_RUN_WARNING > PASS' docs/gate-contract.md \
+    "gate contract documents conservative gate priority"
+  require_grep 'Invalid schema version cannot produce PASS' docs/gate-contract.md \
     "summary schema contract blocks invalid schema PASS"
-  require_grep 'Missing or unsupported `schema_version` is rejected' docs/spec/policy-schema.md \
+  require_grep 'Missing or unsupported `schema_version` is rejected' docs/gate-contract.md \
     "policy schema contract rejects missing/unsupported version"
-  require_grep 'Invalid policy or summary input must not produce `PASS`' docs/spec/gate-result-semantics.md \
+  require_grep 'Invalid policy or summary input must not produce `PASS`' docs/gate-contract.md \
     "gate semantics block invalid input PASS"
-  require_grep 'summary/missing-schema-version.json' docs/test-matrix/bad-fixtures.md \
-    "bad fixture matrix includes missing summary schema"
-  require_grep 'policy/unknown-operator.yaml' docs/test-matrix/bad-fixtures.md \
-    "bad fixture matrix includes unknown policy operator"
-  require_grep 'security/external-service-url.yaml' docs/test-matrix/bad-fixtures.md \
-    "bad fixture matrix includes external ServiceURLFormat"
-  require_grep 'E2E-6 \| External ServiceURLFormat configured \| reject before scraping' docs/test-matrix/kind-e2e.md \
+}
+
+check_test_strategy() {
+  echo "== test strategy guardrails =="
+  require_grep 'summary/missing-schema-version.json' docs/test-strategy.md \
+    "test strategy includes missing summary schema fixture"
+  require_grep 'policy/unknown-operator.yaml' docs/test-strategy.md \
+    "test strategy includes unknown policy operator fixture"
+  require_grep 'security/external-service-url.yaml' docs/test-strategy.md \
+    "test strategy includes external ServiceURLFormat fixture"
+  require_grep 'E2E-6 \| External ServiceURLFormat configured \| reject before scraping' docs/test-strategy.md \
     "kind E2E matrix includes external ServiceURLFormat rejection"
-  require_grep 'invalid input produces `PASS`' docs/test-matrix/e2e-acceptance.md \
+  require_grep 'invalid input produces `PASS`' docs/test-strategy.md \
     "E2E acceptance rejects invalid-input PASS"
-  require_grep 'kube-slint-no-bearer-token-in-curl-args' .semgrep/rules-plan.md \
-    "Semgrep plan includes bearer-token curl args rule"
-  require_grep 'kube-slint-no-direct-service-url-format' .semgrep/rules-plan.md \
-    "Semgrep plan includes ServiceURLFormat rule"
 }
 
 check_identity_wording() {
   echo "== product identity guardrails =="
   require_grep 'does not replace your tests\. It measures what happens during them\.' README.md \
     "README keeps test-vs-measurement message"
-  require_grep 'operator-first, dataplane-aware shift-left operational SLI' docs/quality-roadmap-sprint-plan.md \
-    "quality plan uses operator-first dataplane-aware framing"
-  require_grep 'does not replace your tests' docs/README-structure.md \
-    "README structure preserves test-vs-measurement first-screen message"
+  require_grep 'does not replace your tests' docs/release-devex-plan.md \
+    "release/devex plan preserves test-vs-measurement first-screen message"
   reject_grep 'generic Kubernetes YAML linter|Prometheus replacement|functional test framework replacement' README.md \
     "README does not describe kube-slint as a generic linter, Prometheus replacement, or test replacement"
 }
 
 check_release_and_ux_contract() {
   echo "== release and ux guardrails =="
-  require_grep 'action downloads or uses a release binary' docs/release/release-policy.md \
-    "release policy targets release-binary based GitHub Action"
-  require_grep 'Default `fail-on` includes `NO_GRADE`' docs/integrations/github-action.md \
+  require_grep 'action downloads or uses a release binary' docs/release-devex-plan.md \
+    "release/devex plan targets release-binary based GitHub Action"
+  require_grep 'Default `fail-on` includes `NO_GRADE`' docs/release-devex-plan.md \
     "GitHub Action integration keeps NO_GRADE in default fail-on"
-  require_grep 'Failure messages must not include' docs/ux/failure-catalog.md \
+  require_grep 'Failure messages must not include' docs/release-devex-plan.md \
     "failure catalog includes secret exclusion rule"
-  require_grep 'Runtime behavior changed:[[:space:]]*$' docs/quality-roadmap-sprint-summary.md \
-    "sprint summary reports runtime behavior change status"
-  require_grep 'Priority 0 Task 1: ServiceURLFormat Default-Deny Validator' docs/quality-roadmap-implementation-handoff.md \
-    "implementation handoff includes ServiceURLFormat validator task"
 }
 
 check_source_of_truth
+check_canonical_docs
 check_security_contract
 check_rbac_contract
 check_secret_redaction_contract
 check_curlpod_security_contract
 check_gate_contract
+check_test_strategy
 check_identity_wording
 check_release_and_ux_contract
 

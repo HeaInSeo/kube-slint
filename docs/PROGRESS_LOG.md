@@ -19,7 +19,8 @@ Update this file at the **start and end** of every stage/task.
 * `docs/DECISIONS.md` D-014
 * `docs/post-rc-hardening-design.md`
 * `docs/post-rc-hardening-sprint.md`
-* `docs/quality-roadmap-sprint-plan.md`
+* `docs/quality-roadmap.md`
+* `docs/quality-roadmap-implementation-handoff.md`
 * `docs/quality-guardrails.md`
 
 **완료 항목:**
@@ -44,6 +45,7 @@ Update this file at the **start and end** of every stage/task.
 * [x] Review/freeze 요약 문서 추가 및 D-015 decision log 반영
 * [x] Priority 0 구현 handoff 문서 고정
 * [x] 전체 품질 로드맵 planning/guardrail sprint 기준 100% 완료
+* [x] 품질 로드맵 세부 문서를 canonical 문서 5개와 implementation handoff 문서로 통합
 
 **진행/남은 항목:**
 

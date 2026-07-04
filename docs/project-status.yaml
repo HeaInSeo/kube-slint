@@ -15,7 +15,7 @@ current_focus:
   - "Quality roadmap Sprint 1 security/defaults/ServiceURLFormat/token/RBAC/Semgrep specification drafts added"
   - "Quality roadmap Sprint 2 summary/policy/gate semantics and bad fixture matrix drafts added"
   - "Quality roadmap Sprint 3 kind E2E/release/GitHub Action/docs IA/UX failure catalog drafts added"
-  - "Quality roadmap planning/guardrail sprint completed at 100%; implementation handoff frozen and D-015 accepted"
+  - "Quality roadmap planning/guardrail sprint completed at 100%; canonical docs consolidated and implementation handoff frozen"
 next_milestone: "v1.5.0 dataplane-service static profile; pkg/policy and pkg/summary public package cleanup"
 active_hardening_sprint: "post-rc-secret-rbac-gate-lifecycle"
 capabilities:

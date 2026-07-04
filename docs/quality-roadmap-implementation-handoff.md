@@ -44,13 +44,13 @@ Acceptance criteria:
   - invalid URL cannot produce PASS.
 
 Test cases:
-  - docs/test-matrix/bad-fixtures.md security URL cases.
+  - docs/test-strategy.md security URL cases.
   - unit tests for URL builder/validator.
   - optional kind E2E E2E-6.
 
 Docs to update:
-  - docs/security/service-url-format.md
-  - docs/test-matrix/bad-fixtures.md
+  - docs/security-model.md
+  - docs/test-strategy.md
   - README.md if user-facing config changes.
 
 Security impact:
@@ -80,7 +80,7 @@ Rejected behavior:
   - Silently changing compatibility behavior without migration notes.
 
 Acceptance criteria:
-  - Dangerous options use names from docs/dangerous-options.md.
+  - Dangerous options use names from docs/security-model.md.
   - Legacy fields are documented as compatibility-only or deprecated.
   - Tests cover default safe behavior and explicit opt-in behavior.
 
@@ -89,8 +89,7 @@ Test cases:
   - dangerous opt-in allows the behavior only when explicitly set.
 
 Docs to update:
-  - docs/dangerous-options.md
-  - docs/security-defaults.md
+  - docs/security-model.md
   - README.md / README(Kor).md
 
 Security impact:
@@ -119,7 +118,7 @@ Rejected behavior:
   - malformed JSON accepted.
 
 Acceptance criteria:
-  - All summary fixture rows in docs/test-matrix/bad-fixtures.md have tests.
+  - All summary fixture rows in docs/test-strategy.md have tests.
   - Invalid summary produces reject or NO_GRADE, never PASS.
 
 Test cases:
@@ -132,8 +131,8 @@ Test cases:
   - summary/malformed-json.json
 
 Docs to update:
-  - docs/spec/summary-schema.md
-  - docs/test-matrix/bad-fixtures.md
+  - docs/gate-contract.md
+  - docs/test-strategy.md
 
 Security impact:
   Prevents malformed or adversarial measurement artifacts from bypassing gate.
@@ -162,7 +161,7 @@ Rejected behavior:
   - invalid policy producing PASS.
 
 Acceptance criteria:
-  - All policy fixture rows in docs/test-matrix/bad-fixtures.md have tests.
+  - All policy fixture rows in docs/test-strategy.md have tests.
   - Invalid policy produces reject or NO_GRADE, never PASS.
 
 Test cases:
@@ -176,9 +175,8 @@ Test cases:
   - policy/unknown-fail-on.yaml
 
 Docs to update:
-  - docs/spec/policy-schema.md
-  - docs/spec/gate-result-semantics.md
-  - docs/test-matrix/bad-fixtures.md
+  - docs/gate-contract.md
+  - docs/test-strategy.md
 
 Security impact:
   Prevents unsafe CI policy interpretation.
@@ -206,7 +204,7 @@ Rejected behavior:
   - Cleanup can target resources without kube-slint ownership metadata.
 
 Acceptance criteria:
-  - Security fixture rows in docs/test-matrix/bad-fixtures.md have tests or
+  - Security fixture rows in docs/test-strategy.md have tests or
     explicit deferred implementation notes.
   - Existing quality guardrails remain passing.
 
@@ -219,9 +217,8 @@ Test cases:
   - security/cleanup-without-owner-label.yaml
 
 Docs to update:
-  - docs/security-defaults.md
-  - docs/guardrails/security-patterns.md
-  - docs/test-matrix/bad-fixtures.md
+  - docs/security-model.md
+  - docs/test-strategy.md
 
 Security impact:
   Prevents reintroduction of high-risk defaults.
