@@ -151,3 +151,30 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - kube-slint는 운영 SLI guardrail이므로 token 노출, 과도한 RBAC, 측정 불충분의 PASS 오인 가능성은 correctness feature보다 먼저 줄여야 한다.
   - 동시에 best-effort measurement 철학을 유지하려면 계측 실패와 policy violation의 책임 경계를 계속 분리해야 한다.
+
+## D-015: Quality roadmap contracts are CI-guarded planning inputs
+
+- Date: 2026-07-04
+- Status: Accepted
+- Decision:
+  - 8 -> 9 -> 10 quality roadmap work is tracked as a non-runtime planning and
+    guardrail workstream unless an implementation task explicitly says
+    otherwise.
+  - The quality roadmap contracts live in `docs/quality-roadmap-sprint-plan.md`,
+    `docs/quality-roadmap-ticket-backlog.md`, and the related security,
+    schema, test matrix, release, and UX documents.
+  - `hack/quality-guardrails.sh` and
+    `.github/workflows/quality-guardrails.yml` are accepted as CI-backed drift
+    detection for identity, security, RBAC, schema, and gate-contract wording.
+  - These guardrails may check that proposed-contract documents exist and stay
+    aligned, but they must not claim that unimplemented runtime behavior has
+    shipped.
+  - Runtime behavior changes still require normal implementation work, tests,
+    and source-of-truth updates.
+- Rationale:
+  - The quality roadmap contains many high-impact security and CI contracts.
+    Capturing them only as prose would let implementation drift or stale docs
+    re-enter the repo.
+  - CI-backed drift detection is appropriate for accepted identity/security
+    contracts, while future behavior must remain clearly labeled as proposed
+    until implemented.

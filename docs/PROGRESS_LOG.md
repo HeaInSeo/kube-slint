@@ -19,6 +19,8 @@ Update this file at the **start and end** of every stage/task.
 * `docs/DECISIONS.md` D-014
 * `docs/post-rc-hardening-design.md`
 * `docs/post-rc-hardening-sprint.md`
+* `docs/quality-roadmap-sprint-plan.md`
+* `docs/quality-guardrails.md`
 
 **완료 항목:**
 
@@ -32,10 +34,19 @@ Update this file at the **start and end** of every stage/task.
 * [x] port-forward lifecycle와 PreFetch 실패 전파 보정
 * [x] 기본 RunID를 nanosecond + random suffix로 강화하고 Kubernetes label selector 값을 sanitize
 * [x] Prometheus text parser scanner limit 확장
+* [x] direction-aware regression policy 설계/구현 완료(`docs/project-status.yaml` v1.4.0 shipped 상태와 정렬)
+* [x] 품질 로드맵 스프린트 일정과 개발 에이전트 handoff ticket backlog 추가
+* [x] `quality-guardrails` CI workflow와 `hack/quality-guardrails.sh` 추가
+* [x] `SECURITY.md`의 stale token-in-command 설명을 현재 in-pod ServiceAccount token 경로와 맞게 보정
+* [x] Sprint 1 보안 기본값, dangerous option naming, ServiceURLFormat, token handling, RBAC model, security pattern, Semgrep rule plan 초안 추가
+* [x] Sprint 2 Summary/Policy/Gate semantics 계약 문서와 bad fixture matrix 초안 추가
+* [x] Sprint 3 kind E2E matrix, E2E acceptance, release policy, GitHub Action target, README IA, UX failure catalog 초안 추가
+* [x] Review/freeze 요약 문서 추가 및 D-015 decision log 반영
+* [x] Priority 0 구현 handoff 문서 고정
+* [x] 전체 품질 로드맵 planning/guardrail sprint 기준 100% 완료
 
 **진행/남은 항목:**
 
-* [ ] direction-aware regression policy 설계/구현
 * [ ] ownerRef metric semantics 재검토
 * [ ] Docker/curl image digest pinning 정책 결정
 

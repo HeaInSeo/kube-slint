@@ -47,6 +47,7 @@ Recommended `tmux` layout:
 - Docs/CI agent
   - Maintain README wording, operating docs, progress/status consistency, and workflow-facing terminology.
   - Ensure docs do not imply that correctness tests and guardrail evaluation are the same path.
+  - Maintain `hack/quality-guardrails.sh` and `.github/workflows/quality-guardrails.yml` when accepted security, identity, RBAC, or gate contracts need CI-backed drift detection.
 
 ## 5. When To Avoid Product Changes
 
@@ -94,6 +95,7 @@ If formal skills are added later, keep them skeleton-only until the workflow is 
 4. If parallel exploration is needed, keep it read-only.
 5. Integrate final writes in one main thread.
 6. Report facts, target state, changed files, and unresolved risks explicitly.
+7. If CI-backed docs/contract guardrails are changed, run `bash hack/quality-guardrails.sh` and report the result.
 
 ## 10. Codex Config Caution
 
