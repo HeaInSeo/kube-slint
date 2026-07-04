@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-04
+
+Post-RC hardening sprint: gate reliability/regression correctness, secret
+redaction coverage, fetcher metric normalization, and moving gate evaluation
+to a public package (`pkg/gate`). See `docs/post-rc-hardening-design.md` for
+the full before/after analysis behind each item below.
+
 ### Changed
 
 - `pkg/gate/gate.go`: `reliability.collectionStatus == "Failed"`는 `reliability.required` 설정과 무관하게 무조건 `NO_GRADE`로 승격됨 (기존에는 threshold 규칙이 없고 `reliability.required: false`이면 조용히 `PASS`가 나올 수 있었음). 새 reason 코드 `COLLECTION_FAILED` 추가.

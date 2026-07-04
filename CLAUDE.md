@@ -13,7 +13,7 @@
 
 ---
 
-## 현재 상태 (2026-05-11 기준)
+## 현재 상태 (2026-07-04 기준)
 
 ### 완료된 작업
 
@@ -55,7 +55,25 @@
 - [x] CHANGELOG (CHANGELOG.md, v0.1.0 엔트리)
 - [x] `make coverage` 테스트 커버리지 리포트
 - [x] 공모전 제출 문서 (docs/competition-submission.md)
-- [ ] `v0.1.0` git tag + GitHub release
+- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.4.0` 태그 존재)
+
+#### Batch 4 — Post-RC Hardening Sprint ✅ (v1.4.0, 커밋 `4862544`~`9172d25`)
+
+`docs/post-rc-hardening-design.md`에 각 항목의 상세 근거/diff 요약 있음.
+
+- [x] gate reliability: `CollectionStatus=Failed`가 `reliability.required` 설정과 무관하게 무조건 `NO_GRADE`로 승격 (R1)
+- [x] regression 검사가 threshold rule의 operator로 metric 방향(lower/higher-is-better)을 인식 — 개선을 회귀로 오탐하지 않음 (R2)
+- [x] curl-pod fetch의 외부 context timeout이 `WaitPodDoneTimeout+LogsTimeout`을 더 이상 무효화하지 않음 (R4)
+- [x] orphan sweep 셀렉터가 다른 곳과 동일하게 RunID를 sanitize (N1)
+- [x] `SessionConfig.Token` 필수 검증 제거 + curl pod에 `automountServiceAccountToken: true` 명시 (N2)
+- [x] `POLICY_INVALID` 진단 힌트에 `schema_version` 등 실제 원인 명시 (N4)
+- [x] 예제 RBAC를 네임스페이스 스코프 `Role`/`RoleBinding`으로 변경 (R5)
+- [x] curlpod/portforward fetcher의 metric aggregation을 `pkg/slo/fetch/promtext`로 통일 (R3)
+- [x] secret redaction 패턴이 JSON/CLI-flag/YAML 형태까지 커버 (N3)
+- [x] `Session.End()`가 세션이 직접 생성한 fetcher에만 `Stop()` 호출 (N5)
+- [x] `internal/gate` → `pkg/gate` 이동, `pkg/slint` 진단 로그를 stdout→stderr로 이전 (R6)
+
+N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 항목: F4(quoted label parser 개선), `pkg/policy`/`pkg/summary` 공개 API 정리(v1.4.0 로드맵 항목 중 미착수분).
 
 ---
 
