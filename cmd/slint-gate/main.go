@@ -25,6 +25,17 @@ func main() {
 		case "analyze-dataplane":
 			runAnalyzeDataplane(os.Args[2:])
 			return
+		case "inspect":
+			if err := runInspect(os.Args[2:]); err != nil {
+				os.Exit(1)
+			}
+			return
+		case "recommend-policy":
+			if err := runRecommendPolicy(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate recommend-policy: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
 	}
 	runGate()

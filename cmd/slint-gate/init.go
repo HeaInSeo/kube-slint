@@ -150,11 +150,6 @@ sess.End(ctx)
 // ──────────────────────────────────────────────────────────────────────────
 `
 
-// supportedProfiles is the set of --profile values init currently accepts.
-var supportedProfiles = map[string]bool{
-	"kubebuilder-operator": true,
-}
-
 type initTemplateData struct {
 	GeneratedAt string
 	Namespace   string
@@ -179,7 +174,7 @@ func runInit(args []string) error {
 	}
 
 	profileName := strings.TrimSpace(*profile)
-	if profileName != "" && !supportedProfiles[profileName] {
+	if profileName != "" && !isSupportedProfile(profileName) {
 		return fmt.Errorf("unknown profile %q (supported: kubebuilder-operator)", profileName)
 	}
 

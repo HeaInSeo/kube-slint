@@ -113,30 +113,40 @@ UX goal:
 Give the user a safe starting point, not a blank policy file.
 ```
 
-### 2. Inspect Summary
+### 2. Inspect Summary — implemented (Sprint 2)
 
 ```sh
 slint-gate inspect --summary artifacts/sli-summary.json
 ```
 
-Expected output:
+Actual output:
 
 ```text
-Measured SLIs:
-  reconcile_total_delta: 14
-  reconcile_error_delta: 0
-  workqueue_depth_end: 0
-  rest_client_429_delta: 0
-  rest_client_5xx_delta: 0
+Measured shift-left SLIs:
+  reconcile_total_delta            14           usable for threshold + regression
+  reconcile_error_delta            0            usable for threshold + regression
+  workqueue_depth_end              0            usable for threshold + regression
+  rest_client_5xx_delta            0            usable for threshold + regression
+  rest_client_429_delta            0            usable, but may be CI-environment sensitive
+  workqueue_retries_total_delta    0            usable, but may be CI-environment sensitive
 
-Missing or skipped:
-  workqueue_retries_total_delta: missing metric
+Missing profile SLIs:
+  (none)
 
-Gate readiness:
-  Ready for threshold policy: yes
-  Ready for regression baseline: yes
+Readiness:
+  Threshold policy: ready
+  Baseline approval: ready
+  Regression gate: not enabled yet
   Measurement confidence: complete
+
+Next:
+  slint-gate recommend-policy --summary artifacts/sli-summary.json --profile kubebuilder-operator
 ```
+
+When a profile SLI is absent from the summary, it's listed under "Missing
+profile SLIs" with a keep-commented-out recommendation instead. `inspect`
+never produces a gate verdict — it exits non-zero only if the summary file
+itself can't be loaded (missing, malformed, or unsupported schema version).
 
 UX goal:
 
@@ -144,49 +154,72 @@ UX goal:
 Explain what kube-slint saw before asking the user to write policy.
 ```
 
-### 3. Recommend Policy
+### 3. Recommend Policy — implemented (Sprint 2)
 
 ```sh
 slint-gate recommend-policy \
   --summary artifacts/sli-summary.json \
   --profile kubebuilder-operator \
+  --strictness conservative \
   --output .slint/policy.yaml
 ```
 
-Expected behavior:
+Actual behavior:
 
-- generate conservative thresholds for measured SLIs;
-- mark missing SLIs as comments, not active rules;
-- explain why each rule exists;
-- default to `threshold_miss` and `regression_detected` in `fail_on`;
-- keep reliability optional unless the user requests strict promotion mode.
+- measured SLIs become active `thresholds:` entries; SLIs the profile expects
+  but that are absent from the summary are recorded as trailing comments, not
+  active rules — regardless of `--strictness`;
+- `--strictness` (`strict` | `conservative` [default] | `lenient`) only
+  affects the profile's two CI-environment-sensitive SLIs
+  (`rest_client_429_delta`, `workqueue_retries_total_delta`): `strict` makes
+  them active with no caveat, `conservative` makes them active with a
+  relax-if-flaky comment, `lenient` comments them out entirely (same
+  treatment as a missing SLI). The other four SLIs are always active once
+  measured, independent of strictness;
+- **known limitation, stated rather than faked**: `promote_to_fail` operates
+  on the whole `threshold_miss` category, not per-rule, so there is no way
+  yet to make one specific threshold WARN-only while others FAIL — that's
+  why `lenient` omits a rule entirely instead of downgrading it;
+- refuses to overwrite an existing `--output` unless `--force` is passed;
+  `--dry-run` prints the draft to stdout instead of writing it;
+- defaults to `promote_to_fail: ["threshold_miss"]` with
+  `# - "regression_detected"` commented out, and `regression.enabled: false`
+  — matches `init`'s existing template so both commands feel consistent.
 
-Example output:
+Example output (`--strictness conservative`, all 6 SLIs measured):
 
 ```yaml
 schema_version: "slint.policy.v1"
 
 thresholds:
-  - name: "reconcile_error_delta_zero"
+  - name: "reconcile_error_delta_recommended"
     metric: "reconcile_error_delta"
     operator: "=="
     value: 0
-  - name: "workqueue_depth_end_max"
-    metric: "workqueue_depth_end"
-    operator: "<="
+    # A healthy operator E2E run should not introduce reconcile errors.
+
+  - name: "rest_client_429_delta_recommended"
+    metric: "rest_client_429_delta"
+    operator: "=="
     value: 0
+    # Client-side throttling may indicate API pressure or controller behavior changes.
+    #
+    # This SLI can be CI-environment sensitive. If your CI proves this
+    # signal is noisy rather than a real regression, consider relaxing this
+    # rule only after confirming the source is transient.
 
 regression:
-  enabled: true
+  enabled: false
   tolerance_percent: 10
 
 reliability:
   required: false
   min_level: "partial"
 
-fail_on:
+promote_to_fail:
   - "threshold_miss"
-  - "regression_detected"
+  # Uncomment after baseline is established:
+  # - "regression_detected"
 ```
 
 UX goal:
@@ -380,20 +413,16 @@ A new-project onboarding UX is acceptable when:
 
 Recommended implementation order:
 
-1. `slint-gate inspect --summary`.
-2. `slint-gate recommend-policy --summary --profile`.
-3. `slint-gate baseline approve`.
-4. `slint-gate ci github-actions`.
+1. ~~`slint-gate inspect --summary`.~~ Done (Sprint 2).
+2. ~~`slint-gate recommend-policy --summary --profile`.~~ Done (Sprint 2).
+3. `slint-gate baseline approve`. (Sprint 3)
+4. `slint-gate ci github-actions`. (Sprint 3)
 5. Docs update for quickstart and troubleshooting.
 
 Each command should be independently useful and testable.
 
 ## Open Decisions
 
-- Whether `recommend-policy` should overwrite existing policy files or require
-  `--force`.
-- Whether recommended thresholds should be strict by default or comment-only
-  until the user opts in.
 - Whether first-run baseline absence remains `WARN` or becomes configurable
   as `NO_GRADE`.
 - Whether CI snippet generation should target the current local action or only
@@ -410,3 +439,14 @@ Resolved:
   `--exit-on`/`exit-on` (CLI/action), with the old names kept as working,
   deprecated aliases. See "Naming: policy `promote_to_fail` vs CLI/action
   `--exit-on`" above.
+- **`recommend-policy` overwrite behavior**: refuses to overwrite an existing
+  `--output` by default; `--force` opts in, `--dry-run` previews without
+  writing.
+- **Threshold strictness default**: mixed strategy, not strict-by-default nor
+  comment-only-by-default. Core SLIs (`reconcile_total_delta`,
+  `reconcile_error_delta`, `workqueue_depth_end`, `rest_client_5xx_delta`) are
+  always active once measured; the two CI-environment-sensitive SLIs
+  (`rest_client_429_delta`, `workqueue_retries_total_delta`) are governed by
+  `--strictness` (default `conservative`: active with a relax-if-flaky
+  comment). See "Recommend Policy" above for the exact per-strictness
+  behavior and the stated `promote_to_fail`-is-category-wide limitation.
