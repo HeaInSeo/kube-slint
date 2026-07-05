@@ -395,22 +395,63 @@ Initial profile:
 kubebuilder-operator
 ```
 
-Default SLI candidates:
+Default SLI candidates (Sprint 5: expanded from 6 to all 9 real SLIs
+`pkg/slint.BaselineV3Specs()` already defines — see below):
 
-| SLI | Default recommendation |
-|---|---|
-| `reconcile_total_delta` | measured, usually threshold `>= 1` for active test scenarios |
-| `reconcile_error_delta` | threshold `== 0` |
-| `workqueue_depth_end` | threshold `<= 0` or small configured value |
-| `workqueue_retries_total_delta` | threshold `== 0` or WARN depending on workload |
-| `rest_client_429_delta` | threshold `== 0` |
-| `rest_client_5xx_delta` | threshold `== 0` |
+| SLI | Tier | Default recommendation |
+|---|---|---|
+| `reconcile_total_delta` | core | threshold `>= 1` |
+| `reconcile_error_delta` | core | threshold `== 0` |
+| `workqueue_depth_end` | core | threshold `<= 0` |
+| `rest_client_5xx_delta` | core | threshold `== 0` |
+| `rest_client_429_delta` | noisy | threshold `== 0`, `--strictness`-governed |
+| `workqueue_retries_total_delta` | noisy | threshold `== 0`, `--strictness`-governed |
+| `reconcile_success_delta` | informational | shown, never gated (no principled threshold) |
+| `workqueue_adds_total_delta` | informational | shown, never gated |
+| `rest_client_requests_total_delta` | informational | shown, never gated |
 
-Future profiles:
+**Why only one built-in profile**: every other profile name this doc
+originally floated (`dataplane-service`, `controller-runtime-operator`,
+`custom-prometheus`, etc.) has no backing SLI spec or collector anywhere in
+this codebase. Fabricating a second built-in profile would mean inventing
+metric names with nothing behind them — a real honesty risk for what's
+meant to be a shift-left guardrail grounded in actually-measured signals.
+Instead, Sprint 5 closed the gap between `kubebuilder-operator`'s 6
+candidates and `BaselineV3Specs()`'s 9 real specs, and added local custom
+profile support (below) as the extensibility path for anything else.
 
-- `dataplane-service`
-- `controller-runtime-operator`
-- `custom-prometheus`
+### Local Custom Profile Files (Sprint 5)
+
+Resolution order for both `inspect --profile`/`--profile-file` and
+`recommend-policy --profile`/`--profile-file`:
+
+```text
+1. --profile-file <path>                      (explicit, always wins)
+2. .slint/profiles/<profile-name>.yaml        (repo-local convention)
+3. built-in profile lookup by --profile name  (today: kubebuilder-operator only)
+```
+
+Custom profile schema (`slint.profile.v1`) — deliberately simpler than the
+per-strictness-override schema floated earlier in this doc, since
+`recommend-policy`'s strictness logic operates on a global `--strictness`
+flag plus a per-candidate tier, not per-rule per-strictness value maps:
+
+```yaml
+schema_version: "slint.profile.v1"
+name: "my-custom-profile"
+description: "..."
+candidates:
+  - id: "some_metric_delta"
+    operator: "=="        # <, <=, >, >=, == (omit entirely for tier: informational)
+    value: 0
+    tier: "core"           # core | noisy | informational (default: core)
+    reason: "..."
+```
+
+Validated at load time (unsupported `schema_version`, unknown `operator`,
+unrecognized `tier`, or an empty `id` are all rejected with a clear error)
+rather than allowed to silently produce an invalid generated `policy.yaml`.
+A pinned remote profile registry remains future work, as originally staged.
 
 ## Naming: policy `promote_to_fail` vs CLI/action `--exit-on`
 

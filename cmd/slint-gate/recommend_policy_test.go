@@ -30,7 +30,10 @@ func TestRunRecommendPolicy_FullyMeasured_AllActive(t *testing.T) {
 		assert.Contains(t, body, `metric: "`+id+`"`)
 	}
 	assert.Contains(t, body, "promote_to_fail:")
-	assert.NotContains(t, body, "Not yet promoted")
+	// The 3 informational-tier candidates are always commented out (by
+	// design, regardless of measurement), so "Not promoted" still appears --
+	// but none of the 6 gateable candidates above should be inside it.
+	assert.Contains(t, body, "Not promoted to an active rule")
 }
 
 func TestRunRecommendPolicy_PartiallyMeasured_MissingCommented(t *testing.T) {
@@ -132,6 +135,44 @@ func TestRunRecommendPolicy_Conservative_NoisyHasRelaxNote(t *testing.T) {
 	require.NoError(t, capturedErr)
 	assert.Contains(t, stdout, `metric: "rest_client_429_delta"`)
 	assert.Contains(t, stdout, "CI-environment sensitive")
+}
+
+func TestRunRecommendPolicy_Informational_NeverActive_AnyStrictness(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{"reconcile_success_delta"}, "Complete")
+
+	for _, s := range []string{"strict", "conservative", "lenient"} {
+		var capturedErr error
+		stdout := captureStdout(t, func() {
+			capturedErr = runRecommendPolicy([]string{"--summary", summaryPath, "--strictness", s, "--dry-run"})
+		})
+		require.NoError(t, capturedErr)
+		assert.NotContains(t, stdout, `metric: "reconcile_success_delta"`, "strictness=%s", s)
+		assert.Contains(t, stdout, "no default threshold is recommended", "strictness=%s", s)
+	}
+}
+
+func TestRunRecommendPolicy_ProfileFile_DrivesOutput(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{"custom_metric_delta"}, "Complete")
+	profilePath := filepath.Join(dir, "profile.yaml")
+	require.NoError(t, os.WriteFile(profilePath, []byte(`schema_version: "slint.profile.v1"
+name: "custom"
+candidates:
+  - id: "custom_metric_delta"
+    operator: "=="
+    value: 0
+    tier: "core"
+    reason: "custom candidate"
+`), 0o644))
+
+	var capturedErr error
+	stdout := captureStdout(t, func() {
+		capturedErr = runRecommendPolicy([]string{"--summary", summaryPath, "--profile-file", profilePath, "--dry-run"})
+	})
+	require.NoError(t, capturedErr)
+	assert.Contains(t, stdout, `metric: "custom_metric_delta"`)
+	assert.Contains(t, stdout, "# Profile:      custom")
 }
 
 func TestRunRecommendPolicy_Lenient_NoisyIsCommentedOut(t *testing.T) {

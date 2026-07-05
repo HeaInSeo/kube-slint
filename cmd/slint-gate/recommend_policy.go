@@ -80,6 +80,7 @@ func runRecommendPolicy(args []string) error {
 	}
 	summaryPath := fs.String("summary", "artifacts/sli-summary.json", "Path to the measurement summary JSON")
 	profile := fs.String("profile", "kubebuilder-operator", "Onboarding profile to recommend thresholds for")
+	profileFile := fs.String("profile-file", "", "Path to a local custom profile file (overrides --profile)")
 	strictness := fs.String("strictness", "conservative", "Threshold strictness: strict | conservative | lenient")
 	output := fs.String("output", filepath.Join(".slint", "policy.yaml"), "Output path for the generated policy.yaml")
 	force := fs.Bool("force", false, "Overwrite --output if it already exists")
@@ -89,8 +90,7 @@ func runRecommendPolicy(args []string) error {
 		return err
 	}
 
-	profileName := strings.TrimSpace(*profile)
-	candidates, err := profileCandidates(profileName)
+	candidates, profileName, err := resolveProfileCandidates(*profileFile, strings.TrimSpace(*profile))
 	if err != nil {
 		return err
 	}
@@ -116,32 +116,7 @@ func runRecommendPolicy(args []string) error {
 		measured[s.Results[i].ID] = &s.Results[i]
 	}
 
-	var active []recommendedThreshold
-	var commented []profileCandidate
-	for _, c := range candidates {
-		if _, ok := measured[c.ID]; !ok {
-			commented = append(commented, c)
-			continue
-		}
-		if c.Tier == tierNoisy && strictnessName == "lenient" {
-			commented = append(commented, c)
-			continue
-		}
-		t := recommendedThreshold{
-			Name:     c.ID + "_recommended",
-			Metric:   c.ID,
-			Operator: c.Operator,
-			Value:    c.Value,
-			Reason:   c.Reason,
-		}
-		if c.Tier == tierNoisy && strictnessName == "conservative" {
-			t.RelaxNote = "    #\n" +
-				"    # This SLI can be CI-environment sensitive. If your CI proves this\n" +
-				"    # signal is noisy rather than a real regression, consider relaxing this\n" +
-				"    # rule only after confirming the source is transient.\n"
-		}
-		active = append(active, t)
-	}
+	active, commented := classifyCandidates(candidates, measured, strictnessName)
 
 	data := recommendPolicyTemplateData{
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
@@ -179,6 +154,43 @@ func runRecommendPolicy(args []string) error {
 	return nil
 }
 
+// classifyCandidates decides, for each profile candidate, whether it becomes
+// an active threshold rule or a commented-out entry (and why), per the
+// tier/measurement/strictness rules described on profileCandidate.Tier.
+func classifyCandidates(candidates []profileCandidate, measured map[string]*summary.SLIResult, strictnessName string) ([]recommendedThreshold, []commentedEntry) {
+	var active []recommendedThreshold
+	var commented []commentedEntry
+	for _, c := range candidates {
+		if c.Tier == tierInformational {
+			commented = append(commented, commentedEntry{c, "this is an informational SLI — no default threshold is recommended"})
+			continue
+		}
+		if _, ok := measured[c.ID]; !ok {
+			commented = append(commented, commentedEntry{c, "missing metric — not measured in the current summary"})
+			continue
+		}
+		if c.Tier == tierNoisy && strictnessName == "lenient" {
+			commented = append(commented, commentedEntry{c, "held back by --strictness lenient"})
+			continue
+		}
+		t := recommendedThreshold{
+			Name:     c.ID + "_recommended",
+			Metric:   c.ID,
+			Operator: c.Operator,
+			Value:    c.Value,
+			Reason:   c.Reason,
+		}
+		if c.Tier == tierNoisy && strictnessName == "conservative" {
+			t.RelaxNote = "    #\n" +
+				"    # This SLI can be CI-environment sensitive. If your CI proves this\n" +
+				"    # signal is noisy rather than a real regression, consider relaxing this\n" +
+				"    # rule only after confirming the source is transient.\n"
+		}
+		active = append(active, t)
+	}
+	return active, commented
+}
+
 func renderActiveThresholds(items []recommendedThreshold) string {
 	if len(items) == 0 {
 		return ""
@@ -198,17 +210,24 @@ func renderActiveThresholds(items []recommendedThreshold) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func renderCommentedCandidates(items []profileCandidate) string {
+// commentedEntry pairs a candidate not promoted to an active rule with the
+// specific reason (missing / informational / held back by strictness), so
+// the generated comment block describes each case accurately instead of
+// using one generic explanation for all of them.
+type commentedEntry struct {
+	candidate profileCandidate
+	note      string
+}
+
+func renderCommentedCandidates(items []commentedEntry) string {
 	if len(items) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("\n# Not yet promoted to an active rule (missing from the current summary,\n")
-	b.WriteString("# or held back by --strictness lenient):\n#\n")
-	for _, c := range items {
-		fmt.Fprintf(&b, "# - %s\n", c.ID)
-		b.WriteString("#   Recommendation: keep this commented out for now.\n")
-		fmt.Fprintf(&b, "#   %s\n#\n", c.Reason)
+	b.WriteString("\n# Not promoted to an active rule:\n#\n")
+	for _, e := range items {
+		fmt.Fprintf(&b, "# - %s (%s)\n", e.candidate.ID, e.note)
+		fmt.Fprintf(&b, "#   %s\n#\n", e.candidate.Reason)
 	}
 	return b.String()
 }

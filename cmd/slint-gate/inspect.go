@@ -26,12 +26,13 @@ func runInspect(args []string) error {
 	}
 	summaryPath := fs.String("summary", "artifacts/sli-summary.json", "Path to the measurement summary JSON")
 	profile := fs.String("profile", "kubebuilder-operator", "Onboarding profile to check measured SLIs against")
+	profileFile := fs.String("profile-file", "", "Path to a local custom profile file (overrides --profile)")
 
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	candidates, err := profileCandidates(strings.TrimSpace(*profile))
+	candidates, _, err := resolveProfileCandidates(*profileFile, strings.TrimSpace(*profile))
 	if err != nil {
 		return err
 	}
@@ -73,8 +74,11 @@ Result:
 		}
 		measuredCount++
 		usable := "usable for threshold + regression"
-		if c.Tier == tierNoisy {
+		switch c.Tier {
+		case tierNoisy:
 			usable = "usable, but may be CI-environment sensitive"
+		case tierInformational:
+			usable = "measured, informational only (no default threshold)"
 		}
 		fmt.Printf("  %-32s %-12v %s\n", c.ID, *r.Value, usable)
 	}

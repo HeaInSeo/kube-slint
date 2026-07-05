@@ -61,6 +61,7 @@ func TestRunInspect_FullyMeasured(t *testing.T) {
 	path := writeInspectSummary(t, dir, []string{
 		"reconcile_total_delta", "reconcile_error_delta", "workqueue_depth_end",
 		"rest_client_5xx_delta", "rest_client_429_delta", "workqueue_retries_total_delta",
+		"reconcile_success_delta", "workqueue_adds_total_delta", "rest_client_requests_total_delta",
 	}, "Complete")
 
 	var err error
@@ -100,6 +101,19 @@ func TestRunInspect_EmptySummary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out, "Threshold policy: not ready")
 	assert.Contains(t, out, "Baseline approval: not ready")
+}
+
+func TestRunInspect_InformationalTier_MeasuredShowsInformationalWording(t *testing.T) {
+	dir := t.TempDir()
+	path := writeInspectSummary(t, dir, []string{"reconcile_success_delta"}, "Complete")
+
+	var err error
+	out := captureStdout(t, func() {
+		err = runInspect([]string{"--summary", path})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, out, "reconcile_success_delta")
+	assert.Contains(t, out, "measured, informational only (no default threshold)")
 }
 
 func TestRunInspect_InvalidSchemaVersion(t *testing.T) {
