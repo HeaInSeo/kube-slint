@@ -334,6 +334,15 @@ Update this file at the **start and end** of every stage/task.
 * **기본 동작 유지(No Regression)**: 기본 `curl` 이미지 태그 유지 및 TLS 검증(Verify) On 상태를 기본 동작으로 고수.
 * **통합 가이드 반영**: `README.md` 및 `README(Kor).md`에 설정(`sess := harness.NewSession(...)`) 예시 및 RBAC(`create pods`) 관련 최소 주의사항 기재.
 
+### Stage v1.5.0 + Quality Roadmap Priority 0 (2026-07-05)
+
+* **dataplane-service 정적 분석기 출시**: `slint-gate analyze-dataplane <dir>` 서브커맨드 + `pkg/report`(범용 Finding/Report/SARIF/JSON 모델) + `pkg/dataplane`(경량 K8s 매니페스트 모델). kube-linter와 겹치는 체크 2개(`KSL-DP-003` probe wiring, `KSL-DP-005` resource limits)는 실제 kube-linter 체크 목록 확인 후 제거.
+* **`internal/gate` → `pkg/gate` 이동 이후, quality-roadmap-guardrails 브랜치(Codex) 머지**: 로드맵/보안/게이트 계약 문서(`docs/quality-roadmap*.md`, `docs/security-model.md`, `docs/gate-contract.md`, `docs/test-strategy.md`) 및 `hack/quality-guardrails.sh` CI 드리프트 감지 스크립트 도입.
+* **Priority 0 런타임 구현**: `pkg/slo/fetch/curlpod`에 `ValidateMetricsURL`/`isDangerousNamespace` 추가 — `ServiceURLFormat`이 curl pod 생성 전에 검증되어 외부 host/미지원 scheme/템플릿 인젝션이 기본 거부됨. `kube-system`/`kube-public`/`kube-node-lease`도 기본 거부. `DangerouslySkipTLSVerify`/`DangerouslyAllowExternalMetricsURL`/`DangerouslyAllowKubeSystemNamespace` dangerous opt-in 도입, `curlpod.New()`의 `TLSInsecureSkipVerify` 기본값을 `true`→`false`로 수정.
+* **summary/policy 검증 강화**: `summary.Validate`가 중복 result ID·미지원 status도 거부하도록 확장하고 `gate.go`가 이를 호출하도록 연결. `validatePolicy`가 중복 threshold 이름·NaN 값·음수 tolerance를 거부.
+* **Bad fixture 실행 테스트 16종** (`pkg/gate/testdata/{summary,policy}/` + `badfixtures_test.go`) 추가 — 잘못된 입력이 절대 `PASS`를 내지 않음을 고정.
+* **문서-코드 불일치 2건 발견 및 문서 수정으로 해결**: `gate-contract.md`의 `!=` 연산자 지원 오기재, `test-strategy.md`의 empty-threshold-name reject 요구가 기존 테스트(`TestEvaluate_UnnamedThreshold`)와 충돌 — 코드 대신 문서를 실제 동작에 맞게 정정.
+
 ---
 
 ## Pending Items

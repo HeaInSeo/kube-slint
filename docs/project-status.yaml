@@ -16,7 +16,9 @@ current_focus:
   - "Quality roadmap Sprint 2 summary/policy/gate semantics and bad fixture matrix drafts added"
   - "Quality roadmap Sprint 3 kind E2E/release/GitHub Action/docs IA/UX failure catalog drafts added"
   - "Quality roadmap planning/guardrail sprint completed at 100%; canonical docs consolidated and implementation handoff frozen"
-next_milestone: "v1.5.0 dataplane-service static profile; pkg/policy and pkg/summary public package cleanup"
+  - "v1.5.0 dataplane-service static analyzer shipped: slint-gate analyze-dataplane, pkg/report, pkg/dataplane; two checks later removed as kube-linter duplicates"
+  - "Quality roadmap Priority 0 implemented: ServiceURLFormat default-deny validator, kube-system namespace rejection, dangerously-named opt-ins, summary/policy bad-fixture executable tests"
+next_milestone: "pkg/policy and pkg/summary public package cleanup; MCP read-only exposure of analyze-dataplane"
 active_hardening_sprint: "post-rc-secret-rbac-gate-lifecycle"
 capabilities:
   identity_aligned: "done"
