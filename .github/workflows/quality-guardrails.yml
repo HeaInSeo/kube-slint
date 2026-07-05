@@ -1,0 +1,53 @@
+name: Quality Guardrails
+
+on:
+  push:
+    paths:
+      - ".github/actions/slint-gate/**"
+      - ".github/workflows/quality-guardrails.yml"
+      - ".github/workflows/roadmap-status.yml"
+      - ".github/workflows/slint-gate.yml"
+      - "cmd/slint-gate/init.go"
+      - "cmd/slint-gate/init_test.go"
+      - "docs/**"
+      - "hack/quality-guardrails.sh"
+      - "pkg/slo/evidence/**"
+      - "pkg/slo/fetch/curlpod/**"
+      - "README.md"
+      - "README(Kor).md"
+      - "SECURITY.md"
+  pull_request:
+    paths:
+      - ".github/actions/slint-gate/**"
+      - ".github/workflows/quality-guardrails.yml"
+      - ".github/workflows/roadmap-status.yml"
+      - ".github/workflows/slint-gate.yml"
+      - "cmd/slint-gate/init.go"
+      - "cmd/slint-gate/init_test.go"
+      - "docs/**"
+      - "hack/quality-guardrails.sh"
+      - "pkg/slo/evidence/**"
+      - "pkg/slo/fetch/curlpod/**"
+      - "README.md"
+      - "README(Kor).md"
+      - "SECURITY.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-guardrails-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-guardrails:
+    name: Check product, security, and gate contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run quality guardrails
+        run: bash hack/quality-guardrails.sh

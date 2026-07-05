@@ -1,5 +1,7 @@
 # kube-slint
 
+한국어 문서는 [README(Kor).md](README(Kor).md)를 참조하세요.
+
 **kube-slint does not replace your tests. It measures what happens during them.**
 
 Attach kube-slint to your existing Kubernetes operator E2E session. It reads `/metrics` before and after your workload, computes operational SLI deltas (reconcile rate, workqueue depth, REST errors), and evaluates them against a declarative policy — without modifying your operator code.
@@ -71,7 +73,6 @@ sess := slint.NewSession(slint.SessionConfig{
     ServiceAccountName:    "kube-slint-scraper",
     ArtifactsDir:          "artifacts",
     Specs:                 slint.DefaultSpecs(),
-    TLSInsecureSkipVerify: true,
     CurlImage:             "my-registry/curlimages/curl:8.11.0",
 })
 sess.Start()
@@ -170,9 +171,8 @@ sess := slint.NewSession(slint.SessionConfig{
     // SLI spec set — use preset or custom
     Specs: slint.DefaultSpecs(),
 
-    // Real-cluster settings
-    TLSInsecureSkipVerify: true,
-    CurlImage:             "my-registry/curlimages/curl:8.11.0",
+    // Optional real-cluster settings
+    CurlImage: "my-registry/curlimages/curl:8.11.0",
 })
 
 sess.Start()
@@ -188,7 +188,30 @@ sess.End(ctx)
 
 ---
 
-### 3. Gate the Result (slint-gate CLI)
+### 3. Token and Metrics URL Handling
+
+The default curl pod path reads its own mounted ServiceAccount token inside the
+pod. The bearer token is not embedded in kubectl arguments.
+
+For plain HTTP metrics endpoints in development clusters:
+
+```go
+sess := slint.NewSession(slint.SessionConfig{
+    // ...
+    ServiceURLFormat: slint.ServiceURLHTTP, // "http://%s.%s.svc:8080/metrics"
+})
+```
+
+The default URL format is `slint.ServiceURLHTTPS`
+(`"https://%s.%s.svc:8443/metrics"`).
+
+`TLSInsecureSkipVerify` is available for compatibility with self-signed
+development clusters, but it weakens TLS verification. Do not enable it in
+shared or production-like CI unless you have explicitly accepted that risk.
+
+---
+
+### 4. Gate the Result (slint-gate CLI)
 
 The gate CLI is a Go binary located in `cmd/slint-gate`.
 
@@ -260,7 +283,7 @@ fail_on:
 
 ---
 
-### 4. Deploy Observability Stack (Kustomize)
+### 5. Deploy Observability Stack (Kustomize)
 
 kube-slint ships a Kustomize base that installs the metrics collection infrastructure into your cluster.
 
@@ -320,11 +343,28 @@ Both gate model components are complete.
 
 ---
 
+## Security Defaults
+
+kube-slint's default measurement path is namespace-scoped:
+
+- the generated RBAC uses ServiceAccount, Role, and RoleBinding;
+- ClusterRoleBinding is not required for the default path;
+- the curl pod reads its own mounted ServiceAccount token;
+- command and error output are redacted for common token/secret shapes;
+- `NO_GRADE` is a first-class gate result for insufficient measurement.
+
+ServiceURLFormat validation and dangerous option naming are tracked in the
+quality roadmap handoff. Until that implementation lands, keep metrics URLs
+cluster-local and avoid sending Authorization material to external hosts.
+
+---
+
 ## CI Integration
 
 ### GitHub Composite Action (recommended)
 
-Drop the action into any workflow — no extra scripting required:
+Drop the action into any workflow. The current action runs the Go CLI from
+source, so the workflow must set up Go first:
 
 ```yaml
 jobs:
@@ -359,6 +399,9 @@ jobs:
 | `upload-artifact` | `true` | Upload gate result as artifact |
 
 **Outputs**: `gate-result`, `evaluation-status`, `summary-path`
+
+For long-lived CI, pin the action to a tag or SHA when available instead of
+tracking `main`.
 
 ### Manual invocation
 
@@ -413,6 +456,17 @@ make slint-gate
 # Update baseline from a local summary
 make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json
 ```
+
+---
+
+## Project Docs
+
+- Product and quality roadmap: `docs/quality-roadmap.md`
+- Implementation handoff: `docs/quality-roadmap-implementation-handoff.md`
+- Security model: `docs/security-model.md`
+- Gate contract: `docs/gate-contract.md`
+- Test strategy: `docs/test-strategy.md`
+- Release and DevEx plan: `docs/release-devex-plan.md`
 
 ---
 
