@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "slo.v3",
+  "generatedAt": "2026-07-05T00:00:00Z",
+  "results": [
+    { "id": "reconcile_total_delta", "value": 3, "status": "fail" },
+    { "id": "reconcile_total_delta", "value": 10, "status": "pass" }
+  ]
+}

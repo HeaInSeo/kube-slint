@@ -43,13 +43,31 @@ type SessionConfig struct {
 	Writer  summary.Writer
 
 	// Real-cluster Integration Knobs
-	CurlImage             string // overrides default curl image
-	TLSInsecureSkipVerify bool   // true to skip self-signed cert verification (pass -k to curl)
+	CurlImage string // overrides default curl image
+
+	// TLSInsecureSkipVerify: true to skip self-signed cert verification (pass -k to curl).
+	//
+	// Deprecated: use DangerouslySkipTLSVerify instead — this field is kept
+	// for backward compatibility and still takes effect (the two are OR'd).
+	TLSInsecureSkipVerify bool
+
 	// ServiceURLFormat overrides the default metrics URL template.
 	// Format: two %s verbs — service name, namespace.
 	// Default: "https://%s.%s.svc:8443/metrics"
 	// Use "http://%s.%s.svc:8080/metrics" for plain-HTTP dev clusters.
+	//
+	// By default the resulting URL must resolve to a cluster-local Service
+	// address ("<service>.<namespace>.svc[.cluster.local]"); anything else is
+	// rejected before a curl pod is created. See
+	// DangerouslyAllowExternalMetricsURL to opt out.
 	ServiceURLFormat string
+
+	// Security boundary bypasses — off by default. Each one allows behavior
+	// that is otherwise rejected; see docs/security-model.md for the default
+	// policy each of these overrides.
+	DangerouslySkipTLSVerify            bool // disable TLS certificate verification (see TLSInsecureSkipVerify)
+	DangerouslyAllowExternalMetricsURL  bool // allow ServiceURLFormat to resolve outside the cluster-local .svc boundary
+	DangerouslyAllowKubeSystemNamespace bool // allow kube-system/kube-public/kube-node-lease as the target namespace
 
 	// Internal metadata
 	ConfigSourceType string
@@ -72,6 +90,10 @@ type sessionImpl struct {
 	ServiceURLFormat      string
 	CurlImage             string
 	TLSInsecureSkipVerify bool
+
+	DangerouslySkipTLSVerify            bool
+	DangerouslyAllowExternalMetricsURL  bool
+	DangerouslyAllowKubeSystemNamespace bool
 
 	ScrapeTimeout      time.Duration
 	WaitPodDoneTimeout time.Duration
@@ -149,6 +171,9 @@ func NewSession(cfg SessionConfig) *Session {
 		impl.ServiceURLFormat = cfg.ServiceURLFormat
 	}
 	impl.TLSInsecureSkipVerify = cfg.TLSInsecureSkipVerify
+	impl.DangerouslySkipTLSVerify = cfg.DangerouslySkipTLSVerify
+	impl.DangerouslyAllowExternalMetricsURL = cfg.DangerouslyAllowExternalMetricsURL
+	impl.DangerouslyAllowKubeSystemNamespace = cfg.DangerouslyAllowKubeSystemNamespace
 
 	return &Session{impl: impl}
 }

@@ -651,6 +651,23 @@ func validatePolicy(p Policy) error {
 	if minLevel != "" && minLevel != "partial" && minLevel != "complete" {
 		return fmt.Errorf("unsupported reliability.min_level %q", p.Reliability.MinLevel)
 	}
+	seenNames := map[string]bool{}
+	for _, rule := range p.Thresholds {
+		if math.IsNaN(rule.Value) {
+			return fmt.Errorf("threshold %q has a NaN value", rule.Name)
+		}
+		name := strings.TrimSpace(rule.Name)
+		if name == "" {
+			continue // empty names are allowed and auto-assigned ("unnamed-threshold"); see evalThreshold
+		}
+		if seenNames[name] {
+			return fmt.Errorf("duplicate threshold name %q", name)
+		}
+		seenNames[name] = true
+	}
+	if p.Regression.Enabled && p.Regression.TolerancePercent < 0 {
+		return fmt.Errorf("regression.tolerance_percent must not be negative (got %v)", p.Regression.TolerancePercent)
+	}
 	return nil
 }
 
@@ -693,6 +710,14 @@ func loadMeasurement(path string) (*summary.Summary, string) {
 	}
 	if err := summary.ValidateSchemaVersion(s); err != nil {
 		return nil, measUnsupportedSchema
+	}
+	// summary.Validate additionally rejects empty/duplicate result IDs, an
+	// unrecognized result status, and a missing/zero generatedAt — none of
+	// which ValidateSchemaVersion alone catches. Any such artifact is
+	// untrustworthy, same as malformed JSON, so it maps to the same
+	// measCorrupt/MEASUREMENT_INPUT_CORRUPT outcome.
+	if err := summary.Validate(s); err != nil {
+		return nil, measCorrupt
 	}
 	return &s, measOK
 }

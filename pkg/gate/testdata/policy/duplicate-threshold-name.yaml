@@ -1,0 +1,12 @@
+schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+  - name: reconcile_min
+    metric: workqueue_depth_end
+    operator: "<="
+    value: 5
+fail_on:
+  - threshold_miss

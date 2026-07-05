@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "slo.v3",
+  "generatedAt": "2026-07-05T00:00:00Z",
+  "results": [
+    { "id": "", "value": 3, "status": "pass" }
+  ]
+}

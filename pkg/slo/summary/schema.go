@@ -20,9 +20,19 @@ func ValidateSchemaVersion(s Summary) error {
 	return nil
 }
 
+// allowedStatuses is the enum of valid SLIResult.Status values.
+var allowedStatuses = map[Status]bool{
+	StatusPass:  true,
+	StatusWarn:  true,
+	StatusFail:  true,
+	StatusBlock: true,
+	StatusSkip:  true,
+}
+
 // Validate performs a comprehensive check of a Summary:
-// schemaVersion must be supported, generatedAt must be non-zero,
-// and every SLIResult must have a non-empty ID.
+// schemaVersion must be supported, generatedAt must be non-zero, every
+// SLIResult must have a non-empty and unique ID, and every SLIResult's
+// Status must be one of the allowed enum values.
 // External tools should call this after loading a summary to ensure contract compliance.
 func Validate(s Summary) error {
 	if err := ValidateSchemaVersion(s); err != nil {
@@ -31,9 +41,17 @@ func Validate(s Summary) error {
 	if s.GeneratedAt.IsZero() {
 		return fmt.Errorf("generatedAt is zero")
 	}
+	seenIDs := make(map[string]bool, len(s.Results))
 	for i, r := range s.Results {
 		if r.ID == "" {
 			return fmt.Errorf("results[%d].id is empty", i)
+		}
+		if seenIDs[r.ID] {
+			return fmt.Errorf("results[%d].id %q is a duplicate result ID", i, r.ID)
+		}
+		seenIDs[r.ID] = true
+		if !allowedStatuses[r.Status] {
+			return fmt.Errorf("results[%d].status %q is not a recognized status", i, r.Status)
 		}
 	}
 	return nil

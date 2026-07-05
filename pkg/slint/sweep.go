@@ -303,6 +303,16 @@ func printSweepSummary(
 	}
 }
 
+// applySweepDeletes deletes pods by name only (not by label selector) — this
+// is safe because targetNames is derived exclusively from
+// listOrphanCandidates' label-filtered output earlier in the same call
+// (SweepOrphansWithResult), so a name can never reach this function without
+// having already matched the managed-by ownership selector. Combining name
+// and "-l" in one kubectl invocation was considered for defense-in-depth,
+// but kubectl rejects it outright ("name cannot be provided when a selector
+// is specified"), so re-verifying per-name would require an extra kubectl
+// call per pod; given targetNames' provenance is already provably
+// label-scoped, that extra round-trip isn't adding real safety here.
 func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res *SweepResult) error {
 	if res.Apply.ModeEffective != modeDelete {
 		if len(targetNames) > 0 {

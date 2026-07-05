@@ -76,13 +76,16 @@ Thresholds require:
 Allowed operators:
 
 ```text
-< <= > >= == !=
+< <= > >= ==
 ```
+
+`!=` is not supported — it is correctly treated as an unknown operator (see
+below), which already satisfies "invalid policy never produces PASS."
 
 Policy invalid cases:
 
-- empty threshold name;
-- duplicate threshold name;
+- duplicate threshold name (empty names are allowed and auto-assigned
+  `unnamed-threshold`; see the Priority 0 implementation notes);
 - missing metric;
 - unknown operator;
 - non-finite value;
@@ -137,6 +140,9 @@ Unknown `fail-on` values are invalid.
 
 ## Open Decisions
 
-- Whether NaN/Inf metric values are invalid input or measurement failure.
+- ~~Whether NaN/Inf metric values are invalid input or measurement failure.~~
+  Resolved (Priority 0 implementation): summary-side NaN/Inf is invalid JSON
+  and is rejected as `measCorrupt` before any policy logic runs; policy-side
+  NaN threshold values are explicitly rejected by `validatePolicy`.
 - Which unknown summary/policy fields may be ignored for compatibility.
 - Whether required baseline absence should produce `NO_GRADE` or `FAIL`.

@@ -132,3 +132,30 @@ func TestValidate_EmptyResultID(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "results[0].id is empty")
 }
+
+func TestValidate_DuplicateResultID(t *testing.T) {
+	s := validSummary()
+	dup := s.Results[0]
+	s.Results = append(s.Results, dup)
+	err := summary.Validate(s)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate result ID")
+}
+
+func TestValidate_UnknownResultStatus(t *testing.T) {
+	s := validSummary()
+	s.Results[0].Status = "bogus"
+	err := summary.Validate(s)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not a recognized status")
+}
+
+func TestValidate_AllKnownStatusesAccepted(t *testing.T) {
+	for _, st := range []summary.Status{
+		summary.StatusPass, summary.StatusWarn, summary.StatusFail, summary.StatusBlock, summary.StatusSkip,
+	} {
+		s := validSummary()
+		s.Results[0].Status = st
+		assert.NoError(t, summary.Validate(s), "status %q should be valid", st)
+	}
+}

@@ -1,0 +1,11 @@
+schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+regression:
+  enabled: true
+  tolerance_percent: -5
+fail_on:
+  - threshold_miss

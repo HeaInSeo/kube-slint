@@ -130,12 +130,14 @@ const sessionSnippet = `
 // import "github.com/HeaInSeo/kube-slint/pkg/slint"
 
 sess := slint.NewSession(slint.SessionConfig{
-    Namespace:             "{{ .Namespace }}",
-    MetricsServiceName:    "{{ .ServiceName }}",
-    ServiceAccountName:    "kube-slint-scraper",
-    ArtifactsDir:          "artifacts",
-    Specs:                 slint.DefaultSpecs(),
-    TLSInsecureSkipVerify: true,
+    Namespace:          "{{ .Namespace }}",
+    MetricsServiceName: "{{ .ServiceName }}",
+    ServiceAccountName: "kube-slint-scraper",
+    ArtifactsDir:       "artifacts",
+    Specs:              slint.DefaultSpecs(),
+    // Uncomment only if your metrics endpoint uses a self-signed cert you
+    // can't otherwise trust (e.g. a local dev cluster):
+    // DangerouslySkipTLSVerify: true,
 })
 sess.Start()
 // ... run your E2E scenario here ...

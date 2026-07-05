@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "slo.v3",
+  "results": [
+    { "id": "reconcile_total_delta", "value": 3, "status": "pass" }
+  ]
+}

@@ -22,11 +22,34 @@ type Client struct {
 	Runner kubeutil.CmdRunner
 
 	// 옵션 조정 가능 항목
-	Image                 string
-	LabelSelector         string
-	PodNamePrefix         string
-	ServiceURLFormat      string // e.g. "https://%s.%s.svc:8443/metrics"
-	TLSInsecureSkipVerify bool   // if true, adds -k to curl
+	Image            string
+	LabelSelector    string
+	PodNamePrefix    string
+	ServiceURLFormat string // e.g. "https://%s.%s.svc:8443/metrics"
+
+	// TLSInsecureSkipVerify: if true, adds -k to curl.
+	//
+	// Deprecated: use DangerouslySkipTLSVerify instead — this field is kept
+	// for backward compatibility and still takes effect (the two are OR'd),
+	// but new callers should prefer the visibly-named dangerous option.
+	TLSInsecureSkipVerify bool
+
+	// DangerouslySkipTLSVerify disables TLS certificate verification for the
+	// metrics scrape (adds -k to curl). Off by default; only enable this for
+	// a narrow, known-insecure dev/test target.
+	DangerouslySkipTLSVerify bool
+
+	// DangerouslyAllowExternalMetricsURL disables the default-deny check that
+	// ServiceURLFormat must resolve to a cluster-local Service address
+	// ("<service>.<namespace>.svc[.cluster.local]"). Off by default: enabling
+	// it allows the Authorization bearer token to be sent to whatever host
+	// ServiceURLFormat happens to resolve to, including an external one.
+	DangerouslyAllowExternalMetricsURL bool
+
+	// DangerouslyAllowKubeSystemNamespace disables the default rejection of
+	// cluster-critical target namespaces (kube-system, kube-public,
+	// kube-node-lease). Off by default.
+	DangerouslyAllowKubeSystemNamespace bool
 }
 
 // New 는 안전한 기본값으로 클라이언트를 생성함.
@@ -36,13 +59,16 @@ func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 		r = kubeutil.DefaultRunner{}
 	}
 	return &Client{
-		Logger:                slo.NewLogger(logger),
-		Runner:                r,
-		Image:                 "curlimages/curl:8.11.0",
-		LabelSelector:         PodLabelSelector,
-		PodNamePrefix:         "curl-metrics",
-		ServiceURLFormat:      "https://%s.%s.svc:8443/metrics",
-		TLSInsecureSkipVerify: true, // Defaulting to true for backward compatibility with E2E suite
+		Logger:           slo.NewLogger(logger),
+		Runner:           r,
+		Image:            "curlimages/curl:8.11.0",
+		LabelSelector:    PodLabelSelector,
+		PodNamePrefix:    "curl-metrics",
+		ServiceURLFormat: "https://%s.%s.svc:8443/metrics",
+		// TLSInsecureSkipVerify defaults to false: skipping TLS verification
+		// is a security boundary bypass and must be an explicit opt-in
+		// (DangerouslySkipTLSVerify), not a silent default.
+		TLSInsecureSkipVerify: false,
 	}
 }
 
@@ -59,14 +85,26 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	// kubectl args, PodSpec command strings, or command logs.
 	_ = token
 
+	// Validate the target namespace and metrics URL BEFORE creating any pod
+	// (best-effort cleanup included) — a rejected config must never reach
+	// kubectl.
+	if isDangerousNamespace(ns) && !c.DangerouslyAllowKubeSystemNamespace {
+		return "", fmt.Errorf(
+			"namespace %q is a cluster-critical namespace and is rejected by default; "+
+				"set DangerouslyAllowKubeSystemNamespace to override", ns)
+	}
+	metricsURL, err := ValidateMetricsURL(c.ServiceURLFormat, metricsSvcName, ns, c.DangerouslyAllowExternalMetricsURL)
+	if err != nil {
+		return "", err
+	}
+
 	// 이전 curl-metrics 파드 최선(best-effort) 정리
 	_ = c.CleanupByLabel(ctx, ns)
 
 	podName := fmt.Sprintf("%s-%d", c.PodNamePrefix, time.Now().UnixNano())
-	metricsURL := fmt.Sprintf(c.ServiceURLFormat, metricsSvcName, ns)
 
 	insecureFlag := ""
-	if c.TLSInsecureSkipVerify {
+	if c.TLSInsecureSkipVerify || c.DangerouslySkipTLSVerify {
 		insecureFlag = "-k"
 	}
 
@@ -118,7 +156,7 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer ${TOKEN}" "%s";`, insecur
 }`, podName, ns, string(labelsJSON), serviceAccountName, c.Image, curlCmd),
 	)
 
-	_, err := c.Runner.Run(ctx, c.Logger, cmd)
+	_, err = c.Runner.Run(ctx, c.Logger, cmd)
 	return podName, err
 }
 

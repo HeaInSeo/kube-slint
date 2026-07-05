@@ -169,3 +169,130 @@ func TestRunOnce_PodOverrides_SetsAutomountServiceAccountTokenAndIsValidJSON(t *
 		t.Fatal("expected automountServiceAccountToken=true so the pod can read its own SA token")
 	}
 }
+
+// security/privileged-curlpod.yaml, security/hostpath-curlpod.yaml
+func TestRunOnce_PodOverrides_NeverPrivilegedOrHostPath(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+
+	_, err := c.RunOnce(context.Background(), "ns", "", "metrics-svc", "scraper-sa")
+	if err != nil {
+		t.Fatalf("RunOnce returned error: %v", err)
+	}
+
+	var overridesJSON string
+	for i, a := range r.args {
+		if a == "--overrides" && i+1 < len(r.args) {
+			overridesJSON = r.args[i+1]
+			break
+		}
+	}
+	if overridesJSON == "" {
+		t.Fatalf("expected --overrides argument, got args: %v", r.args)
+	}
+	if strings.Contains(overridesJSON, "hostPath") {
+		t.Fatalf("pod override must never contain a hostPath volume: %s", overridesJSON)
+	}
+	if strings.Contains(overridesJSON, `"privileged": true`) || strings.Contains(overridesJSON, `"privileged":true`) {
+		t.Fatalf("pod override must never set privileged: true: %s", overridesJSON)
+	}
+
+	var overrides struct {
+		Spec struct {
+			Containers []struct {
+				SecurityContext struct {
+					AllowPrivilegeEscalation bool `json:"allowPrivilegeEscalation"`
+					RunAsNonRoot             bool `json:"runAsNonRoot"`
+					Capabilities             struct {
+						Drop []string `json:"drop"`
+					} `json:"capabilities"`
+					SeccompProfile struct {
+						Type string `json:"type"`
+					} `json:"seccompProfile"`
+				} `json:"securityContext"`
+			} `json:"containers"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal([]byte(overridesJSON), &overrides); err != nil {
+		t.Fatalf("--overrides is not valid JSON: %v\n%s", err, overridesJSON)
+	}
+	require1 := overrides.Spec.Containers
+	if len(require1) != 1 {
+		t.Fatalf("expected exactly one container, got %d", len(require1))
+	}
+	sc := require1[0].SecurityContext
+	if sc.AllowPrivilegeEscalation {
+		t.Fatal("expected allowPrivilegeEscalation=false")
+	}
+	if !sc.RunAsNonRoot {
+		t.Fatal("expected runAsNonRoot=true")
+	}
+	if len(sc.Capabilities.Drop) != 1 || sc.Capabilities.Drop[0] != "ALL" {
+		t.Fatalf("expected capabilities.drop=[ALL], got %v", sc.Capabilities.Drop)
+	}
+	if sc.SeccompProfile.Type != "RuntimeDefault" {
+		t.Fatalf("expected seccompProfile.type=RuntimeDefault, got %q", sc.SeccompProfile.Type)
+	}
+}
+
+// security/kube-system-target.yaml
+func TestRunOnce_RejectsKubeSystemNamespaceByDefault(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+
+	_, err := c.RunOnce(context.Background(), "kube-system", "", "metrics-svc", "scraper-sa")
+	if err == nil {
+		t.Fatal("expected kube-system namespace to be rejected by default")
+	}
+	if len(r.args) != 0 {
+		t.Fatalf("expected no kubectl command to run before namespace validation, got: %v", r.args)
+	}
+}
+
+func TestRunOnce_DangerouslyAllowKubeSystemNamespace_Opt(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+	c.DangerouslyAllowKubeSystemNamespace = true
+
+	_, err := c.RunOnce(context.Background(), "kube-system", "", "metrics-svc", "scraper-sa")
+	if err != nil {
+		t.Fatalf("expected explicit opt-in to allow kube-system namespace, got error: %v", err)
+	}
+}
+
+// security/external-service-url.yaml — enforced at RunOnce, before any kubectl command
+func TestRunOnce_RejectsExternalServiceURLFormatByDefault(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+	c.ServiceURLFormat = "https://evil.example.com/collect?svc=%s&ns=%s"
+
+	_, err := c.RunOnce(context.Background(), "ns", "", "metrics-svc", "scraper-sa")
+	if err == nil {
+		t.Fatal("expected external ServiceURLFormat to be rejected by default")
+	}
+	if len(r.args) != 0 {
+		t.Fatalf("expected no kubectl command to run before URL validation, got: %v", r.args)
+	}
+}
+
+func TestRunOnce_DangerouslyAllowExternalMetricsURL_Opt(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+	c.ServiceURLFormat = "https://evil.example.com/collect?svc=%s&ns=%s"
+	c.DangerouslyAllowExternalMetricsURL = true
+
+	_, err := c.RunOnce(context.Background(), "ns", "", "metrics-svc", "scraper-sa")
+	if err != nil {
+		t.Fatalf("expected explicit opt-in to allow external ServiceURLFormat, got error: %v", err)
+	}
+}
+
+func TestNew_TLSInsecureSkipVerifyDefaultsFalse(t *testing.T) {
+	c := New(nil, nil)
+	if c.TLSInsecureSkipVerify {
+		t.Fatal("expected TLSInsecureSkipVerify to default to false")
+	}
+	if c.DangerouslySkipTLSVerify {
+		t.Fatal("expected DangerouslySkipTLSVerify to default to false")
+	}
+}

@@ -11,48 +11,55 @@ executable tests.
 
 ## Bad Fixture Matrix
 
+Status: implemented as executable tests in `pkg/gate/testdata/{summary,policy}/`
+and `pkg/gate/badfixtures_test.go` (`TestBadFixtures_Summary`,
+`TestBadFixtures_Policy`), plus `pkg/slo/fetch/curlpod/urlvalidate_test.go`
+and `client_test.go` for the security fixtures — see the notes below for two
+rows whose "expected result" changed from originally planned during
+implementation.
+
 Summary fixtures:
 
 | File | Expected result |
 |---|---|
-| `summary/missing-schema-version.json` | reject |
-| `summary/wrong-schema-version.json` | reject |
-| `summary/empty-result-id.json` | reject |
-| `summary/duplicate-result-id.json` | reject |
-| `summary/unknown-result-status.json` | reject |
-| `summary/invalid-generated-at.json` | reject |
-| `summary/nan-metric-value.json` | reject recommended; open policy |
-| `summary/inf-metric-value.json` | reject recommended; open policy |
-| `summary/malformed-json.json` | reject |
+| `summary/missing-schema-version.json` | reject — implemented |
+| `summary/wrong-schema-version.json` | reject — implemented |
+| `summary/empty-result-id.json` | reject — implemented |
+| `summary/duplicate-result-id.json` | reject — implemented |
+| `summary/unknown-result-status.json` | reject — implemented |
+| `summary/invalid-generated-at.json` | reject — implemented |
+| `summary/nan-metric-value.json` | reject — implemented (bare NaN is invalid JSON, rejected before any policy logic) |
+| `summary/inf-metric-value.json` | reject — implemented (same as above) |
+| `summary/malformed-json.json` | reject — implemented |
 
 Policy fixtures:
 
 | File | Expected result |
 |---|---|
-| `policy/missing-policy-version.yaml` | reject |
-| `policy/wrong-policy-version.yaml` | reject |
-| `policy/unknown-operator.yaml` | reject |
-| `policy/duplicate-threshold-name.yaml` | reject |
-| `policy/missing-metric.yaml` | reject |
-| `policy/negative-tolerance.yaml` | reject |
-| `policy/nan-threshold-value.yaml` | reject recommended |
-| `policy/empty-threshold-name.yaml` | reject |
-| `policy/unknown-fail-on.yaml` | reject |
-| `policy/baseline-required-but-missing.yaml` | `NO_GRADE` or `FAIL`; open policy |
+| `policy/missing-policy-version.yaml` | reject — implemented |
+| `policy/wrong-policy-version.yaml` | reject — implemented |
+| `policy/unknown-operator.yaml` | reject — implemented (uses `!=`; `!=` is not a supported operator, see gate-contract.md) |
+| `policy/duplicate-threshold-name.yaml` | reject — implemented |
+| `policy/missing-metric.yaml` | reject — implemented (per-check `NO_GRADE`, not a whole-policy reject) |
+| `policy/negative-tolerance.yaml` | reject — implemented |
+| `policy/nan-threshold-value.yaml` | reject — implemented |
+| `policy/empty-threshold-name.yaml` | **allowed, not rejected** — resolved conflict: `evalThreshold` intentionally auto-names an empty threshold `"unnamed-threshold"` and proceeds; this is existing, tested (`TestEvaluate_UnnamedThreshold`), accepted behavior. Not implemented as a bad fixture. |
+| `policy/unknown-fail-on.yaml` | reject — implemented |
+| `policy/baseline-required-but-missing.yaml` | `NO_GRADE` or `FAIL`; still open policy, not implemented this pass |
 
 Security fixtures:
 
 | File | Expected result |
 |---|---|
-| `security/external-service-url.yaml` | reject |
-| `security/external-service-url-template-injection.yaml` | reject |
-| `security/ftp-service-url.yaml` | reject |
-| `security/insecure-tls-default.yaml` | reject or compatibility warning until migrated |
-| `security/clusterrolebinding-default.yaml` | reject |
-| `security/privileged-curlpod.yaml` | reject |
-| `security/hostpath-curlpod.yaml` | reject |
-| `security/kube-system-target.yaml` | reject |
-| `security/cleanup-without-owner-label.yaml` | reject |
+| `security/external-service-url.yaml` | reject — implemented (`ValidateMetricsURL`) |
+| `security/external-service-url-template-injection.yaml` | reject — implemented (DNS-label validation on service/namespace) |
+| `security/ftp-service-url.yaml` | reject — implemented |
+| `security/insecure-tls-default.yaml` | reject by default — implemented (`curlpod.New()`'s `TLSInsecureSkipVerify` default changed to `false`; `DangerouslySkipTLSVerify` is the explicit opt-in) |
+| `security/clusterrolebinding-default.yaml` | reject — already implemented and tested (`TestRunInit_EmitRBAC`) |
+| `security/privileged-curlpod.yaml` | reject — already implemented and tested |
+| `security/hostpath-curlpod.yaml` | reject — already implemented and tested |
+| `security/kube-system-target.yaml` | reject — implemented (`isDangerousNamespace`; `DangerouslyAllowKubeSystemNamespace` is the explicit opt-in) |
+| `security/cleanup-without-owner-label.yaml` | reject — already safe by construction (delete targets are derived exclusively from the label-filtered list step in the same call; see the code comment on `applySweepDeletes`) |
 
 Fixture rules:
 

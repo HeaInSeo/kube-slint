@@ -205,9 +205,18 @@ sess := slint.NewSession(slint.SessionConfig{
 The default URL format is `slint.ServiceURLHTTPS`
 (`"https://%s.%s.svc:8443/metrics"`).
 
-`TLSInsecureSkipVerify` is available for compatibility with self-signed
+By default, `ServiceURLFormat` must resolve to a cluster-local Service
+address (`<service>.<namespace>.svc` or `.svc.cluster.local`, `http`/`https`
+only) — anything else is rejected before a curl pod is created, so a
+misconfigured or malicious external URL can never receive the scrape's
+Authorization token. Set `DangerouslyAllowExternalMetricsURL: true` to
+explicitly opt out.
+
+`TLSInsecureSkipVerify` is deprecated in favor of `DangerouslySkipTLSVerify`
+(same effect, visibly named) — available for compatibility with self-signed
 development clusters, but it weakens TLS verification. Do not enable it in
 shared or production-like CI unless you have explicitly accepted that risk.
+It is `false` by default.
 
 ---
 
@@ -351,11 +360,15 @@ kube-slint's default measurement path is namespace-scoped:
 - ClusterRoleBinding is not required for the default path;
 - the curl pod reads its own mounted ServiceAccount token;
 - command and error output are redacted for common token/secret shapes;
-- `NO_GRADE` is a first-class gate result for insufficient measurement.
+- `NO_GRADE` is a first-class gate result for insufficient measurement;
+- `ServiceURLFormat` is validated before any curl pod is created — external
+  hosts, unsupported schemes, and malformed service/namespace values are
+  rejected by default (see `DangerouslyAllowExternalMetricsURL` to opt out);
+- `kube-system`/`kube-public`/`kube-node-lease` are rejected as measurement
+  target namespaces by default (see `DangerouslyAllowKubeSystemNamespace`).
 
-ServiceURLFormat validation and dangerous option naming are tracked in the
-quality roadmap handoff. Until that implementation lands, keep metrics URLs
-cluster-local and avoid sending Authorization material to external hosts.
+See `docs/security-model.md` for the full default-deny policy and dangerous
+option reference.
 
 ---
 

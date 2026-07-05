@@ -47,6 +47,31 @@ Dangerous options must document the default safe behavior, the risk being
 accepted, the narrow use case, and the tests covering default rejection and
 explicit opt-in.
 
+### Implemented dangerous options (Priority 0)
+
+`SessionConfig` (`pkg/slint`) and `curlpod.Client`/`CurlPod`
+(`pkg/slo/fetch/curlpod`) expose:
+
+| Field | Default | Risk accepted when enabled | Narrow use case |
+|---|---|---|---|
+| `DangerouslyAllowExternalMetricsURL` | `false` | Authorization bearer token may be sent to a host outside the cluster-local `.svc` boundary. | `ServiceURLFormat` must point at a metrics endpoint hosted outside the cluster (rare; prefer routing through an in-cluster proxy instead). |
+| `DangerouslySkipTLSVerify` | `false` | TLS certificate verification is skipped for the metrics scrape (curl `-k`). | The metrics endpoint uses a self-signed certificate you cannot otherwise trust, e.g. a local dev cluster. |
+| `DangerouslyAllowKubeSystemNamespace` | `false` | Curl pods and measurement target a cluster-critical namespace (`kube-system`, `kube-public`, `kube-node-lease`). | You are deliberately measuring a component that only runs in one of those namespaces. |
+
+Compatibility: `TLSInsecureSkipVerify` (the pre-existing field on both
+`SessionConfig` and `curlpod.Client`) is deprecated in favor of
+`DangerouslySkipTLSVerify` but still takes effect — the two are OR'd, so
+existing callers are unaffected. Its own default changed from `true` to
+`false` in `curlpod.New()` (previously "defaulting to true for backward
+compatibility with E2E suite," which contradicted this document's own
+default-deny policy).
+
+All three are validated in `pkg/slo/fetch/curlpod`'s `RunOnce`, before any
+`kubectl` command runs — see `ValidateMetricsURL` and `isDangerousNamespace`
+in `urlvalidate.go`. A rejection surfaces as a Go `error` through the
+existing fetch/measurement-failure path (`CollectionStatus=Failed` →
+`NO_GRADE`), not a panic or a silently-accepted config.
+
 ## ServiceURLFormat Policy
 
 Default mode accepts only cluster-local metrics hosts.
@@ -156,10 +181,10 @@ The quality guardrail workflow currently checks:
 
 ## Acceptance Checklist
 
-- [ ] External metrics URL rejected by default.
-- [ ] Token forwarding to external hosts impossible in default mode.
-- [ ] Namespace-scoped RBAC remains default.
-- [ ] Cluster-wide RBAC requires explicit dangerous opt-in.
-- [ ] Privileged pod and hostPath are rejected in generated/default resources.
-- [ ] Cleanup requires kube-slint ownership metadata.
-- [ ] Invalid summary/policy cannot produce PASS.
+- [x] External metrics URL rejected by default (`ValidateMetricsURL`).
+- [x] Token forwarding to external hosts impossible in default mode (same validator runs before any curl pod is created).
+- [x] Namespace-scoped RBAC remains default (`TestRunInit_EmitRBAC`).
+- [ ] Cluster-wide RBAC requires explicit dangerous opt-in — not implemented this pass; default RBAC generation never produces `ClusterRoleBinding`, and `pkg/kubeutil.ApplyClusterRoleBinding` is dead code (test-only, unreachable from any default path), so there is currently no opt-in surface at all for cluster-wide RBAC to gate.
+- [x] Privileged pod and hostPath are rejected in generated/default resources (`TestRunOnce_PodOverrides_NeverPrivilegedOrHostPath`).
+- [x] Cleanup requires kube-slint ownership metadata (delete targets are derived exclusively from the label-filtered list step; see `applySweepDeletes`'s code comment for why combining `-l` with a resource name isn't possible in `kubectl` itself).
+- [x] Invalid summary/policy cannot produce PASS (`pkg/gate/badfixtures_test.go`).

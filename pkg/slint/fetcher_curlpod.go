@@ -28,8 +28,12 @@ func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
 	client := curlpod.New(nil, nil)
 	// 필요한 안전 레이블을 추가함
 	client.LabelSelector = fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", SanitizeKubernetesLabelValue(impl.RunID))
-	// Apply TLS integration knob
+	// Apply TLS integration knob and dangerous security-boundary opt-ins.
+	//nolint:staticcheck // SA1019: intentional bridge for the deprecated legacy field, kept for backward compatibility.
 	client.TLSInsecureSkipVerify = impl.TLSInsecureSkipVerify
+	client.DangerouslySkipTLSVerify = impl.DangerouslySkipTLSVerify
+	client.DangerouslyAllowExternalMetricsURL = impl.DangerouslyAllowExternalMetricsURL
+	client.DangerouslyAllowKubeSystemNamespace = impl.DangerouslyAllowKubeSystemNamespace
 
 	return &curlPodFetcher{
 		impl: impl,

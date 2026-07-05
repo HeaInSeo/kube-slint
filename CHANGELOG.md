@@ -12,6 +12,15 @@
 - `pkg/dataplane`: shared, kind-agnostic manifest model (Deployment/StatefulSet/DaemonSet unified as one `Workload` shape, plus `Service`/`ServiceMonitor`) and `LoadDir` directory loader — hand-rolled local structs on top of the existing `gopkg.in/yaml.v3` dependency, no new `k8s.io/**`/`sigs.k8s.io/**` dependency added. `.golangci.yml` gained a `depguard` rule enforcing this for `pkg/dataplane/**`/`pkg/report/**`, mirroring the existing `pkg/slo` core-boundary rule.
 - `pkg/dataplane/service`: the dataplane-service checks + a `spec.Registry`-shaped check registry.
 
+### Security
+
+- `pkg/slo/fetch/curlpod`: `ValidateMetricsURL` and `isDangerousNamespace` — `ServiceURLFormat` is now validated before any curl pod is created. Default-deny: external hosts, unsupported URL schemes, malformed service/namespace values, and `kube-system`/`kube-public`/`kube-node-lease` target namespaces are all rejected unless explicitly opted into via new `Dangerously*` fields on `SessionConfig`/`curlpod.Client`/`CurlPod` (`DangerouslyAllowExternalMetricsURL`, `DangerouslySkipTLSVerify`, `DangerouslyAllowKubeSystemNamespace`). A rejection surfaces as a normal fetch error → `CollectionStatus=Failed` → `NO_GRADE`, not a panic or silent pass. See `docs/security-model.md`.
+- `pkg/slo/fetch/curlpod/client.go`: `curlpod.New()`'s `TLSInsecureSkipVerify` default changed from `true` ("defaulting to true for backward compatibility with E2E suite") to `false` — this contradicted `docs/security-model.md`'s default-deny policy. `TLSInsecureSkipVerify` is now deprecated in favor of `DangerouslySkipTLSVerify` (same effect, OR'd for compatibility).
+- `cmd/slint-gate/init.go`'s onboarding snippet no longer sets the now-deprecated `TLSInsecureSkipVerify: true` by default; it's now a commented-out `DangerouslySkipTLSVerify: true` line with a note on when to use it.
+- `pkg/slo/summary/schema.go`: `Validate` now also rejects duplicate result IDs and unrecognized result statuses (previously only checked schema version, `generatedAt`, and empty IDs). `pkg/gate/gate.go`'s `loadMeasurement` now calls the fuller `Validate` (was only `ValidateSchemaVersion`), so these join malformed JSON as `MEASUREMENT_INPUT_CORRUPT`/`NO_GRADE` instead of being silently accepted.
+- `pkg/gate/gate.go`'s `validatePolicy`: rejects duplicate threshold names, a NaN threshold value, and a negative `regression.tolerance_percent`.
+- `pkg/gate/testdata/{summary,policy}/` + `pkg/gate/badfixtures_test.go`: 16 executable bad-fixture tests per `docs/test-strategy.md`'s Bad Fixture Matrix, asserting invalid summary/policy input never produces `PASS`.
+
 ### Fixed
 
 - `.gitignore`: a bare `slint-gate` pattern unintentionally matched the `cmd/slint-gate` source directory (not just an accidental root-level binary build), forcing `git add -f` on every new file under it. Anchored to `/slint-gate`.

@@ -1,0 +1,8 @@
+schema_version: "slint.policy.v1"
+thresholds:
+  - name: no_metric_here
+    metric: ""
+    operator: ">="
+    value: 1
+fail_on:
+  - threshold_miss

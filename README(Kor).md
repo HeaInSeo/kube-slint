@@ -215,9 +215,17 @@ sess := slint.NewSession(slint.SessionConfig{
 
 기본값은 `slint.ServiceURLHTTPS` (`"https://%s.%s.svc:8443/metrics"`)입니다.
 
-`TLSInsecureSkipVerify`는 자체 서명 인증서를 쓰는 개발 클러스터와의
-호환을 위해 남아 있지만 TLS 검증을 약화합니다. 공유 CI나 운영과 유사한
-환경에서는 위험을 명시적으로 수용한 경우가 아니라면 켜지 마십시오.
+기본적으로 `ServiceURLFormat`은 클러스터 내부 Service 주소
+(`<service>.<namespace>.svc` 또는 `.svc.cluster.local`, `http`/`https`만
+허용)로만 해석되어야 합니다 — 그 외에는 curl pod 생성 전에 거부되므로
+잘못 설정되거나 악의적인 외부 URL이 스크랩용 Authorization 토큰을 받을 수
+없습니다. 이 기본값을 명시적으로 해제하려면 `DangerouslyAllowExternalMetricsURL: true`를 설정하세요.
+
+`TLSInsecureSkipVerify`는 `DangerouslySkipTLSVerify`로 대체된 deprecated
+필드입니다(효과는 동일하고 이름만 명확함) — 자체 서명 인증서를 쓰는 개발
+클러스터와의 호환을 위해 남아 있지만 TLS 검증을 약화합니다. 공유 CI나
+운영과 유사한 환경에서는 위험을 명시적으로 수용한 경우가 아니라면 켜지
+마십시오. 기본값은 `false`입니다.
 
 ---
 
@@ -377,11 +385,15 @@ kube-slint의 기본 계측 경로는 네임스페이스 스코프입니다:
 - curl pod는 pod 내부에 mount된 ServiceAccount token을 읽습니다.
 - command/error 출력은 일반적인 token/secret 형태를 redaction합니다.
 - 계측이 불충분한 경우 `NO_GRADE`가 1급 gate 결과로 노출됩니다.
+- `ServiceURLFormat`은 curl pod 생성 전에 검증됩니다 — 외부 host, 지원하지
+  않는 scheme, 잘못된 형식의 service/namespace 값은 기본적으로 거부됩니다
+  (해제하려면 `DangerouslyAllowExternalMetricsURL` 참고).
+- `kube-system`/`kube-public`/`kube-node-lease`는 기본적으로 계측 대상
+  namespace로 거부됩니다 (해제하려면 `DangerouslyAllowKubeSystemNamespace`
+  참고).
 
-ServiceURLFormat 검증과 dangerous option naming은 quality roadmap handoff에
-구현 과제로 정리되어 있습니다. 해당 구현이 들어오기 전까지 metrics URL은
-cluster-local로 유지하고, Authorization material을 외부 host로 보내지
-마십시오.
+전체 default-deny 정책과 dangerous option 목록은 `docs/security-model.md`를
+참고하세요.
 
 ---
 
