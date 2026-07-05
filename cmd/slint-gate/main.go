@@ -37,14 +37,7 @@ func main() {
 			}
 			return
 		case "baseline":
-			if len(os.Args) < 3 || os.Args[2] != "approve" {
-				fmt.Fprintln(os.Stderr, "usage: slint-gate baseline approve [flags]")
-				os.Exit(2)
-			}
-			if err := runBaselineApprove(os.Args[3:]); err != nil {
-				fmt.Fprintf(os.Stderr, "slint-gate baseline approve: %v\n", err)
-				os.Exit(1)
-			}
+			dispatchBaseline(os.Args[2:])
 			return
 		case "ci":
 			if len(os.Args) < 3 || os.Args[2] != "github-actions" {
@@ -59,6 +52,32 @@ func main() {
 		}
 	}
 	runGate()
+}
+
+// dispatchBaseline handles `slint-gate baseline <approve|diff|merge> [flags]`.
+func dispatchBaseline(args []string) {
+	usage := "usage: slint-gate baseline <approve|diff|merge> [flags]"
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(2)
+	}
+
+	var err error
+	switch args[0] {
+	case "approve":
+		err = runBaselineApprove(args[1:])
+	case "diff":
+		err = runBaselineDiff(args[1:])
+	case "merge":
+		err = runBaselineMerge(args[1:])
+	default:
+		fmt.Fprintln(os.Stderr, usage)
+		os.Exit(2)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "slint-gate baseline %s: %v\n", args[0], err)
+		os.Exit(1)
+	}
 }
 
 func runGate() {
