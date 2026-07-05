@@ -177,6 +177,48 @@ func TestIsValidFailOn(t *testing.T) {
 	assert.False(t, isValidFailOn("FAIL_OR_NO_GRADE"))
 }
 
+func TestResolveExitOn(t *testing.T) {
+	cases := []struct {
+		name                 string
+		exitOnSet, failOnSet bool
+		exitOnVal, failOnVal string
+		wantResolved         string
+		wantDeprecated       bool
+	}{
+		{
+			name:      "neither set uses fail-on default, no deprecation warning",
+			exitOnSet: false, exitOnVal: "",
+			failOnSet: false, failOnVal: "NEVER",
+			wantResolved: "NEVER", wantDeprecated: false,
+		},
+		{
+			name:      "only --fail-on set is honored with deprecation warning",
+			exitOnSet: false, exitOnVal: "",
+			failOnSet: true, failOnVal: "FAIL",
+			wantResolved: "FAIL", wantDeprecated: true,
+		},
+		{
+			name:      "only --exit-on set is honored with no deprecation warning",
+			exitOnSet: true, exitOnVal: "FAIL_OR_WARN",
+			failOnSet: false, failOnVal: "NEVER",
+			wantResolved: "FAIL_OR_WARN", wantDeprecated: false,
+		},
+		{
+			name:      "both set: --exit-on wins, no deprecation warning",
+			exitOnSet: true, exitOnVal: "FAIL_OR_NOGRADE",
+			failOnSet: true, failOnVal: "FAIL",
+			wantResolved: "FAIL_OR_NOGRADE", wantDeprecated: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolved, deprecated := resolveExitOn(tc.exitOnSet, tc.exitOnVal, tc.failOnSet, tc.failOnVal)
+			assert.Equal(t, tc.wantResolved, resolved)
+			assert.Equal(t, tc.wantDeprecated, deprecated)
+		})
+	}
+}
+
 func TestMarkdownCellEscapesTableBreaks(t *testing.T) {
 	assert.Equal(t, "a\\|b c", mdCell("a|b\nc"))
 }

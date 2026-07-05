@@ -75,7 +75,18 @@ type Policy struct {
 	Thresholds    []ThresholdRule `yaml:"thresholds"`
 	Regression    RegressionCfg   `yaml:"regression"`
 	Reliability   ReliabilityCfg  `yaml:"reliability"`
-	FailOn        []string        `yaml:"fail_on"`
+
+	// FailOn is deprecated: use PromoteToFail instead. Both are honored
+	// (union of the two) during the deprecation window; using FailOn
+	// produces a PolicyWarnings entry recommending migration.
+	FailOn []string `yaml:"fail_on"`
+
+	// PromoteToFail lists which gate conditions ("threshold_miss",
+	// "regression_detected") are promoted from WARN to FAIL. This is the
+	// preferred name for what was previously FailOn — it disambiguates
+	// from the CLI/action's --exit-on/exit-on, which controls process
+	// exit code, not gate grade promotion.
+	PromoteToFail []string `yaml:"promote_to_fail"`
 }
 
 // ThresholdRule is a single absolute threshold check.
@@ -598,11 +609,12 @@ func gateMessage(result string) string {
 
 // knownPolicyKeys is the set of top-level keys that policy.yaml supports.
 var knownPolicyKeys = map[string]bool{
-	"schema_version": true,
-	"thresholds":     true,
-	"regression":     true,
-	"reliability":    true,
-	"fail_on":        true,
+	"schema_version":  true,
+	"thresholds":      true,
+	"regression":      true,
+	"reliability":     true,
+	"fail_on":         true,
+	"promote_to_fail": true,
 }
 
 func loadPolicy(path string) (*Policy, string, []string) {
@@ -631,6 +643,10 @@ func loadPolicy(path string) (*Policy, string, []string) {
 		warnings = append(warnings, err.Error())
 		return nil, policyInvalid, warnings
 	}
+	if len(p.FailOn) > 0 {
+		warnings = append(warnings,
+			"policy.yaml: 'fail_on' is deprecated; use 'promote_to_fail' instead (both are honored during the deprecation window)")
+	}
 	return &p, policyOK, warnings
 }
 
@@ -645,6 +661,15 @@ func validatePolicy(p Policy) error {
 		}
 		if !allowedPolicyFailOn[v] {
 			return fmt.Errorf("unsupported fail_on value %q", item)
+		}
+	}
+	for _, item := range p.PromoteToFail {
+		v := normalizeFailOn(item)
+		if v == "" {
+			continue
+		}
+		if !allowedPolicyFailOn[v] {
+			return fmt.Errorf("unsupported promote_to_fail value %q", item)
 		}
 	}
 	minLevel := strings.ToLower(strings.TrimSpace(p.Reliability.MinLevel))
@@ -686,7 +711,7 @@ func collectUnknownPolicyKeys(doc *yaml.Node) []string {
 		key := root.Content[i].Value
 		if !knownPolicyKeys[key] {
 			warnings = append(warnings,
-				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, fail_on",
+				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, fail_on (deprecated), promote_to_fail",
 					key, root.Content[i].Line))
 		}
 	}
@@ -739,7 +764,16 @@ func resultValueMap(s *summary.Summary) map[string]float64 {
 
 func makeFailOn(policy *Policy) map[string]bool {
 	result := map[string]bool{}
+	// FailOn (deprecated) and PromoteToFail are unioned: whichever field(s)
+	// are populated take effect, so a policy authored under either name
+	// behaves identically.
 	for _, item := range policy.FailOn {
+		item = normalizeFailOn(item)
+		if item != "" {
+			result[item] = true
+		}
+	}
+	for _, item := range policy.PromoteToFail {
 		item = normalizeFailOn(item)
 		if item != "" {
 			result[item] = true

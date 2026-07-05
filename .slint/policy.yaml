@@ -18,6 +18,6 @@ reliability:
   required: false
   min_level: "partial"
 
-fail_on:
+promote_to_fail:
   - "threshold_miss"
   - "regression_detected"

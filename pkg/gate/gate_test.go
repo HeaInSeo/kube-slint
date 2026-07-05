@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ type policyFixture struct {
 	Regression    map[string]any   `yaml:"regression"`
 	Reliability   map[string]any   `yaml:"reliability"`
 	FailOn        []string         `yaml:"fail_on"`
+	PromoteToFail []string         `yaml:"promote_to_fail,omitempty"`
 }
 
 func defaultPolicy() policyFixture {
@@ -33,9 +35,9 @@ func defaultPolicy() policyFixture {
 			{"name": "reconcile_min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
 			{"name": "workqueue_max", "metric": "workqueue_depth_end", "operator": "<=", "value": 5},
 		},
-		Regression:  map[string]any{"enabled": true, "tolerance_percent": 5},
-		Reliability: map[string]any{"required": false, "min_level": "partial"},
-		FailOn:      []string{"threshold_miss", "regression_detected"},
+		Regression:    map[string]any{"enabled": true, "tolerance_percent": 5},
+		Reliability:   map[string]any{"required": false, "min_level": "partial"},
+		PromoteToFail: []string{"threshold_miss", "regression_detected"},
 	}
 }
 
@@ -750,6 +752,125 @@ severity: high     # another unknown field
 	for _, w := range result.PolicyWarnings {
 		assert.Contains(t, w, "unknown field")
 	}
+}
+
+// --- promote_to_fail / fail_on dual support ---
+
+func TestEvaluate_PromoteToFailOnly_EquivalentToFailOn(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 10},
+		},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		PromoteToFail: []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 0}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	// Same outcome as the equivalent fail_on-only policy in
+	// TestEvaluate_DefaultFailOn_Applied's sibling cases: threshold miss
+	// promoted to FAIL.
+	assert.Equal(t, gate.GateFail, result.GateResult)
+}
+
+func TestEvaluate_FailOn_ProducesDeprecationWarning(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		FailOn:      []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 2}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	found := false
+	for _, w := range result.PolicyWarnings {
+		if strings.Contains(w, "fail_on") && strings.Contains(w, "promote_to_fail") {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected a fail_on deprecation warning, got: %v", result.PolicyWarnings)
+}
+
+func TestEvaluate_PromoteToFailOnly_NoDeprecationWarning(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
+		},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		PromoteToFail: []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 2}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	for _, w := range result.PolicyWarnings {
+		assert.NotContains(t, w, "fail_on")
+	}
+}
+
+func TestEvaluate_FailOnAndPromoteToFail_UnionApplied(t *testing.T) {
+	// fail_on only contains threshold_miss, promote_to_fail only contains
+	// regression_detected — both conditions must still be promoted to FAIL,
+	// confirming the two fields are unioned rather than one overriding the
+	// other.
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
+		},
+		Regression:    map[string]any{"enabled": true, "tolerance_percent": 5},
+		Reliability:   map[string]any{"required": false},
+		FailOn:        []string{"threshold_miss"},
+		PromoteToFail: []string{"regression_detected"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	// operator ">=" means higher-is-better: a large drop from baseline is the
+	// regression, while the threshold itself (>= 1) still passes at 10.
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 10}, "Complete",
+	))
+	baseline := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 100}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+		BaselinePath:    baseline,
+	})
+
+	// regression_detected (from promote_to_fail) must promote to FAIL even
+	// though the threshold itself passes.
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "REGRESSION_DETECTED")
 }
 
 // --- fail_on semantics: check=fail must never produce PASS ---

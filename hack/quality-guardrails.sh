@@ -148,7 +148,7 @@ check_gate_contract() {
   echo "== gate workflow guardrails =="
   require_grep 'default: FAIL_OR_NOGRADE' .github/actions/slint-gate/action.yml \
     "GitHub Action default fail-on includes NO_GRADE"
-  require_grep 'fail-on:[[:space:]]+FAIL_OR_NOGRADE' .github/workflows/slint-gate.yml \
+  require_grep 'exit-on:[[:space:]]+FAIL_OR_NOGRADE' .github/workflows/slint-gate.yml \
     "slint-gate workflow uses FAIL_OR_NOGRADE"
   require_grep 'FAIL > NO_GRADE > WARN > FIRST_RUN_WARNING > PASS' docs/gate-contract.md \
     "gate contract documents conservative gate priority"

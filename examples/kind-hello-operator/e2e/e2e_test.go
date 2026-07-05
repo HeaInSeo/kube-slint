@@ -120,6 +120,6 @@ func TestHelloOperatorSLI(t *testing.T) {
 	if _, statErr := os.Stat(summaryPath); statErr == nil {
 		t.Logf("Artifact written: %s", summaryPath)
 		t.Log("Run slint-gate to evaluate against policy (from kind-hello-operator/):")
-		t.Log("  go run ../../cmd/slint-gate --measurement-summary artifacts/sli-summary.json --policy .slint/policy.yaml --fail-on FAIL_OR_NOGRADE")
+		t.Log("  go run ../../cmd/slint-gate --measurement-summary artifacts/sli-summary.json --policy .slint/policy.yaml --exit-on FAIL_OR_NOGRADE")
 	}
 }

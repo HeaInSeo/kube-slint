@@ -92,6 +92,14 @@ first gate.
 slint-gate init --profile kubebuilder-operator
 ```
 
+`--profile` is a backward-compatible extension of the existing `init`
+command, not a new command. Omitting `--profile` preserves today's exact
+`init` output and behavior. Only `kubebuilder-operator` is supported today;
+an unrecognized profile name is rejected with a clear error before any file
+is written. When a profile is given, `init` prints a leading
+`Initialized kube-slint for profile: <name>` line and records the profile
+as a comment in the generated `policy.yaml`.
+
 Expected output:
 
 - `.slint/policy.yaml` draft;
@@ -262,6 +270,43 @@ Future profiles:
 - `controller-runtime-operator`
 - `custom-prometheus`
 
+## Naming: policy `promote_to_fail` vs CLI/action `--exit-on`
+
+`policy.fail_on` and the CLI/action `--fail-on`/`fail-on` looked like the
+same concept because both contain the word "fail," but they operate at
+different layers:
+
+```text
+policy.promote_to_fail (policy.yaml)
+  Which gate conditions (threshold_miss, regression_detected) are promoted
+  from WARN to FAIL. Decided by kube-slint's own gate evaluation.
+
+CLI/action --exit-on / exit-on
+  Which gate_result values (FAIL, WARN, NO_GRADE) cause the process/job to
+  exit non-zero. Decided by the caller (CI), not by kube-slint.
+```
+
+To make this split visible in the names themselves — rather than relying on
+documentation, matching this project's existing `Dangerously*` naming
+convention — the policy field is now `promote_to_fail` and the CLI/action
+flag is now `--exit-on`/`exit-on`.
+
+`fail_on`, `--fail-on`, and the action's `fail-on` input already shipped in
+tagged releases (v1.0.0–v1.4.0), so this is a **dual-support** migration, not
+a breaking rename:
+
+- `policy.yaml`'s `fail_on` and `promote_to_fail` are unioned — either field
+  (or both) is honored. Using `fail_on` adds a non-fatal deprecation entry to
+  `slint-gate-summary.json`'s `policy_warnings`.
+- The CLI's `--exit-on` wins if both `--exit-on` and `--fail-on` are passed;
+  `--fail-on` alone still works but prints a one-line stderr deprecation
+  notice.
+- The GitHub Action's `exit-on` input wins if both `exit-on` and `fail-on`
+  are set; `fail-on` alone still works unchanged (its existing default,
+  `FAIL_OR_NOGRADE`, is preserved).
+
+There is no removal date yet for the deprecated names.
+
 ## UX Concepts To Hide Until Needed
 
 The first-run path should avoid front-loading:
@@ -351,7 +396,17 @@ Each command should be independently useful and testable.
   until the user opts in.
 - Whether first-run baseline absence remains `WARN` or becomes configurable
   as `NO_GRADE`.
-- Whether profile selection should happen in `.slint.yaml`, `.slint/policy.yaml`,
-  or only as CLI input.
 - Whether CI snippet generation should target the current local action or only
   future release-binary action usage.
+
+Resolved:
+
+- **Profile selection location**: CLI input only for now (`--profile` on
+  `init`). The generated `policy.yaml` records the profile as a comment, not
+  a schema field, since `slint.policy.v1`'s field compatibility policy isn't
+  settled yet. See the "Naming" section above for how `--profile` was wired
+  into `init` as a backward-compatible extension.
+- **`fail_on` naming**: renamed to `promote_to_fail` (policy) and
+  `--exit-on`/`exit-on` (CLI/action), with the old names kept as working,
+  deprecated aliases. See "Naming: policy `promote_to_fail` vs CLI/action
+  `--exit-on`" above.

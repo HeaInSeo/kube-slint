@@ -64,7 +64,8 @@ Top-level fields:
 - `thresholds`;
 - `regression`;
 - `reliability`;
-- `fail_on`.
+- `promote_to_fail` (preferred) / `fail_on` (deprecated alias — both are
+  honored as a union; see `docs/sli-gate-onboarding-ux.md`'s naming section).
 
 Thresholds require:
 
@@ -90,7 +91,7 @@ Policy invalid cases:
 - unknown operator;
 - non-finite value;
 - negative regression tolerance;
-- unknown `fail_on` value.
+- unknown `promote_to_fail`/`fail_on` value.
 
 ## Gate Result Semantics
 
@@ -116,17 +117,22 @@ Invalid policy or summary input must not produce `PASS`.
 | Scenario | Expected gate result |
 |---|---|
 | valid summary, valid policy, thresholds pass | `PASS` |
-| threshold miss and `threshold_miss` in `fail_on` | `FAIL` |
-| threshold miss and `threshold_miss` not in `fail_on` | `WARN`, never `PASS` |
-| regression detected and `regression_detected` in `fail_on` | `FAIL` |
-| regression detected and `regression_detected` not in `fail_on` | `WARN`, never `PASS` |
+| threshold miss and `threshold_miss` in `promote_to_fail`/`fail_on` | `FAIL` |
+| threshold miss and `threshold_miss` not in `promote_to_fail`/`fail_on` | `WARN`, never `PASS` |
+| regression detected and `regression_detected` in `promote_to_fail`/`fail_on` | `FAIL` |
+| regression detected and `regression_detected` not in `promote_to_fail`/`fail_on` | `WARN`, never `PASS` |
 | regression enabled, first run, no baseline | `WARN` with `BASELINE_ABSENT_FIRST_RUN` |
 | corrupt or unreadable baseline | `NO_GRADE` |
 | measurement collection failed | `NO_GRADE` |
 | invalid policy | `NO_GRADE` or execution reject |
 | invalid summary | `NO_GRADE` or execution reject |
 
-## fail-on Modes
+## exit-on Modes
+
+CLI flag `--exit-on` (preferred) / `--fail-on` (deprecated alias); GitHub
+Action input `exit-on` (preferred) / `fail-on` (deprecated alias). `--exit-on`
+wins if both are passed; using only `--fail-on`/`fail-on` still works but
+emits a deprecation notice.
 
 | Mode | Fails CI on |
 |---|---|
@@ -136,7 +142,7 @@ Invalid policy or summary input must not produce `PASS`.
 | `FAIL_OR_NOGRADE` | `FAIL`, `NO_GRADE` |
 | `FAIL_WARN_OR_NOGRADE` | `FAIL`, `WARN`, `NO_GRADE` |
 
-Unknown `fail-on` values are invalid.
+Unknown `--exit-on`/`exit-on` values are invalid.
 
 ## Open Decisions
 

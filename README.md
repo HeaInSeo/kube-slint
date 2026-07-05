@@ -182,6 +182,8 @@ sess.End(ctx)
 
 **RBAC note:** The harness creates a temporary curl pod to scrape the metrics endpoint. Run `slint-gate init --emit-rbac rbac.yaml` to scaffold the required ServiceAccount, Role, and RoleBinding in the target namespace.
 
+`slint-gate init --profile kubebuilder-operator` is a backward-compatible extension of `init` (the only supported profile today); omitting `--profile` keeps `init`'s existing output unchanged.
+
 **Output:** `sess.End(ctx)` writes two files:
 - `artifacts/sli-summary.<runID>.<testcase>.json` — unique audit file
 - `artifacts/sli-summary.json` — latest alias; default input for slint-gate
@@ -243,9 +245,9 @@ go run ./cmd/slint-gate [flags]
 | `--baseline` | `""` (disabled) | Path to a baseline summary for regression comparison; omit to skip |
 | `--output` | `slint-gate-summary.json` | Path to write the gate result JSON |
 | `--github-step-summary` | false | Write markdown to `$GITHUB_STEP_SUMMARY` for GitHub Actions |
-| `--fail-on` | `NEVER` | Exit 1 when gate result meets this level: `NEVER` \| `FAIL` \| `FAIL_OR_WARN` \| `FAIL_OR_NOGRADE` \| `FAIL_WARN_OR_NOGRADE` |
+| `--exit-on` | `NEVER` | Exit 1 when gate result meets this level: `NEVER` \| `FAIL` \| `FAIL_OR_WARN` \| `FAIL_OR_NOGRADE` \| `FAIL_WARN_OR_NOGRADE`. (`--fail-on` still works as a deprecated alias — see below.) |
 
-**Exit behavior:** The binary exits 0 by default (`--fail-on NEVER`). Pass `--fail-on FAIL` (or stricter) to exit 1 on a policy violation. Unknown `--fail-on` values are rejected. The GitHub Actions wrapper handles this automatically via its `fail-on` input.
+**Exit behavior:** The binary exits 0 by default (`--exit-on NEVER`). Pass `--exit-on FAIL` (or stricter) to exit 1 on a policy violation. Unknown `--exit-on` values are rejected. The GitHub Actions wrapper handles this automatically via its `exit-on` input.
 
 **Policy file (`.slint/policy.yaml`)**
 
@@ -266,7 +268,7 @@ regression:
 reliability:
   required: false
   min_level: "partial"
-fail_on:
+promote_to_fail:
   - "threshold_miss"
   - "regression_detected"
 ```
@@ -276,15 +278,15 @@ fail_on:
 | Result | Meaning |
 |---|---|
 | `PASS` | All threshold and regression checks passed |
-| `WARN` | A check failed but its category is not listed in `fail_on`, or a non-blocking condition (first run without baseline, reliability below minimum) |
-| `FAIL` | Policy violation listed in `fail_on` — threshold miss or regression detected |
+| `WARN` | A check failed but its category is not listed in `promote_to_fail`, or a non-blocking condition (first run without baseline, reliability below minimum) |
+| `FAIL` | Policy violation listed in `promote_to_fail` — threshold miss or regression detected |
 | `NO_GRADE` | Evaluation not possible — missing or corrupt inputs |
 
-**`fail_on` semantics**
+**`promote_to_fail` semantics**
 
-`policy.fail_on` controls which violation categories promote `gate_result` to `FAIL`. Violations not listed become `WARN` — a failed check can never produce `PASS`. If `fail_on` is omitted or empty, kube-slint applies the default: `threshold_miss` and `regression_detected`.
+`policy.promote_to_fail` controls which violation categories promote `gate_result` to `FAIL`. Violations not listed become `WARN` — a failed check can never produce `PASS`. If `promote_to_fail` is omitted or empty, kube-slint applies the default: `threshold_miss` and `regression_detected`. (`fail_on` still works as a deprecated alias; both are unioned, and using `fail_on` adds a non-fatal notice to `slint-gate-summary.json`'s `policy_warnings`.)
 
-`--fail-on` (CLI flag / action input) is a separate layer that controls whether a given `gate_result` exits the process with code 1. The two settings are independent.
+`--exit-on` (CLI flag / action input) is a separate layer that controls whether a given `gate_result` exits the process with code 1. The two settings are independent.
 
 **`checks[].observed` field**
 
@@ -346,9 +348,9 @@ kube-slint supports three first-class measurement modes, set per-session or per-
 
 Both gate model components are complete.
 
-**Threshold checking** (DONE): Each metric result in `sli-summary.json` is evaluated against the threshold rules in `policy.yaml`. A threshold miss sets `gate_result` to `FAIL` if `threshold_miss` is in `fail_on`; otherwise it sets `gate_result` to `WARN`.
+**Threshold checking** (DONE): Each metric result in `sli-summary.json` is evaluated against the threshold rules in `policy.yaml`. A threshold miss sets `gate_result` to `FAIL` if `threshold_miss` is in `promote_to_fail`; otherwise it sets `gate_result` to `WARN`.
 
-**Regression detection** (DONE): When `--baseline` is provided, each metric result is compared to the stored baseline value. If the change exceeds `tolerance_percent`, the result is flagged as a regression. A detected regression sets `gate_result` to `FAIL` if `regression_detected` is in `fail_on`; otherwise it sets `gate_result` to `WARN`. A regression from a zero baseline to a non-zero current value is always treated as a detected regression.
+**Regression detection** (DONE): When `--baseline` is provided, each metric result is compared to the stored baseline value. If the change exceeds `tolerance_percent`, the result is flagged as a regression. A detected regression sets `gate_result` to `FAIL` if `regression_detected` is in `promote_to_fail`; otherwise it sets `gate_result` to `WARN`. A regression from a zero baseline to a non-zero current value is always treated as a detected regression.
 
 ---
 
@@ -396,7 +398,7 @@ jobs:
         with:
           measurement-summary: artifacts/sli-summary.json   # default
           policy:              .slint/policy.yaml            # default
-          fail-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
+          exit-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **Inputs**
@@ -407,7 +409,7 @@ jobs:
 | `policy` | `.slint/policy.yaml` | Path to policy YAML |
 | `baseline` | `` | Optional baseline summary path |
 | `output` | `slint-gate-summary.json` | Output path for gate result |
-| `fail-on` | `FAIL_OR_NOGRADE` | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE` |
+| `exit-on` | `` (falls back to `fail-on`) | `NEVER`\|`FAIL`\|`FAIL_OR_WARN`\|`FAIL_OR_NOGRADE`\|`FAIL_WARN_OR_NOGRADE`. Preferred over `fail-on` (deprecated, still works — default `FAIL_OR_NOGRADE`). |
 | `github-step-summary` | `true` | Append Markdown table to step summary |
 | `upload-artifact` | `true` | Upload gate result as artifact |
 

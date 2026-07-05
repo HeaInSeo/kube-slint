@@ -25,13 +25,20 @@ inputs:
     required: false
     default: slint-gate-summary.json
 
-  fail-on:
+  exit-on:
     description: >
-      Gate result level that fails the job.
+      Gate result level that fails the job. Preferred over the deprecated
+      fail-on input (both are honored; exit-on wins if both are set).
       FAIL                 — only hard violations fail.
       FAIL_OR_WARN         — treat WARN as a failure too.
-      FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure (default).
+      FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure.
       FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures.
+    required: false
+    default: ''
+
+  fail-on:
+    description: >
+      Deprecated: use exit-on instead. Same values as exit-on.
     required: false
     default: FAIL_OR_NOGRADE
 
@@ -77,9 +84,12 @@ runs:
         INPUT_BASELINE: ${{ inputs.baseline }}
         INPUT_OUTPUT: ${{ inputs.output }}
         INPUT_STEP_SUMMARY: ${{ inputs.github-step-summary }}
-        FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_EXIT_ON: ${{ inputs.exit-on }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
       run: |
         set -euo pipefail
+
+        RESOLVED_EXIT_ON="${INPUT_EXIT_ON:-$INPUT_FAIL_ON}"
 
         EXTRA=""
         if [ "${INPUT_STEP_SUMMARY}" = "true" ]; then
@@ -91,6 +101,7 @@ runs:
           --policy             "${INPUT_POLICY}" \
           --baseline           "${INPUT_BASELINE}" \
           --output             "${INPUT_OUTPUT}" \
+          --exit-on            "${RESOLVED_EXIT_ON}" \
           ${EXTRA}
 
         GATE=$(jq -r '.gate_result'        "${INPUT_OUTPUT}")
@@ -114,12 +125,15 @@ runs:
       shell: bash
       env:
         GATE_RESULT: ${{ steps.run-gate.outputs.gate_result }}
-        FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_EXIT_ON: ${{ inputs.exit-on }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
       run: |
         set -euo pipefail
         echo "slint-gate result: ${GATE_RESULT}"
 
-        case "${FAIL_ON}" in
+        RESOLVED_EXIT_ON="${INPUT_EXIT_ON:-$INPUT_FAIL_ON}"
+
+        case "${RESOLVED_EXIT_ON}" in
           FAIL)
             if [ "${GATE_RESULT}" = "FAIL" ]; then
               echo "::error::slint-gate FAIL — policy violation detected."
@@ -128,24 +142,24 @@ runs:
             ;;
           FAIL_OR_WARN)
             if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "WARN" ]; then
-              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (exit-on=${RESOLVED_EXIT_ON})."
               exit 1
             fi
             ;;
           FAIL_OR_NOGRADE)
             if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "NO_GRADE" ]; then
-              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (exit-on=${RESOLVED_EXIT_ON})."
               exit 1
             fi
             ;;
           FAIL_WARN_OR_NOGRADE)
             if [ "${GATE_RESULT}" = "FAIL" ] || [ "${GATE_RESULT}" = "WARN" ] || [ "${GATE_RESULT}" = "NO_GRADE" ]; then
-              echo "::error::slint-gate ${GATE_RESULT} treated as failure (fail-on=${FAIL_ON})."
+              echo "::error::slint-gate ${GATE_RESULT} treated as failure (exit-on=${RESOLVED_EXIT_ON})."
               exit 1
             fi
             ;;
           *)
-            echo "::error::invalid fail-on value: ${FAIL_ON}"
+            echo "::error::invalid exit-on value: ${RESOLVED_EXIT_ON}"
             exit 2
             ;;
         esac

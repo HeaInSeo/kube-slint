@@ -11,6 +11,12 @@
 - `pkg/report`: new generic Finding/Report model (rule ID, severity, message, location) reusable by future dataplane profiles (e.g. a v1.6.0 `dataplane-job` summary gate), plus `WriteJSON`/`WriteSARIF`/`WriteGitHubStepSummary` output writers.
 - `pkg/dataplane`: shared, kind-agnostic manifest model (Deployment/StatefulSet/DaemonSet unified as one `Workload` shape, plus `Service`/`ServiceMonitor`) and `LoadDir` directory loader — hand-rolled local structs on top of the existing `gopkg.in/yaml.v3` dependency, no new `k8s.io/**`/`sigs.k8s.io/**` dependency added. `.golangci.yml` gained a `depguard` rule enforcing this for `pkg/dataplane/**`/`pkg/report/**`, mirroring the existing `pkg/slo` core-boundary rule.
 - `pkg/dataplane/service`: the dataplane-service checks + a `spec.Registry`-shaped check registry.
+- `slint-gate init --profile <name>`: backward-compatible extension of `init` — omitting `--profile` preserves today's exact output. Only `kubebuilder-operator` is supported today; an unrecognized profile is rejected before any file is written. When set, the generated `policy.yaml` records the profile as a comment and `init` prints an `Initialized kube-slint for profile: ...` line.
+- `policy.yaml`'s `promote_to_fail` field and CLI/action `--exit-on`/`exit-on`: preferred replacements for `fail_on`/`--fail-on`/`fail-on`, which looked like the same concept despite operating at different layers (policy grade promotion vs. process exit code). See `docs/sli-gate-onboarding-ux.md`'s naming section for the full rationale.
+
+### Deprecated
+
+- `policy.yaml`'s `fail_on` (use `promote_to_fail`), CLI `--fail-on` (use `--exit-on`), and the GitHub Action's `fail-on` input (use `exit-on`). All three still work — the old and new names are unioned/take precedence per `docs/gate-contract.md`'s `exit-on` Modes section — and using the deprecated names produces a non-fatal notice (a `policy_warnings` entry for `fail_on`, a stderr line for `--fail-on`). No removal date set yet.
 
 ### Security
 

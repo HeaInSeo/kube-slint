@@ -139,6 +139,40 @@ func TestSnippetData_PreservesValues(t *testing.T) {
 	assert.Equal(t, "svc", d.ServiceName)
 }
 
+func TestRunInit_WithProfile_AddsProfileComment(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "policy.yaml")
+
+	err := runInit([]string{"--output", out, "--profile", "kubebuilder-operator"})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "# Profile:      kubebuilder-operator")
+}
+
+func TestRunInit_NoProfile_OmitsProfileComment(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "policy.yaml")
+
+	err := runInit([]string{"--output", out})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "# Profile:")
+}
+
+func TestRunInit_UnknownProfile_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "policy.yaml")
+
+	err := runInit([]string{"--output", out, "--profile", "bogus"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown profile")
+	assert.NoFileExists(t, out)
+}
+
 func TestRunInit_EmitRBAC(t *testing.T) {
 	dir := t.TempDir()
 	policyOut := filepath.Join(dir, "policy.yaml")

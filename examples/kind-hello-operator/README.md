@@ -19,7 +19,7 @@ make demo
 | 2. `sess.Start()` | kube-slint launches a curl pod to capture the pre-workload snapshot |
 | 3. Workload runs | `hello-operator` fires reconcile loops in the background |
 | 4. `sess.End()` | kube-slint captures the post-workload snapshot, computes deltas, writes `artifacts/sli-summary.json` |
-| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml`; the demo uses `--fail-on FAIL_OR_NOGRADE` so missing measurement is not treated as promotion approval |
+| 5. `slint-gate` | Evaluates `sli-summary.json` against `.slint/policy.yaml`; the demo uses `--exit-on FAIL_OR_NOGRADE` so missing measurement is not treated as promotion approval |
 
 ## Prerequisites
 
@@ -79,7 +79,7 @@ SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -tags kind -v -timeout 120s -run TestHell
 go run ../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
-  --fail-on FAIL_OR_NOGRADE
+  --exit-on FAIL_OR_NOGRADE
 
 # 8. Tear down
 kind delete cluster --name slint-demo
@@ -182,5 +182,5 @@ Run the gate separately after any E2E suite that writes `artifacts/sli-summary.j
   with:
     measurement-summary: artifacts/sli-summary.json
     policy: examples/kind-hello-operator/.slint/policy.yaml
-    fail-on: FAIL_OR_NOGRADE
+    exit-on: FAIL_OR_NOGRADE
 ```

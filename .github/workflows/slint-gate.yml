@@ -64,6 +64,6 @@ jobs:
           policy:              ${{ github.event.inputs.policy_path || '.slint/policy.yaml' }}
           baseline:            ${{ github.event.inputs.baseline_path || 'docs/fixtures/slint-gate-pass-summary.json' }}
           output:              slint-gate-summary.json
-          fail-on:             FAIL_OR_NOGRADE
+          exit-on:             FAIL_OR_NOGRADE
           github-step-summary: 'true'
           upload-artifact:     'true'

@@ -36,18 +36,34 @@ func runGate() {
 	baselinePath := flag.String("baseline", "", "Optional path to baseline summary JSON")
 	outputPath := flag.String("output", "slint-gate-summary.json", "Output path for gate summary JSON")
 	githubStepSummary := flag.Bool("github-step-summary", false, "Append markdown result to $GITHUB_STEP_SUMMARY")
-	failOn := flag.String("fail-on", "NEVER",
+	exitOn := flag.String("exit-on", "",
 		"Gate result level that causes non-zero exit.\n"+
 			"  NEVER               — always exit 0; let the caller inspect gate_result (default)\n"+
 			"  FAIL                — exit 1 on hard policy violations\n"+
 			"  FAIL_OR_WARN        — treat WARN as failure too\n"+
 			"  FAIL_OR_NOGRADE     — treat NO_GRADE as failure too\n"+
 			"  FAIL_WARN_OR_NOGRADE — treat WARN and NO_GRADE as failures")
+	failOn := flag.String("fail-on", "NEVER", "Deprecated: use --exit-on instead. Same values as --exit-on.")
 	flag.Parse()
 
-	failOnValue := strings.ToUpper(strings.TrimSpace(*failOn))
+	exitOnSet, failOnSet := false, false
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "exit-on":
+			exitOnSet = true
+		case "fail-on":
+			failOnSet = true
+		}
+	})
+
+	resolved, deprecated := resolveExitOn(exitOnSet, *exitOn, failOnSet, *failOn)
+	if deprecated {
+		fmt.Fprintln(os.Stderr, "slint-gate: --fail-on is deprecated; use --exit-on instead (still honored)")
+	}
+
+	failOnValue := strings.ToUpper(strings.TrimSpace(resolved))
 	if !isValidFailOn(failOnValue) {
-		fmt.Fprintf(os.Stderr, "invalid --fail-on: %s\n", *failOn)
+		fmt.Fprintf(os.Stderr, "invalid --exit-on: %s\n", resolved)
 		os.Exit(2)
 	}
 
@@ -72,9 +88,22 @@ func runGate() {
 	}
 
 	if shouldFailOn(result.GateResult, failOnValue) {
-		fmt.Fprintf(os.Stderr, "slint-gate: exit 1 (gate_result=%s, fail-on=%s)\n", result.GateResult, *failOn)
+		fmt.Fprintf(os.Stderr, "slint-gate: exit 1 (gate_result=%s, exit-on=%s)\n", result.GateResult, resolved)
 		os.Exit(1)
 	}
+}
+
+// resolveExitOn applies --exit-on/--fail-on precedence: an explicitly-passed
+// --exit-on always wins; otherwise an explicitly-passed --fail-on is honored
+// (and flagged as deprecated); otherwise the default is "NEVER".
+func resolveExitOn(exitOnSet bool, exitOnVal string, failOnSet bool, failOnVal string) (resolved string, deprecated bool) {
+	if exitOnSet {
+		return exitOnVal, false
+	}
+	if failOnSet {
+		return failOnVal, true
+	}
+	return failOnVal, false
 }
 
 func isValidFailOn(failOn string) bool {
