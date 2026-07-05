@@ -228,20 +228,50 @@ UX goal:
 Let users edit a reasonable draft instead of inventing a policy from scratch.
 ```
 
-### 4. Approve Baseline
+### 4. Approve Baseline — implemented (Sprint 3)
 
 ```sh
 slint-gate baseline approve \
   --summary artifacts/sli-summary.json \
+  --policy .slint/policy.yaml \
   --output docs/baselines/my-service-sli-summary.json
 ```
 
-Expected behavior:
+Actual behavior:
 
-- validate summary schema;
-- reject `NO_GRADE` or incomplete measurement as a baseline unless forced;
-- normalize non-deterministic metadata where appropriate;
-- print a review summary.
+- evaluates the summary against the policy via the same `gate.Evaluate` used
+  by `slint-gate` itself (`BaselinePath` empty — this is a first-run
+  evaluation against policy only, not a comparison to an existing baseline);
+- `PASS` → approved; `WARN` → approved only with `--allow-warn`; `FAIL` and
+  `NO_GRADE` → **always rejected — no flag overrides this**, including
+  `--force`. `--force` only controls overwriting an existing `--output` file.
+  (Letting any flag launder a `FAIL`/`NO_GRADE` result into a "known-good"
+  baseline would break the "measurement failure never produces a false
+  approval" contract more deeply than any existing `Dangerously*` option
+  does — none of those let invalid measurement become a trusted result.)
+- clears `config.evidencePaths` before writing (local temp-file paths from
+  the original run, meaningless once committed as a baseline) — no other
+  normalization is performed;
+- prints a review block (paths, gate result, every measured SLI value,
+  output path, "Approved.") before confirming.
+
+Rejection example:
+
+```text
+Baseline was not approved.
+
+Reason:
+  The summary produced NO_GRADE.
+
+How to fix:
+  1. Run:
+       slint-gate inspect --summary artifacts/sli-summary.json
+  2. Review the failed threshold, regression, or reliability check.
+  3. Fix the test environment or application behavior and re-run.
+
+Result:
+  NO_GRADE
+```
 
 UX goal:
 
@@ -249,7 +279,7 @@ UX goal:
 Make baseline creation explicit, reviewable, and hard to do accidentally.
 ```
 
-### 5. Generate CI Snippet
+### 5. Generate CI Snippet — implemented (Sprint 3)
 
 ```sh
 slint-gate ci github-actions \
@@ -258,17 +288,25 @@ slint-gate ci github-actions \
   --baseline docs/baselines/my-service-sli-summary.json
 ```
 
-Expected output:
+Actual output (using the shipped `exit-on` naming, not the deprecated
+`fail-on`; `--action-ref` defaults to the CLI's own build `Version`, not
+`@main` — consistent with this repo's existing "pin, don't float" convention
+for generated snippets):
 
 ```yaml
-- name: Run kube-slint gate
-  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@<tag-or-sha>
+- name: Run kube-slint shift-left SLI gate
+  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.4.0
   with:
     measurement-summary: artifacts/sli-summary.json
     policy: .slint/policy.yaml
     baseline: docs/baselines/my-service-sli-summary.json
-    fail-on: FAIL_OR_NOGRADE
+    exit-on: FAIL_OR_NOGRADE
 ```
+
+`--baseline` is optional — omitting it emits a threshold-only snippet
+without the `baseline:` line. This command does no file I/O beyond stdout
+and doesn't evaluate anything; it only needs the path strings, since a user
+may run it before ever executing the E2E test just to scaffold CI.
 
 UX goal:
 
@@ -415,8 +453,8 @@ Recommended implementation order:
 
 1. ~~`slint-gate inspect --summary`.~~ Done (Sprint 2).
 2. ~~`slint-gate recommend-policy --summary --profile`.~~ Done (Sprint 2).
-3. `slint-gate baseline approve`. (Sprint 3)
-4. `slint-gate ci github-actions`. (Sprint 3)
+3. ~~`slint-gate baseline approve`.~~ Done (Sprint 3).
+4. ~~`slint-gate ci github-actions`.~~ Done (Sprint 3).
 5. Docs update for quickstart and troubleshooting.
 
 Each command should be independently useful and testable.
@@ -425,10 +463,17 @@ Each command should be independently useful and testable.
 
 - Whether first-run baseline absence remains `WARN` or becomes configurable
   as `NO_GRADE`.
-- Whether CI snippet generation should target the current local action or only
-  future release-binary action usage.
 
 Resolved:
+
+- **CI snippet action target**: current local composite action
+  (`.github/actions/slint-gate`), pinned via `--action-ref` (defaults to the
+  CLI's own build `Version`, e.g. `v1.4.0` — never `@main`). Revisit once a
+  release-binary-based action exists.
+- **`baseline approve` grade gate**: `PASS` approved; `WARN` approved only
+  with `--allow-warn`; `FAIL`/`NO_GRADE` always rejected, with no flag
+  (including `--force`) able to override — `--force` only controls
+  overwriting an existing `--output` file. See "Approve Baseline" above.
 
 - **Profile selection location**: CLI input only for now (`--profile` on
   `init`). The generated `policy.yaml` records the profile as a comment, not

@@ -36,6 +36,26 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "baseline":
+			if len(os.Args) < 3 || os.Args[2] != "approve" {
+				fmt.Fprintln(os.Stderr, "usage: slint-gate baseline approve [flags]")
+				os.Exit(2)
+			}
+			if err := runBaselineApprove(os.Args[3:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate baseline approve: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "ci":
+			if len(os.Args) < 3 || os.Args[2] != "github-actions" {
+				fmt.Fprintln(os.Stderr, "usage: slint-gate ci github-actions [flags]")
+				os.Exit(2)
+			}
+			if err := runCIGithubActions(os.Args[3:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate ci github-actions: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
 	}
 	runGate()
