@@ -1,0 +1,16 @@
+rules:
+  - id: kube-slint-no-insecure-skip-verify
+    languages: [go]
+    severity: ERROR
+    message: >
+      Do not set TLSInsecureSkipVerify/InsecureSkipVerify to true directly.
+      Skipping TLS verification is a security boundary bypass and must be an
+      explicit, visibly-named opt-in — use DangerouslySkipTLSVerify instead
+      (see docs/security-model.md's "Dangerous Option Naming"). The default
+      must stay false.
+    patterns:
+      - pattern-either:
+          - pattern: '$X{..., TLSInsecureSkipVerify: true, ...}'
+          - pattern: '$X{..., InsecureSkipVerify: true, ...}'
+          - pattern: $X.TLSInsecureSkipVerify = true
+          - pattern: $X.InsecureSkipVerify = true

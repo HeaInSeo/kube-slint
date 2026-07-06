@@ -1,0 +1,17 @@
+rules:
+  - id: kube-slint-no-bearer-token-in-curl-args
+    languages: [go]
+    severity: ERROR
+    message: >
+      Do not interpolate a token value into a curl command string. The
+      sanctioned pattern reads the token inside the pod from its own mounted
+      ServiceAccount token file (see docs/security-model.md's "Token
+      Handling") so secrets never enter kubectl args, PodSpec command
+      strings, or command logs. Use the in-pod
+      "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" pattern
+      instead of formatting a token variable into the command.
+    patterns:
+      - pattern: 'fmt.Sprintf($FMT, ...)'
+      - metavariable-regex:
+          metavariable: $FMT
+          regex: '.*Bearer %s.*'

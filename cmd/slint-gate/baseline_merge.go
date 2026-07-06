@@ -90,6 +90,10 @@ func runBaselineMerge(args []string) error {
 
 	baseline.Results = append(baseline.Results, appended...)
 
+	// kube-slint-no-stat-before-write: the earlier os.Stat only checks that
+	// --baseline already exists (a precondition, not an overwrite guard);
+	// this is a single-user local CLI artifact write, not a shared/multi-tenant race.
+	// nosemgrep
 	if err := summary.WriteFile(outPath, baseline); err != nil {
 		return fmt.Errorf("write merged baseline: %w", err)
 	}

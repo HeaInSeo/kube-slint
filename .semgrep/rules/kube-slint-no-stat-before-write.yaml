@@ -1,0 +1,24 @@
+rules:
+  - id: kube-slint-no-stat-before-write
+    languages: [go]
+    severity: ERROR
+    message: >
+      Checking os.Stat and then writing separately (os.WriteFile/os.Create)
+      is a check-then-act (TOCTOU) race: something can create/remove the
+      file between the check and the write. Prefer an atomic primitive
+      (e.g. os.OpenFile with O_CREATE|O_EXCL to guarantee "only if absent").
+      If this call site is a known, accepted exception (e.g. a single-user
+      local CLI artifact write, not a shared/multi-tenant race), annotate it
+      with "# nosemgrep: kube-slint-no-stat-before-write" and a comment
+      explaining why.
+    patterns:
+      - pattern-either:
+          - pattern: os.WriteFile(...)
+          - pattern: os.Create(...)
+          - pattern: summary.WriteFile(...)
+      - pattern-inside: |
+          func $FUNC(...) $RET {
+            ...
+            os.Stat(...)
+            ...
+          }

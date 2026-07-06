@@ -335,6 +335,10 @@ func applySweepDeletes(ctx context.Context, ns string, targetNames []string, res
 	}
 
 	for _, name := range targetNames {
+		// kube-slint-no-unsafe-cleanup: see applySweepDeletes' doc comment
+		// above -- targetNames is derived exclusively from a label-filtered
+		// list step, and kubectl itself rejects combining a resource name with "-l".
+		// nosemgrep
 		cmd := execCommandContext(ctx, "kubectl", "delete", "pods", name, "-n", ns, "--ignore-not-found=true")
 		delOut, delErr := cmd.CombinedOutput()
 		idx, ok := itemIdx[name]

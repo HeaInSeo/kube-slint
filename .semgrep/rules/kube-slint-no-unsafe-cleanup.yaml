@@ -1,0 +1,21 @@
+rules:
+  - id: kube-slint-no-unsafe-cleanup
+    languages: [go]
+    severity: ERROR
+    message: >
+      A "kubectl delete pods <name>" construction with no label selector in
+      the same command is a cleanup-without-ownership-check anti-pattern
+      (see docs/security-model.md's "cleanup without owner label: reject").
+      If the name is already sourced exclusively from a prior
+      label-filtered list step (kubectl itself rejects combining a resource
+      name with -l, so the selector can't simply be appended here),
+      annotate the call with
+      "# nosemgrep: kube-slint-no-unsafe-cleanup" and a comment pointing at
+      that list step.
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("kubectl", "delete", "pods", $NAME, ...)
+          - pattern: $F($CTX, "kubectl", "delete", "pods", $NAME, ...)
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: '^(?!"-).*'

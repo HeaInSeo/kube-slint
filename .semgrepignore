@@ -1,0 +1,8 @@
+# pkg/kubeutil/rbac.go's ApplyClusterRoleBinding is documented dead/test-only
+# code (see docs/security-model.md's Acceptance Checklist) — unreachable
+# from any default kube-slint path, so it's the one legitimate exception to
+# kube-slint-no-clusterrolebinding-default. Excluded wholesale rather than
+# annotated line-by-line since every line in these two files exists to
+# implement/test that one already-accepted exception.
+pkg/kubeutil/rbac.go
+pkg/kubeutil/rbac_test.go

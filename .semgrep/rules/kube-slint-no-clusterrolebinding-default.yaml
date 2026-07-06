@@ -1,0 +1,15 @@
+rules:
+  - id: kube-slint-no-clusterrolebinding-default
+    languages: [go]
+    severity: ERROR
+    message: >
+      Default generated RBAC must stay namespace-scoped (ServiceAccount +
+      Role + RoleBinding) and must never emit ClusterRole/ClusterRoleBinding
+      (see docs/security-model.md's "RBAC Model"). If this is a deliberate,
+      already-accepted exception (e.g. the dead/test-only
+      pkg/kubeutil.ApplyClusterRoleBinding helper, unreachable from any
+      default path), annotate the specific line with
+      "# nosemgrep: kube-slint-no-clusterrolebinding-default" and a comment
+      explaining why.
+    patterns:
+      - pattern-regex: 'ClusterRoleBinding'

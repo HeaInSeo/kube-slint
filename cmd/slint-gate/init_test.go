@@ -194,6 +194,9 @@ func TestRunInit_EmitRBAC(t *testing.T) {
 	assert.Contains(t, body, "kind: Role")
 	assert.Contains(t, body, "kind: RoleBinding")
 	assert.NotContains(t, body, "ClusterRole")
+	// kube-slint-no-clusterrolebinding-default: this asserts the string's
+	// absence, not its presence.
+	// nosemgrep
 	assert.NotContains(t, body, "ClusterRoleBinding")
 	assert.Contains(t, body, "my-ns")
 	assert.Contains(t, body, "kube-slint-scraper")

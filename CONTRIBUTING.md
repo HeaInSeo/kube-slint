@@ -19,7 +19,8 @@ Requirements: Go 1.25+, `make`, `jq` (for action smoke tests).
 2. Make your changes, add or update tests.
 3. Run `go test ./...` — all tests must pass.
 4. Run `go vet ./...` and `go build ./...` — no errors.
-5. Open a pull request against `main`.
+5. Run `make lint`; run `make semgrep` if you touched `pkg/slo/fetch/curlpod`, `pkg/kubeutil`, or `pkg/slint/sweep.go` (requires `pip install semgrep` — see `.semgrep/rules/` and `docs/security-model.md`'s "Static Guardrail Plan").
+6. Open a pull request against `main`.
 
 ## What to contribute
 

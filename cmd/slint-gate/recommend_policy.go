@@ -144,6 +144,9 @@ func runRecommendPolicy(args []string) error {
 	if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil {
 		return fmt.Errorf("write policy file: %w", err)
 	}
+	// kube-slint-no-stat-before-write: single-user local CLI artifact write
+	// (the --output overwrite-refusal check above), not a shared/multi-tenant race.
+	// nosemgrep
 	if err := os.WriteFile(*output, []byte(buf.String()), 0o644); err != nil {
 		return fmt.Errorf("write policy file: %w", err)
 	}

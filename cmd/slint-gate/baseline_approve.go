@@ -61,6 +61,9 @@ func runBaselineApprove(args []string) error {
 	// run; once committed as a baseline, those paths are stale and meaningless.
 	s.Config.EvidencePaths = nil
 
+	// kube-slint-no-stat-before-write: single-user local CLI artifact write
+	// (the --output overwrite-refusal check above), not a shared/multi-tenant race.
+	// nosemgrep
 	if err := summary.WriteFile(*output, s); err != nil {
 		return fmt.Errorf("write baseline file: %w", err)
 	}

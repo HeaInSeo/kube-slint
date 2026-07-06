@@ -155,19 +155,61 @@ Expected namespace-scoped permissions:
 | `services` | `get` | Find target metrics Service. |
 | `endpoints` | `get` | Confirm Service endpoint shape where needed. |
 
-## Static Guardrail Plan
+## Static Guardrail Plan — implemented
 
-Custom Semgrep or repository-specific checks should cover:
+All six planned rules are implemented as custom Semgrep rules in
+`.semgrep/rules/` (one `.yaml` + one paired positive/negative Go test
+fixture per rule, run via `semgrep --test .semgrep/rules`), enabled as
+**blocking CI** (`.github/workflows/semgrep.yml`, `semgrep scan --error`):
 
-- `kube-slint-no-direct-service-url-format`;
-- `kube-slint-no-bearer-token-in-curl-args`;
-- `kube-slint-no-insecure-skip-verify`;
-- `kube-slint-no-clusterrolebinding-default`;
-- `kube-slint-no-stat-before-write`;
-- `kube-slint-no-unsafe-cleanup`.
+- `kube-slint-no-direct-service-url-format` — flags building the metrics URL
+  via a raw `fmt.Sprintf($X.ServiceURLFormat, ...)` instead of going through
+  `ValidateMetricsURL`.
+- `kube-slint-no-bearer-token-in-curl-args` — flags a `fmt.Sprintf` whose
+  format string contains a literal `Bearer %s` (a Go-level token
+  substitution point), as opposed to the sanctioned in-pod
+  `${TOKEN}` shell-expansion pattern.
+- `kube-slint-no-insecure-skip-verify` — flags `TLSInsecureSkipVerify`/
+  `InsecureSkipVerify` set to `true` directly (struct literal or
+  assignment), instead of the visibly-named `DangerouslySkipTLSVerify`.
+- `kube-slint-no-clusterrolebinding-default` — flags the string
+  `ClusterRoleBinding` appearing anywhere in Go source.
+- `kube-slint-no-stat-before-write` — flags an `os.WriteFile`/`os.Create`/
+  `summary.WriteFile` call inside a function that also calls `os.Stat`
+  (a check-then-act/TOCTOU shape).
+- `kube-slint-no-unsafe-cleanup` — flags a `kubectl delete pods <name>`
+  construction (via `exec.Command` or a context-taking wrapper) with no
+  label selector in the same call.
 
-Do not enable these as blocking CI until each rule has positive and negative
-examples and the current codebase is compliant or explicitly exempted.
+Per the bar this section originally set ("do not enable as blocking CI
+until each rule has positive/negative examples and the current codebase is
+compliant or explicitly exempted"), the real codebase was scanned and found
+to have two rules that legitimately fire on already-accepted patterns:
+
+- `kube-slint-no-stat-before-write` on `recommend-policy`/`baseline
+  approve`/`baseline merge`'s existing `--output`/`--baseline`
+  overwrite-refusal checks (`os.Stat` then a separate write) — accepted as
+  a single-user local CLI artifact write, not a shared/multi-tenant race.
+- `kube-slint-no-unsafe-cleanup` on `pkg/slint/sweep.go`'s
+  `applySweepDeletes` — accepted per its own existing doc comment: delete
+  targets are sourced exclusively from a prior label-filtered list step,
+  and `kubectl` itself rejects combining a resource name with `-l`.
+
+Both are annotated in place with `// nosemgrep` (bare, not
+`// nosemgrep: <rule-id>` — directory-based `--config` loading namespaces
+rule IDs by path, e.g. `semgrep.rules.kube-slint-no-stat-before-write`, and
+that prefix is invocation-path-dependent; the bare form is the one
+consistently supported way to suppress a single line regardless of how
+semgrep is invoked) plus a comment naming the rule and explaining why.
+`pkg/kubeutil/rbac.go`/`rbac_test.go` (the dead/test-only
+`ApplyClusterRoleBinding` helper) are excluded wholesale via
+`.semgrepignore` for the same reason noted in the Acceptance Checklist
+below.
+
+Local usage: `make semgrep` (requires `pip install semgrep`/`pipx install
+semgrep` — semgrep isn't Go-native so it can't be `go install`-pinned like
+`golangci-lint`) and `make semgrep-test` (validates the rule fixtures
+themselves).
 
 ## Current CI-Guarded Items
 
@@ -178,6 +220,10 @@ The quality guardrail workflow currently checks:
 - redaction still covers Bearer and common secret names;
 - curlpod securityContext remains non-privileged;
 - ServiceURLFormat external-host handling remains a Priority 0 policy.
+
+The Semgrep workflow (`.github/workflows/semgrep.yml`) additionally
+blocks on any of the six rules above firing, unrelated to and
+independent from the onboarding-UX sprint tracker.
 
 ## Acceptance Checklist
 

@@ -1,0 +1,34 @@
+name: Semgrep
+
+on:
+  push:
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE*"
+      - ".github/**/*.md"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE*"
+      - ".github/**/*.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Run kube-slint custom rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v6
+
+      - name: Run Semgrep
+        run: semgrep scan --config .semgrep/rules --error --metrics=off cmd pkg

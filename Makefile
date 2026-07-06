@@ -112,6 +112,25 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+# semgrep isn't Go-native (unlike golangci-lint, go-install'd above) — it's a
+# separate Python-distributed tool, so it can't be auto-fetched into ./bin/
+# the same way. Install with: pip install semgrep (or pipx install semgrep).
+.PHONY: semgrep
+semgrep: ## Run kube-slint's custom Semgrep security/stability rules (see .semgrep/rules)
+	@command -v semgrep >/dev/null 2>&1 || { \
+		echo "semgrep not found on PATH. Install with: pip install semgrep (or pipx install semgrep)"; \
+		exit 1; \
+	}
+	semgrep scan --config .semgrep/rules --error --metrics=off cmd pkg
+
+.PHONY: semgrep-test
+semgrep-test: ## Validate the Semgrep rule fixtures themselves (positive/negative examples)
+	@command -v semgrep >/dev/null 2>&1 || { \
+		echo "semgrep not found on PATH. Install with: pip install semgrep (or pipx install semgrep)"; \
+		exit 1; \
+	}
+	semgrep --test .semgrep/rules
+
 
 ##@ Build
 

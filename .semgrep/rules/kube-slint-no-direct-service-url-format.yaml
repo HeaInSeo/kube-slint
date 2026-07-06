@@ -1,0 +1,14 @@
+rules:
+  - id: kube-slint-no-direct-service-url-format
+    languages: [go]
+    severity: ERROR
+    message: >
+      Do not build the metrics scrape URL from ServiceURLFormat with a raw
+      fmt.Sprintf call. This bypasses ValidateMetricsURL, the default-deny
+      check that rejects external hosts, unsupported schemes, and malformed
+      service/namespace values before any curl pod is created (see
+      docs/security-model.md's "ServiceURLFormat Policy"). Call
+      curlpod.ValidateMetricsURL(format, service, namespace, allowExternal)
+      instead and use its returned URL.
+    patterns:
+      - pattern: fmt.Sprintf($X.ServiceURLFormat, ...)
