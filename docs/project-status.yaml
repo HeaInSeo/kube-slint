@@ -16,7 +16,7 @@ current_focus_deferred:
   - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused)"
   - "pkg/policy and pkg/summary public package cleanup"
   - "F4: quoted label parser improvement"
-next_milestone: "Competition submission prep: final regression pass, submission checklist review before ~2026-08-15 deadline"
+next_milestone: "Competition submission prep: final regression pass, submission checklist review before the 2026-07-17 deadline (corrected from an earlier mistaken 2026-08-15 assumption)"
 active_hardening_sprint: "v1.5.0-released"
 capabilities:
   identity_aligned: "done"

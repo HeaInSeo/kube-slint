@@ -14,7 +14,7 @@ It is not a standalone operator repo and not a generic operator correctness test
 4. `docs/PROGRESS_LOG.md`
 5. `README.md`
 6. `docs/notes/*`
-7. `docs/old/*`, `docs/current/*` as reference-only history unless a higher-priority document explicitly promotes them
+7. `docs/old/*` (including `docs/old/pre-implementation-design/*`) as reference-only history unless a higher-priority document explicitly promotes them
 
 ## Change Principles
 

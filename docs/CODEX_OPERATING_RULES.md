@@ -14,7 +14,7 @@ Codex work here should keep the repo aligned as a shift-left operational SLI gua
 4. `docs/PROGRESS_LOG.md`
 5. `README.md`
 6. `docs/notes/*`
-7. Historical material under `docs/old/*` and `docs/current/*`
+7. Historical material under `docs/old/*` (including `docs/old/pre-implementation-design/*`)
 
 Rules:
 
