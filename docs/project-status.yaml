@@ -5,7 +5,7 @@ current_focus:
   - "Post-RC hardening sprint (v1.4.0) complete: gate reliability/regression correctness, secret containment, RBAC scope reduction, fetcher metric normalization"
   - "pkg/gate (formerly internal/gate) provides tested, externally-importable gate evaluation logic"
   - "Quality roadmap Priority 0 implemented: ServiceURLFormat default-deny validator, kube-system namespace rejection, dangerously-named opt-ins, summary/policy bad-fixture executable tests"
-  - "v1.5.0 dataplane-service static analyzer shipped: slint-gate analyze-dataplane, pkg/report, pkg/dataplane; two checks later removed as kube-linter duplicates"
+  - "dataplane-service static analyzer merged to main after v1.4.0 (no dedicated tag cut yet): slint-gate analyze-dataplane, pkg/report, pkg/dataplane; two checks later removed as kube-linter duplicates"
   - "SLI Gate Onboarding UX roadmap complete (Sprint 1-6): init --profile, promote_to_fail/--exit-on naming (dual-support with deprecated fail_on/--fail-on), inspect, recommend-policy (--strictness, --profile-file), baseline approve/diff/merge, ci github-actions, quickstart"
   - "kubebuilder-operator profile expanded 6->9 real SLIs (BaselineV3Specs already defined these); no fabricated second built-in profile added"
   - "Custom Semgrep guardrails implemented and blocking in CI: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"

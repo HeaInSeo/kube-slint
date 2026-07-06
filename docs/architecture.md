@@ -27,7 +27,7 @@ flowchart TD
     N --> O["slint-gate-summary.json\ngate_result: PASS | WARN | FAIL | NO_GRADE"]
 
     O --> P{{"GitHub Actions\n.github/actions/slint-gate"}}
-    P -- "FAIL + fail-on=FAIL" --> Q([CI job exits 1])
+    P -- "FAIL + exit-on=FAIL" --> Q([CI job exits 1])
     P -- "PASS / WARN" --> R([CI job continues])
 ```
 
@@ -39,7 +39,7 @@ flowchart TD
 | E2E scenario | The caller runs the actual test workload. kube-slint is idle during this phase. |
 | `sess.End(ctx)` | Launches a second curl pod to collect the post-workload snapshot. Passes both snapshots to `engine.ExecuteStandard()` for per-SLI delta or end-snapshot computation. Writes two JSON files (see Output Files). |
 | `slint-gate` CLI | Reads `sli-summary.json`, `policy.yaml`, and an optional `baseline`. Evaluates threshold rules, regression against baseline, and reliability. Writes `slint-gate-summary.json`. |
-| GitHub Action | Reads `gate_result` from the gate summary. Exits 1 when the result meets the configured `fail-on` level. |
+| GitHub Action | Reads `gate_result` from the gate summary. Exits 1 when the result meets the configured `exit-on` level (`fail-on` still works as a deprecated alias). |
 
 ---
 
@@ -56,8 +56,8 @@ flowchart TD
 | `pkg/slo/fetch/promtext` | Parses Prometheus text-format exposition into `map[string]float64`. Used by `curlPodFetcher.parsePrometheusText()`. |
 | `pkg/slo/summary` | Output schema types: `Summary`, `SLIResult`, `Reliability`, `RunConfig`, `Status`. `Writer` interface (`Write(path, Summary)`). `JSONFileWriter` default implementation. |
 | `pkg/gate` | Policy evaluation (formerly `internal/gate`; moved to `pkg/` so external consumers can reuse the gate logic directly). `Evaluate(Request)` loads policy + measurement + baseline, runs threshold checks (`runThresholds`), regression checks (`runRegression`), and reliability checks (`runReliability`). Returns a `gate.Summary` written to `slint-gate-summary.json`. |
-| `cmd/slint-gate` | CLI entry point. Parses flags (`--measurement-summary`, `--policy`, `--baseline`, `--output`, `--fail-on`, `--github-step-summary`), calls `gate.Evaluate()`, writes output, optionally renders `$GITHUB_STEP_SUMMARY` markdown, and exits with code 1 if `shouldFailOn()` returns true. Subcommand `slint-gate init` scaffolds `.slint/policy.yaml`. |
-| `.github/actions/slint-gate` | GitHub Composite Action. Runs `go run ./cmd/slint-gate` with action inputs, uploads `slint-gate-summary.json` as a workflow artifact, exposes outputs (`gate-result`, `evaluation-status`, `summary-path`), and enforces `fail-on` via a shell case statement. |
+| `cmd/slint-gate` | CLI entry point. Default invocation parses flags (`--measurement-summary`, `--policy`, `--baseline`, `--output`, `--exit-on`, `--github-step-summary`; `--fail-on` still works as a deprecated alias), calls `gate.Evaluate()`, writes output, optionally renders `$GITHUB_STEP_SUMMARY` markdown, and exits with code 1 if `shouldFailOn()` returns true. Onboarding subcommands: `init` (scaffolds `.slint/policy.yaml`), `inspect` (explains measured/missing SLIs), `recommend-policy` (generates a policy draft from a measured summary), `baseline approve`/`diff`/`merge` (known-good baseline lifecycle), `ci github-actions` (prints a CI step snippet), `quickstart` (onboarding status + next-step suggestion). |
+| `.github/actions/slint-gate` | GitHub Composite Action. Runs `go run ./cmd/slint-gate` with action inputs, uploads `slint-gate-summary.json` as a workflow artifact, exposes outputs (`gate-result`, `evaluation-status`, `summary-path`), and enforces `exit-on` (falls back to the deprecated `fail-on` input) via a shell case statement. |
 | `pkg/kubeutil` | Cluster utilities: `ReadServiceAccountToken`, `WaitForReady`, `PollUntil`, RBAC scaffolding (`--emit-rbac`), Prometheus Operator helpers. |
 | `pkg/devutil` | Development helpers: project root detection, template rendering, patch utilities. |
 
@@ -107,14 +107,14 @@ slint-gate-summary.json                 # gate evaluation result, written by sli
 
 **`checks[].observed` type note:** `observed` is normally a `number`. In non-quantifiable edge cases — for example, a regression check where the baseline is zero and the current value is non-zero — `observed` contains a string marker such as `"baseline_zero_current_nonzero"`. Consumers (jq scripts, dashboards) must not assume `observed` is always numeric.
 
-**`fail_on` two-layer model:**
+**`promote_to_fail` two-layer model** (formerly `fail_on`/`--fail-on` — both names looked like the same concept despite controlling different layers; the old names still work as deprecated aliases, see `docs/sli-gate-onboarding-ux.md`'s naming section):
 
 | Layer | Controls |
 |---|---|
-| `policy.fail_on` | Which violation categories promote `gate_result` to `FAIL`; violations not listed become `WARN` |
-| CLI `--fail-on` | Which `gate_result` values cause the process to exit with code 1 |
+| `policy.promote_to_fail` | Which violation categories promote `gate_result` to `FAIL`; violations not listed become `WARN` |
+| CLI `--exit-on` | Which `gate_result` values cause the process to exit with code 1 |
 
-If `fail_on` is omitted or set to `[]`, the default hard-fail categories apply: `threshold_miss` and `regression_detected`.
+If `promote_to_fail` is omitted or set to `[]`, the default hard-fail categories apply: `threshold_miss` and `regression_detected`.
 
 ---
 

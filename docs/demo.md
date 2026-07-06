@@ -67,7 +67,7 @@ The `gate` target uses:
 go run ../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
-  --fail-on FAIL_OR_NOGRADE
+  --exit-on FAIL_OR_NOGRADE
 ```
 
 `FAIL_OR_NOGRADE` is intentional for promotion-gate demos: a missing or unevaluable measurement is not treated as approval.
@@ -89,7 +89,7 @@ go run ../../cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy /tmp/kube-slint-fail-policy.yaml \
   --output slint-gate-summary.fail.json \
-  --fail-on FAIL_OR_NOGRADE
+  --exit-on FAIL_OR_NOGRADE
 ```
 
 Expected result:
@@ -110,7 +110,7 @@ go run ../../cmd/slint-gate \
   --measurement-summary artifacts/does-not-exist.json \
   --policy .slint/policy.yaml \
   --output slint-gate-summary.nograde.json \
-  --fail-on FAIL_OR_NOGRADE
+  --exit-on FAIL_OR_NOGRADE
 ```
 
 Expected behavior:

@@ -44,7 +44,7 @@ gate:  ## Evaluate policy gate against the latest sli-summary.json
 	go run ../../cmd/slint-gate \
 	  --measurement-summary artifacts/sli-summary.json \
 	  --policy .slint/policy.yaml \
-	  --fail-on FAIL_OR_NOGRADE
+	  --exit-on FAIL_OR_NOGRADE
 
 .PHONY: show-result
 show-result:  ## Print a summary of the gate result

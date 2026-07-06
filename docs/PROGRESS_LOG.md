@@ -360,7 +360,7 @@ without learning the full policy schema first.
 * **기본 동작 유지(No Regression)**: 기본 `curl` 이미지 태그 유지 및 TLS 검증(Verify) On 상태를 기본 동작으로 고수.
 * **통합 가이드 반영**: `README.md` 및 `README(Kor).md`에 설정(`sess := harness.NewSession(...)`) 예시 및 RBAC(`create pods`) 관련 최소 주의사항 기재.
 
-### Stage v1.5.0 + Quality Roadmap Priority 0 (2026-07-05)
+### dataplane-service Analyzer + Quality Roadmap Priority 0 (2026-07-05, merged to main after v1.4.0 — no dedicated tag cut yet)
 
 * **dataplane-service 정적 분석기 출시**: `slint-gate analyze-dataplane <dir>` 서브커맨드 + `pkg/report`(범용 Finding/Report/SARIF/JSON 모델) + `pkg/dataplane`(경량 K8s 매니페스트 모델). kube-linter와 겹치는 체크 2개(`KSL-DP-003` probe wiring, `KSL-DP-005` resource limits)는 실제 kube-linter 체크 목록 확인 후 제거.
 * **`internal/gate` → `pkg/gate` 이동 이후, quality-roadmap-guardrails 브랜치(Codex) 머지**: 로드맵/보안/게이트 계약 문서(`docs/quality-roadmap*.md`, `docs/security-model.md`, `docs/gate-contract.md`, `docs/test-strategy.md`) 및 `hack/quality-guardrails.sh` CI 드리프트 감지 스크립트 도입.
