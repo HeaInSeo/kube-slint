@@ -65,6 +65,7 @@ type recommendedThreshold struct {
 	Name, Metric, Operator, Reason string
 	Value                          float64
 	RelaxNote                      string
+	MismatchNote                   string
 }
 
 type recommendPolicyTemplateData struct {
@@ -186,6 +187,11 @@ func classifyCandidates(candidates []profileCandidate, measured map[string]*summ
 				"    # signal is noisy rather than a real regression, consider relaxing this\n" +
 				"    # rule only after confirming the source is transient.\n"
 		}
+		if r, ok := measured[c.ID]; ok && r.Value != nil && violatesDefault(c.Operator, c.Value, *r.Value) {
+			t.MismatchNote = fmt.Sprintf(
+				"    # ⚠ measured value (%v) does not satisfy this default threshold —\n"+
+					"    #   review before relying on this rule in CI.\n", *r.Value)
+		}
 		active = append(active, t)
 	}
 	return active, commented
@@ -202,12 +208,38 @@ func renderActiveThresholds(items []recommendedThreshold) string {
 		fmt.Fprintf(&b, "    operator: %q\n", t.Operator)
 		fmt.Fprintf(&b, "    value: %v\n", t.Value)
 		fmt.Fprintf(&b, "    # %s\n", t.Reason)
+		if t.MismatchNote != "" {
+			b.WriteString(t.MismatchNote)
+		}
 		if t.RelaxNote != "" {
 			b.WriteString(t.RelaxNote)
 		}
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// violatesDefault reports whether measured fails the rule "measured operator
+// target" — i.e. whether the candidate's own default threshold is already
+// violated by what was actually observed. Mirrors pkg/gate/gate.go's
+// compareOp semantics for the 5 supported operators (duplicated locally for
+// the same reason as baseline_diff.go's direction helpers: this is a
+// CLI-only concern, not worth expanding pkg/gate's public API for).
+func violatesDefault(operator string, target, measured float64) bool {
+	switch strings.TrimSpace(operator) {
+	case "<=", "=<":
+		return !(measured <= target)
+	case ">=", "=>":
+		return !(measured >= target)
+	case "<":
+		return !(measured < target)
+	case ">":
+		return !(measured > target)
+	case "==", "=":
+		return measured != target
+	default:
+		return false
+	}
 }
 
 // commentedEntry pairs a candidate not promoted to an active rule with the

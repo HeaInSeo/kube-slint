@@ -175,6 +175,32 @@ candidates:
 	assert.Contains(t, stdout, "# Profile:      custom")
 }
 
+func TestRunRecommendPolicy_MismatchedValue_ShowsWarning(t *testing.T) {
+	dir := t.TempDir()
+	// workqueue_depth_end's default rule is <= 0; measuring 3 violates it.
+	summaryPath := writeDiffSummary(t, dir, "summary.json", map[string]float64{"workqueue_depth_end": 3})
+
+	var capturedErr error
+	stdout := captureStdout(t, func() {
+		capturedErr = runRecommendPolicy([]string{"--summary", summaryPath, "--dry-run"})
+	})
+	require.NoError(t, capturedErr)
+	assert.Contains(t, stdout, "⚠ measured value (3) does not satisfy this default threshold")
+}
+
+func TestRunRecommendPolicy_MatchingValue_NoWarning(t *testing.T) {
+	dir := t.TempDir()
+	// workqueue_depth_end's default rule is <= 0; measuring 0 satisfies it.
+	summaryPath := writeDiffSummary(t, dir, "summary.json", map[string]float64{"workqueue_depth_end": 0})
+
+	var capturedErr error
+	stdout := captureStdout(t, func() {
+		capturedErr = runRecommendPolicy([]string{"--summary", summaryPath, "--dry-run"})
+	})
+	require.NoError(t, capturedErr)
+	assert.NotContains(t, stdout, "⚠")
+}
+
 func TestRunRecommendPolicy_Lenient_NoisyIsCommentedOut(t *testing.T) {
 	dir := t.TempDir()
 	summaryPath := writeInspectSummary(t, dir, []string{"rest_client_429_delta"}, "Complete")
