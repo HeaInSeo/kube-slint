@@ -6,7 +6,7 @@
 
 kube-slint는 쿠버네티스 오퍼레이터 E2E 테스트 세션에 내장하는 **shift-left 운영 SLI 가드레일 라이브러리**입니다. 오퍼레이터를 수정하지 않고 외부 curl pod 또는 port-forward로 `/metrics` 엔드포인트를 스크랩하여 reconcile rate, workqueue depth, REST client error 등의 SLI를 측정하고, 선언적 `policy.yaml`로 CI 게이트 판정을 내립니다. 기능 정확성을 검증하는 E2E 테스트와 독립적으로 동작하며, 계측 실패가 테스트를 중단시키지 않는 safety-first 원칙을 준수합니다.
 
-**최신 릴리즈**: v1.4.0 (SLI Gate Onboarding UX 로드맵 Sprint 1-6 + 커스텀 Semgrep 가드레일은 v1.4.0 이후 `main`에 병합 완료, 다음 태그에 포함 예정)
+**최신 릴리즈**: v1.5.0 (SLI Gate Onboarding UX 로드맵 Sprint 1-6, dataplane-service 정적 분석기, 커스텀 Semgrep 가드레일 포함)
 
 ---
 

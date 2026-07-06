@@ -75,7 +75,7 @@
 
 N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 항목: F4(quoted label parser 개선), `pkg/policy`/`pkg/summary` 공개 API 정리(v1.4.0 로드맵 항목 중 미착수분).
 
-**Stage 3 — SLI Gate Onboarding UX 로드맵** ✅ 전체 완료 (Sprint 1~6, 커밋 `b947902`~`54f2112`)
+**Stage 3 — SLI Gate Onboarding UX 로드맵** ✅ 전체 완료 (Sprint 1~6, 커밋 `b947902`~`54f2112`, v1.5.0에 포함)
 
 `docs/sli-gate-onboarding-ux.md`에 각 항목 상세 설계/결정 근거 있음. 목표: "측정 → 설명 → 추천 → 승인 → CI"를 사용자가 정책 스키마 전체를 배우기 전에 따라갈 수 있는 온보딩 루프 완성.
 
@@ -88,7 +88,7 @@ N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 
 | 5 (`6868d51`) | `kubebuilder-operator` 프로파일 6→9개 확장(이미 실재하던 `BaselineV3Specs()` SLI 3개 추가, 새 "informational" tier). `--profile-file`/`.slint/profiles/<name>.yaml` local custom profile 지원. 2번째 built-in 프로파일(`dataplane-service` 등)은 실제 spec이 없어 미제작(지어내지 않음). |
 | 6 (`54f2112`) | `slint-gate quickstart`(비대화형 status 명령 — "interactive wizard"는 stdin 프롬프트 등 새로운 위험요소라 스코프 질문에 응답 없어 저위험 대안으로 대체). `recommend-policy`에 threshold-mismatch 경고(⚠, 측정값이 기본 threshold를 이미 위반하면 표시, 자동 조정은 안 함).
 
-**Semgrep 커스텀 가드레일** ✅ (커밋 `06d0cc6`, 온보딩 UX와 별개 트랙)
+**Semgrep 커스텀 가드레일** ✅ (커밋 `06d0cc6`, 온보딩 UX와 별개 트랙, v1.5.0에 포함)
 
 `docs/security-model.md`의 "Static Guardrail Plan"에 계획만 있던 6개 규칙(`kube-slint-no-*`)을 `.semgrep/rules/`에 실제 구현, positive/negative fixture로 검증(`make semgrep-test`), 실제 코드베이스 0 findings 확인 후 CI에 blocking으로 연결(`.github/workflows/semgrep.yml`, `make semgrep`). 이미 받아들여진 패턴 2곳(overwrite-refusal 체크, sweep.go의 label-필터 후 delete-by-name)은 `// nosemgrep`(bare — rule-id 붙이면 디렉토리 기반 config 로딩 시 경로 프리픽스가 붙어 호출 방식에 따라 깨질 수 있음) + 이유 코멘트로 명시적 예외 처리. `pkg/kubeutil/rbac.go`(dead/test-only)는 `.semgrepignore`로 전체 제외.
 
@@ -99,7 +99,8 @@ N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 
 - IDE/MCP 연동 — 스코프 미확정 스트레치 항목, 별도 트랙(다른 에이전트가 진행하다 보류됨)로 아직 재개 안 됨
 - `pkg/policy`/`pkg/summary` 공개 API 정리 (v1.4.0 로드맵부터 미착수)
 - F4: quoted label parser 개선
-- 1차 코드 제출(2026-08-15경) 전 최종 점검: 버전 태그(v1.5.0?) 여부, `docs/competition-submission.md`/`docs/project-status.yaml` 최신화
+- **v1.5.0 태그/릴리스 완료** (2026-07-07) — Sprint 1-6 온보딩 UX + Semgrep 가드레일 + dataplane-service 분석기 전부 포함
+- 1차 코드 제출(2026-08-15경) 전 최종 점검: 회귀 테스트 재확인, 제출 체크리스트 검토
 
 ---
 

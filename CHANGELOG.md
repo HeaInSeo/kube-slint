@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-07
+
+SLI Gate Onboarding UX roadmap (Sprint 1-6): a guided
+`init -> inspect -> recommend-policy -> baseline approve/diff/merge -> ci
+github-actions -> quickstart` CLI loop that lets a user reach a trustworthy
+CI gate without learning the full policy schema first, plus the
+`promote_to_fail`/`--exit-on` naming migration. Also ships the
+`analyze-dataplane` static analyzer (merged earlier, previously undocumented
+under a version header) and 6 custom Semgrep security guardrails, enabled
+as blocking CI. See `docs/sli-gate-onboarding-ux.md` and
+`docs/security-model.md` for the full design/decision record behind each
+item below.
+
 ### Added
 
 - `slint-gate analyze-dataplane <manifest-dir>`: new static analyzer for the "dataplane-service" observability contract — reads a directory of Kubernetes YAML manifests (no live cluster) and checks: metrics port naming (`KSL-DP-001`), `/readyz`/`/livez` probe path convention (`KSL-DP-002`), metrics Service/ServiceMonitor wiring (`KSL-DP-004`), and explicit `terminationGracePeriodSeconds` (`KSL-DP-006`). Outputs JSON, SARIF 2.1.0, and a GitHub Actions step summary via `--output-json`/`--output-sarif`/`--github-step-summary`; `--fail-on none|error|warning` controls exit code. CLI-only in this pass — no GitHub composite Action wiring yet.

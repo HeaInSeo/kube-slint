@@ -1,22 +1,23 @@
-current_stage: "SLI Gate Onboarding UX roadmap complete; competition submission prep"
-roadmap_percent: 92
+current_stage: "v1.5.0 tagged; competition submission prep"
+roadmap_percent: 94
 roadmap_status: "post_rc"
 current_focus:
+  - "v1.5.0 tagged: SLI Gate Onboarding UX roadmap (Sprint 1-6), dataplane-service static analyzer, custom Semgrep guardrails"
   - "Post-RC hardening sprint (v1.4.0) complete: gate reliability/regression correctness, secret containment, RBAC scope reduction, fetcher metric normalization"
   - "pkg/gate (formerly internal/gate) provides tested, externally-importable gate evaluation logic"
   - "Quality roadmap Priority 0 implemented: ServiceURLFormat default-deny validator, kube-system namespace rejection, dangerously-named opt-ins, summary/policy bad-fixture executable tests"
-  - "dataplane-service static analyzer merged to main after v1.4.0 (no dedicated tag cut yet): slint-gate analyze-dataplane, pkg/report, pkg/dataplane; two checks later removed as kube-linter duplicates"
-  - "SLI Gate Onboarding UX roadmap complete (Sprint 1-6): init --profile, promote_to_fail/--exit-on naming (dual-support with deprecated fail_on/--fail-on), inspect, recommend-policy (--strictness, --profile-file), baseline approve/diff/merge, ci github-actions, quickstart"
+  - "dataplane-service static analyzer shipped in v1.5.0: slint-gate analyze-dataplane, pkg/report, pkg/dataplane; two checks later removed as kube-linter duplicates"
+  - "SLI Gate Onboarding UX roadmap complete (Sprint 1-6), shipped in v1.5.0: init --profile, promote_to_fail/--exit-on naming (dual-support with deprecated fail_on/--fail-on), inspect, recommend-policy (--strictness, --profile-file), baseline approve/diff/merge, ci github-actions, quickstart"
   - "kubebuilder-operator profile expanded 6->9 real SLIs (BaselineV3Specs already defined these); no fabricated second built-in profile added"
-  - "Custom Semgrep guardrails implemented and blocking in CI: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"
+  - "Custom Semgrep guardrails implemented and blocking in CI, shipped in v1.5.0: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"
 current_focus_deferred:
   - "baseline merge review-existing/force-replace modes (only append-new-only implemented)"
   - "True interactive wizard (stdin-prompted); quickstart shipped as the non-interactive alternative"
   - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused)"
   - "pkg/policy and pkg/summary public package cleanup"
   - "F4: quoted label parser improvement"
-next_milestone: "Competition submission prep: docs/competition-submission.md refresh, version tag decision, final regression pass before ~2026-08-15 deadline"
-active_hardening_sprint: "sli-gate-onboarding-ux-complete"
+next_milestone: "Competition submission prep: final regression pass, submission checklist review before ~2026-08-15 deadline"
+active_hardening_sprint: "v1.5.0-released"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"
