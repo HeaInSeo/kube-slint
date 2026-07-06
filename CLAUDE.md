@@ -55,7 +55,7 @@
 - [x] CHANGELOG (CHANGELOG.md, v0.1.0 엔트리)
 - [x] `make coverage` 테스트 커버리지 리포트
 - [x] 공모전 제출 문서 (docs/competition-submission.md)
-- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.4.0` 태그 존재)
+- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.5.0` 태그 존재)
 
 #### Batch 4 — Post-RC Hardening Sprint ✅ (v1.4.0, 커밋 `4862544`~`9172d25`)
 

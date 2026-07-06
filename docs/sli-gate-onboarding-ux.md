@@ -305,7 +305,7 @@ for generated snippets):
 
 ```yaml
 - name: Run kube-slint shift-left SLI gate
-  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.4.0
+  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.5.0
   with:
     measurement-summary: artifacts/sli-summary.json
     policy: .slint/policy.yaml
@@ -630,7 +630,7 @@ Resolved:
 
 - **CI snippet action target**: current local composite action
   (`.github/actions/slint-gate`), pinned via `--action-ref` (defaults to the
-  CLI's own build `Version`, e.g. `v1.4.0` — never `@main`). Revisit once a
+  CLI's own build `Version`, e.g. `v1.5.0` — never `@main`). Revisit once a
   release-binary-based action exists.
 - **`baseline approve` grade gate**: `PASS` approved; `WARN` approved only
   with `--allow-warn`; `FAIL`/`NO_GRADE` always rejected, with no flag
