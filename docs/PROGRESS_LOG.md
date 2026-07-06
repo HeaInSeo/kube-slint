@@ -5,10 +5,36 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Stage (Post-RC) — Phase 6-d Go CLI Migration Complete
+## Current Status: SLI Gate Onboarding UX Roadmap Complete + Semgrep Guardrails
 
 **Branch:** `main`
-**Last updated:** 2026-06-27 (competition readiness public API cleanup)
+**Last updated:** 2026-07-07 (Semgrep custom guardrails)
+
+### SLI Gate Onboarding UX Roadmap — Sprint 1-6 (COMPLETE)
+
+**Source of truth:** `docs/sli-gate-onboarding-ux.md`
+
+Goal: let a user follow "measure -> explain -> recommend -> approve -> CI"
+without learning the full policy schema first.
+
+* [x] Sprint 1 (`b947902`): `slint-gate init --profile` (backward-compatible extension); `policy.promote_to_fail`/CLI `--exit-on`/action `exit-on` (dual-support with deprecated `fail_on`/`--fail-on`/`fail-on`)
+* [x] Sprint 2 (`f07e064`): `slint-gate inspect --summary`; `slint-gate recommend-policy --summary --profile --strictness`
+* [x] Sprint 3 (`dad1467`): `slint-gate baseline approve`; `slint-gate ci github-actions` — minimum onboarding loop complete
+* [x] Sprint 4 (`3d2db24`): `slint-gate baseline diff`; `slint-gate baseline merge --mode append-new-only`
+* [x] Sprint 5 (`6868d51`): `kubebuilder-operator` profile expanded 6->9 real SLIs; `--profile-file`/`.slint/profiles/<name>.yaml` local custom profile support (no fabricated second built-in profile)
+* [x] Sprint 6 (`54f2112`): `slint-gate quickstart` (non-interactive status command, substituted for the originally-scoped stdin-prompted "interactive wizard"); `recommend-policy` threshold-mismatch warnings
+
+**Deferred (tracked, not forgotten):** `baseline merge`'s `review-existing`/`force-replace` modes; a true interactive wizard; MCP/IDE integration (separate, paused track); `pkg/policy`/`pkg/summary` public API cleanup; F4 quoted label parser.
+
+### Custom Semgrep Guardrails (COMPLETE)
+
+**Source of truth:** `docs/security-model.md`'s "Static Guardrail Plan"
+
+* [x] Implemented the 6 previously-planned-only rules (`kube-slint-no-direct-service-url-format`, `kube-slint-no-bearer-token-in-curl-args`, `kube-slint-no-insecure-skip-verify`, `kube-slint-no-clusterrolebinding-default`, `kube-slint-no-stat-before-write`, `kube-slint-no-unsafe-cleanup`) in `.semgrep/rules/`, each with a paired positive/negative Go fixture (`make semgrep-test`)
+* [x] Verified the real codebase against all 6 rules (`make semgrep`) and reached 0 findings — two already-accepted patterns got `// nosemgrep` (bare, not rule-id-qualified — directory-based `--config` loading namespaces rule IDs by path in an invocation-dependent way) plus a reason comment; `pkg/kubeutil/rbac.go`'s dead/test-only code is excluded wholesale via `.semgrepignore`
+* [x] Enabled as blocking CI (`.github/workflows/semgrep.yml`), confirmed green on the real `semgrep/semgrep` container image (not just the older local install used to author the rules)
+
+### Previous Status: Phase 6-d Go CLI Migration Complete
 
 ### Post-RC Hardening Sprint — Security, Lifecycle, and Gate Semantics (IN PROGRESS)
 

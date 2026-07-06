@@ -179,3 +179,66 @@ This file records architecture/product-direction decisions that define the proje
   - CI-backed drift detection is appropriate for accepted identity/security
     contracts, while future behavior must remain clearly labeled as proposed
     until implemented.
+
+## D-016: SLI Gate Onboarding UX ships as a guided CLI loop, not an invented one
+
+- Date: 2026-07-07
+- Status: Accepted
+- Decision:
+  - The onboarding CLI surface (`init --profile`, `inspect`, `recommend-policy`,
+    `baseline approve/diff/merge`, `ci github-actions`, `quickstart`) follows
+    "measure -> explain -> recommend -> approve -> CI" per
+    `docs/sli-gate-onboarding-ux.md`, built across Sprint 1-6.
+  - `policy.fail_on`/CLI `--fail-on`/action `fail-on` are renamed to
+    `promote_to_fail`/`--exit-on`/`exit-on` (they controlled two different
+    layers despite the shared "fail" wording) with the old names kept as
+    working, deprecated aliases (dual-support, not a breaking rename) since
+    they already shipped in tagged releases.
+  - The `kubebuilder-operator` profile's SLI candidates are tiered
+    (`core`/`noisy`/`informational`), and only `--strictness` governs the
+    `noisy` tier; a candidate is never given a fabricated threshold it can't
+    principled support (see the `informational` tier for raw activity
+    counters).
+  - No second built-in profile (e.g. `dataplane-service`) was added, since no
+    real SLI spec/collector exists for one in this codebase; local custom
+    profile files (`--profile-file`) are the extensibility path instead.
+  - Sprint 6's "interactive wizard" shipped as a non-interactive `quickstart`
+    status command instead — a real stdin-prompted CLI is a different kind
+    of engineering risk (TTY detection, non-interactive-CI handling, harder
+    to test) than anything else in this tool, and the scoping question went
+    unanswered under deadline pressure.
+- Rationale:
+  - Every naming/scope decision in this roadmap follows the same rule this
+    project already established with `Dangerously*` options: prefer a
+    visible, honest name or an explicit deferral over a rename that breaks
+    existing callers, or a feature that pretends to know something (a safe
+    threshold, a real second profile) it doesn't actually have grounds for.
+
+## D-017: Custom Semgrep guardrails are blocking CI, not advisory-only
+
+- Date: 2026-07-07
+- Status: Accepted
+- Decision:
+  - The 6 rules `docs/security-model.md`'s "Static Guardrail Plan" already
+    named (and left unimplemented) are implemented in `.semgrep/rules/`,
+    each with a paired positive/negative Go fixture, and enabled as
+    blocking CI (`.github/workflows/semgrep.yml`) rather than rolled out
+    advisory-first.
+  - This was possible without an advisory phase because the real codebase
+    was scanned and made fully compliant in the same change: two
+    already-accepted patterns (the `--output`/`--baseline`
+    overwrite-refusal checks; `sweep.go`'s label-filtered-then-delete-by-name
+    cleanup) got a bare `// nosemgrep` plus a reason comment, and
+    `pkg/kubeutil.ApplyClusterRoleBinding` (documented dead/test-only code)
+    is excluded wholesale via `.semgrepignore`.
+  - Inline suppressions use bare `// nosemgrep`, not
+    `// nosemgrep: <rule-id>` — directory-based `--config` loading
+    namespaces rule IDs by path (e.g. `semgrep.rules.<id>`), and that
+    prefix depends on how semgrep is invoked, so the qualified form is
+    fragile across local/CI/future refactors.
+- Rationale:
+  - The doc's own bar ("do not enable as blocking CI until each rule has
+    positive/negative examples and the current codebase is compliant or
+    explicitly exempted") is exactly the condition met here — there was no
+    reason to add an unblocking grace period once compliance was already
+    verified.

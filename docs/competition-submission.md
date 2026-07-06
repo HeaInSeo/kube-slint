@@ -6,7 +6,7 @@
 
 kube-slint는 쿠버네티스 오퍼레이터 E2E 테스트 세션에 내장하는 **shift-left 운영 SLI 가드레일 라이브러리**입니다. 오퍼레이터를 수정하지 않고 외부 curl pod 또는 port-forward로 `/metrics` 엔드포인트를 스크랩하여 reconcile rate, workqueue depth, REST client error 등의 SLI를 측정하고, 선언적 `policy.yaml`로 CI 게이트 판정을 내립니다. 기능 정확성을 검증하는 E2E 테스트와 독립적으로 동작하며, 계측 실패가 테스트를 중단시키지 않는 safety-first 원칙을 준수합니다.
 
-**최신 릴리즈**: v1.2.0
+**최신 릴리즈**: v1.4.0 (SLI Gate Onboarding UX 로드맵 Sprint 1-6 + 커스텀 Semgrep 가드레일은 v1.4.0 이후 `main`에 병합 완료, 다음 태그에 포함 예정)
 
 ---
 
@@ -49,6 +49,8 @@ kube-slint는 두 문제를 동시에 해결합니다. 오퍼레이터 코드를
 | evidence redaction | `evidence.RedactString()` / `RedactMap()` — Bearer 토큰, token=/password=/secret= 값 마스킹 |
 | curlpod 식별 레이블 | 모든 curlpod에 `app.kubernetes.io/managed-by=kube-slint`, `slint-run-id=<RunID>` 레이블 자동 부착. 삭제 실패 시 경고 로그 출력 |
 | PortForward fetcher | `kubectl port-forward` 기반 fetcher — curl pod 생성 없이 로컬 개발 환경에서 사용 가능 |
+| 온보딩 CLI 루프 | `slint-gate init → inspect → recommend-policy → baseline approve → ci github-actions`: 정책 스키마를 몰라도 측정 결과를 기반으로 정책 초안을 생성하고 CI에 연결. `slint-gate quickstart`가 현재 온보딩 단계와 다음 실행 명령을 알려줌 |
+| 커스텀 Semgrep 보안 가드레일 | `.semgrep/rules/`의 6개 규칙(토큰 노출, insecure TLS, ClusterRoleBinding, TOCTOU, 안전하지 않은 cleanup)이 CI에서 blocking으로 실행되어 프로젝트 고유 보안 불변조건의 회귀를 코드 리뷰 없이 자동 차단 |
 
 ---
 
@@ -111,9 +113,10 @@ E2E 테스트 세션
 | `pkg/slo/summary` | 출력 스키마 타입 + SchemaVersion 상수 + LoadFile/WriteFile/Validate 공개 API |
 | `pkg/slo/evidence` | RedactString / RedactMap — 토큰·패스워드 마스킹 유틸리티 |
 | `pkg/gate` | policy 평가 (schemaVersion 검증, result_status, threshold, regression, reliability) |
-| `cmd/slint-gate` | CLI 진입점 (`--fail-on`, `--github-step-summary`, `init` 서브커맨드) |
-| `.github/actions/slint-gate` | GitHub Composite Action; 4단계 fail-on 지원 |
+| `cmd/slint-gate` | CLI 진입점: 게이트 평가(`--exit-on`, `--github-step-summary`) + 온보딩 서브커맨드(`init`, `inspect`, `recommend-policy`, `baseline approve/diff/merge`, `ci github-actions`, `quickstart`, `analyze-dataplane`) |
+| `.github/actions/slint-gate` | GitHub Composite Action; 4단계 exit-on 지원 |
 | `pkg/kubeutil` | 클러스터 유틸리티 (토큰, RBAC, WaitForReady, PollUntil) |
+| `.semgrep/rules` | 프로젝트 전용 Semgrep 보안/안정성 가드레일 6종 (positive/negative fixture 포함, CI blocking) |
 
 ---
 
@@ -146,6 +149,10 @@ E2E 테스트 세션
 
 **CounterResetPolicy**: 프로세스 재시작으로 인한 카운터 리셋(delta < 0)을 SLI별로 다르게 처리할 수 있습니다. promotion gate처럼 측정 신뢰성이 중요한 경우 `no_grade`를 지정하면 counter reset 발생 시 PASS가 아닌 NO_GRADE로 처리되어 잘못된 승인을 방지합니다.
 
+**측정 → 설명 → 추천 → 승인 → CI 온보딩 루프**: 처음 도입하는 사용자가 policy 스키마 전체를 배우기 전에 `init → inspect → recommend-policy → baseline approve → ci github-actions` 순서로 실제 CI 게이트까지 도달할 수 있습니다. `recommend-policy`는 실제 측정된 SLI만 active threshold로 만들고, profile이 기대하지만 측정되지 않은 SLI는 주석으로만 남기며, 원칙적인 pass/fail 기준이 없는 raw activity counter(예: 총 reconcile 횟수)는 어떤 strictness 설정에서도 threshold를 지어내지 않습니다 — "측정하지 못한 것"과 "측정했지만 게이트로 쓸 근거가 없는 것"을 구분해서 보여주는 설계입니다.
+
+**프로젝트 전용 정적 분석 가드레일**: 범용 OWASP 룰셋 대신, 이 프로젝트가 이미 문서화한 보안 불변조건(ServiceURLFormat 검증 우회, 토큰의 커맨드 인자 노출, insecure TLS, ClusterRoleBinding 기본 생성, TOCTOU, label 없는 cleanup)을 코드 레벨에서 강제하는 6개의 커스텀 Semgrep 규칙을 작성하고, 실제 코드베이스를 전수 스캔하여 컴플라이언스를 검증한 뒤 CI에서 blocking으로 연결했습니다. 코드 리뷰 없이도 회귀를 자동으로 막습니다.
+
 ---
 
 ## 7. 사용 방법
@@ -158,7 +165,7 @@ import "github.com/HeaInSeo/kube-slint/pkg/slint"
 sess := slint.NewSession(slint.SessionConfig{
     Namespace:          "my-operator-system",
     MetricsServiceName: "my-operator-controller-manager-metrics-service",
-    Token:              token, // ServiceAccount 토큰
+    ServiceAccountName: "kube-slint-scraper", // curl pod가 자신의 마운트된 토큰을 직접 읽음
     ArtifactsDir:       "artifacts",
     Specs:              slint.DefaultSpecs(),
 })
@@ -240,10 +247,12 @@ thresholds:
 regression:
   enabled: true
   tolerance_percent: 10
-fail_on:
+promote_to_fail:
   - threshold_miss
   - regression_detected
 ```
+
+(구 필드명 `fail_on`도 deprecated alias로 계속 동작 — 둘 다 union으로 반영되며 `fail_on` 사용 시 `policy_warnings`에 마이그레이션 안내가 남음.)
 
 ### CI 게이팅 (GitHub Actions)
 
@@ -253,22 +262,30 @@ fail_on:
   with:
     measurement-summary: artifacts/sli-summary.json
     policy:              .slint/policy.yaml
-    fail-on:             FAIL_OR_NOGRADE
+    exit-on:             FAIL_OR_NOGRADE
 ```
 
 ### CLI 직접 실행
 
 ```sh
-# 정책 파일 스캐폴딩
-go run ./cmd/slint-gate init
+# 측정 결과 설명 (읽기 전용)
+go run ./cmd/slint-gate inspect --summary artifacts/sli-summary.json
+
+# 측정 기반 정책 초안 생성
+go run ./cmd/slint-gate recommend-policy \
+  --summary artifacts/sli-summary.json \
+  --output .slint/policy.yaml
 
 # 게이트 평가
 go run ./cmd/slint-gate \
   --measurement-summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --baseline docs/baselines/current.json \
-  --fail-on FAIL_OR_NOGRADE \
+  --exit-on FAIL_OR_NOGRADE \
   --github-step-summary
+
+# 지금 어느 단계인지 + 다음에 뭘 실행해야 하는지 확인
+go run ./cmd/slint-gate quickstart
 ```
 
 ---
