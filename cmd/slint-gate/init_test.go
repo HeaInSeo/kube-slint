@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -99,15 +101,17 @@ func TestRunInit_DefaultPlaceholders(t *testing.T) {
 }
 
 func TestResolveServiceName_Override(t *testing.T) {
-	svc, candidates := resolveServiceName("ns", "my-svc")
+	svc, candidates, err := resolveServiceName("ns", "my-svc")
 	assert.Equal(t, "my-svc", svc)
 	assert.Nil(t, candidates)
+	assert.NoError(t, err)
 }
 
 func TestResolveServiceName_NoNamespace(t *testing.T) {
-	svc, candidates := resolveServiceName("", "")
+	svc, candidates, err := resolveServiceName("", "")
 	assert.Empty(t, svc)
 	assert.Nil(t, candidates)
+	assert.NoError(t, err)
 }
 
 func TestIsMetricsServiceCandidate(t *testing.T) {
@@ -272,4 +276,55 @@ func TestRunInit_ForceOverwritesRBAC(t *testing.T) {
 	data, err := os.ReadFile(rbacOut)
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "ServiceAccount")
+}
+
+func TestDescribeKubectlError_ExitErrorSurfacesStderr(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "echo 'boom: no such namespace' >&2; exit 1")
+	_, err := cmd.Output()
+	require.Error(t, err)
+
+	got := describeKubectlError(err)
+	assert.Contains(t, got.Error(), "boom: no such namespace")
+}
+
+func TestDescribeKubectlError_NonExitErrorSurfacesGoError(t *testing.T) {
+	cmd := exec.Command("slint-gate-definitely-not-a-real-binary")
+	_, err := cmd.Output()
+	require.Error(t, err)
+
+	got := describeKubectlError(err)
+	assert.Contains(t, got.Error(), "kubectl get svc")
+}
+
+func TestPrintDiscoveryResult_DiscoverErrorIsDistinctFromNoCandidates(t *testing.T) {
+	capture := func(fn func()) string {
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		fn()
+		_ = w.Close()
+		os.Stdout = old
+		var buf strings.Builder
+		tmp := make([]byte, 4096)
+		for {
+			n, _ := r.Read(tmp)
+			if n == 0 {
+				break
+			}
+			buf.Write(tmp[:n])
+		}
+		return buf.String()
+	}
+
+	errOutput := capture(func() {
+		printDiscoveryResult("my-ns", nil, errors.New("kubectl get svc: connection refused"))
+	})
+	assert.Contains(t, errOutput, "could not auto-detect")
+	assert.Contains(t, errOutput, "connection refused")
+
+	noCandidatesOutput := capture(func() {
+		printDiscoveryResult("my-ns", nil, nil)
+	})
+	assert.Contains(t, noCandidatesOutput, "no metrics services auto-detected")
+	assert.NotContains(t, noCandidatesOutput, "could not auto-detect")
 }

@@ -116,8 +116,8 @@ func runGate() {
 		fmt.Fprintln(os.Stderr, "slint-gate: --fail-on is deprecated; use --exit-on instead (still honored)")
 	}
 
-	failOnValue := strings.ToUpper(strings.TrimSpace(resolved))
-	if !isValidFailOn(failOnValue) {
+	exitOnValue := strings.ToUpper(strings.TrimSpace(resolved))
+	if !isValidExitOn(exitOnValue) {
 		fmt.Fprintf(os.Stderr, "invalid --exit-on: %s\n", resolved)
 		os.Exit(2)
 	}
@@ -142,7 +142,7 @@ func runGate() {
 		}
 	}
 
-	if shouldFailOn(result.GateResult, failOnValue) {
+	if shouldExitOn(result.GateResult, exitOnValue) {
 		fmt.Fprintf(os.Stderr, "slint-gate: exit 1 (gate_result=%s, exit-on=%s)\n", result.GateResult, resolved)
 		os.Exit(1)
 	}
@@ -161,8 +161,8 @@ func resolveExitOn(exitOnSet bool, exitOnVal string, failOnSet bool, failOnVal s
 	return failOnVal, false
 }
 
-func isValidFailOn(failOn string) bool {
-	switch failOn {
+func isValidExitOn(exitOn string) bool {
+	switch exitOn {
 	case "NEVER", "", "FAIL", "FAIL_OR_WARN", "FAIL_OR_NOGRADE", "FAIL_WARN_OR_NOGRADE":
 		return true
 	default:
@@ -170,9 +170,9 @@ func isValidFailOn(failOn string) bool {
 	}
 }
 
-// shouldFailOn returns true when gateResult meets the failOn threshold.
-func shouldFailOn(gateResult, failOn string) bool {
-	switch failOn {
+// shouldExitOn returns true when gateResult meets the exitOn threshold.
+func shouldExitOn(gateResult, exitOn string) bool {
+	switch exitOn {
 	case "NEVER", "":
 		return false
 	case "FAIL":

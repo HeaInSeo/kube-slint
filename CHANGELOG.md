@@ -22,6 +22,24 @@
   `recommend-policy --force` / `baseline approve --force` convention. Previously
   `init` was the only onboarding command that unconditionally overwrote an
   existing file.
+- **`slint-gate init` service discovery**: a failed `kubectl get svc` call
+  (not on PATH, no cluster access, timeout) is no longer swallowed into a
+  silent empty candidate list indistinguishable from "ran fine, found
+  nothing." `discoverMetricsServices` now returns the error, and `init`
+  prints why discovery failed instead of just "no metrics services
+  auto-detected."
+
+### Changed
+
+- Internal (non-public-API) naming in `pkg/gate` and `cmd/slint-gate` no
+  longer centers on the deprecated `fail_on`/`--fail-on` vocabulary now that
+  the public names are `promote_to_fail`/`--exit-on`: `makeFailOn` →
+  `makePromotionSet`, `allowedPolicyFailOn` → `allowedPromotionValues`,
+  `normalizeFailOn` → `normalizePromotionValue`, `isValidFailOn` →
+  `isValidExitOn`, `shouldFailOn` → `shouldExitOn`. No behavior change; the
+  `analyze-dataplane` subcommand's own unrelated `--fail-on` flag (which was
+  never renamed to `--exit-on` and isn't part of this migration) is
+  untouched.
 
 ## [1.5.0] - 2026-07-07
 

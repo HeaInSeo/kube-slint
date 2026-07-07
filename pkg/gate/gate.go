@@ -165,9 +165,9 @@ func Evaluate(req Request) *Summary {
 
 	cur := resultValueMap(measurement)
 	base := resultValueMap(baseline)
-	failOn := makeFailOn(policy)
+	promote := makePromotionSet(policy)
 
-	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, failOn)
+	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, promote)
 	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
 	relWarn, relNoGrade := runReliability(out, policy, measurement)
 	rsFailed, rsWarn, rsNoGrade := runResultStatus(out, measurement)
@@ -263,9 +263,9 @@ func initBaseline(out *Summary, path string) *summary.Summary {
 
 // --- check runners ---
 
-func runThresholds(out *Summary, rules []ThresholdRule, cur map[string]float64, failOn map[string]bool) (failed, warn, anyNoGrade bool) {
+func runThresholds(out *Summary, rules []ThresholdRule, cur map[string]float64, promote map[string]bool) (failed, warn, anyNoGrade bool) {
 	for _, rule := range rules {
-		check, ruleFailed, ruleWarn, ruleNoGrade := evalThreshold(rule, cur, failOn)
+		check, ruleFailed, ruleWarn, ruleNoGrade := evalThreshold(rule, cur, promote)
 		if ruleFailed {
 			failed = true
 		}
@@ -289,9 +289,9 @@ type thresholdResult struct {
 }
 
 // evalThreshold returns (result, failed, warn, noGrade).
-// failed=true  → threshold miss and threshold_miss is in fail_on → gate FAIL
-// warn=true    → threshold miss but threshold_miss not in fail_on → gate WARN (never PASS)
-func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string]bool) (thresholdResult, bool, bool, bool) {
+// failed=true  → threshold miss and threshold_miss is in the promotion set → gate FAIL
+// warn=true    → threshold miss but threshold_miss not in the promotion set → gate WARN (never PASS)
+func evalThreshold(rule ThresholdRule, cur map[string]float64, promote map[string]bool) (thresholdResult, bool, bool, bool) {
 	name := rule.Name
 	if name == "" {
 		name = "unnamed-threshold"
@@ -330,7 +330,7 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, failOn map[string
 	c.Status = "fail"
 	c.Message = "threshold miss"
 	c.pendingReasons = []string{reasonThresholdMiss}
-	if failOn["threshold_miss"] {
+	if promote["threshold_miss"] {
 		return c, true, false, false
 	}
 	return c, false, true, false
@@ -347,12 +347,12 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 	case baseUnavailable, baseCorrupt:
 		return false, false, true
 	}
-	failOn := makeFailOn(policy)
+	promote := makePromotionSet(policy)
 	for _, rule := range policy.Thresholds {
 		if rule.Metric == "" {
 			continue
 		}
-		check, rFailed, rWarnCheck, rNoGrade := evalRegressionCheck(rule, cur, base, policy.Regression.TolerancePercent, failOn)
+		check, rFailed, rWarnCheck, rNoGrade := evalRegressionCheck(rule, cur, base, policy.Regression.TolerancePercent, promote)
 		if rFailed {
 			failed = true
 		}
@@ -371,9 +371,9 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 }
 
 // evalRegressionCheck returns (result, failed, warn, noGrade).
-// failed=true  → regression detected and regression_detected is in fail_on → gate FAIL
-// warn=true    → regression detected but regression_detected not in fail_on → gate WARN (never PASS)
-func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, tolerancePct float64, failOn map[string]bool) (thresholdResult, bool, bool, bool) {
+// failed=true  → regression detected and regression_detected is in the promotion set → gate FAIL
+// warn=true    → regression detected but regression_detected not in the promotion set → gate WARN (never PASS)
+func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, tolerancePct float64, promote map[string]bool) (thresholdResult, bool, bool, bool) {
 	c := thresholdResult{
 		Check: Check{
 			Name:     fmt.Sprintf("regression:%s", rule.Metric),
@@ -405,7 +405,7 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 		c.Observed = "baseline_zero_current_nonzero"
 		c.Message = "regression detected: baseline is zero, current is non-zero"
 		c.pendingReasons = []string{reasonRegressionDetected}
-		if failOn["regression_detected"] {
+		if promote["regression_detected"] {
 			return c, true, false, false
 		}
 		return c, false, true, false
@@ -418,7 +418,7 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 		c.Status = "fail"
 		c.Message = "regression detected"
 		c.pendingReasons = []string{reasonRegressionDetected}
-		if failOn["regression_detected"] {
+		if promote["regression_detected"] {
 			return c, true, false, false
 		}
 		return c, false, true, false
@@ -655,20 +655,20 @@ func validatePolicy(p Policy) error {
 		return fmt.Errorf("unsupported schema_version %q (want slint.policy.v1)", p.SchemaVersion)
 	}
 	for _, item := range p.FailOn {
-		v := normalizeFailOn(item)
+		v := normalizePromotionValue(item)
 		if v == "" {
 			continue
 		}
-		if !allowedPolicyFailOn[v] {
+		if !allowedPromotionValues[v] {
 			return fmt.Errorf("unsupported fail_on value %q", item)
 		}
 	}
 	for _, item := range p.PromoteToFail {
-		v := normalizeFailOn(item)
+		v := normalizePromotionValue(item)
 		if v == "" {
 			continue
 		}
-		if !allowedPolicyFailOn[v] {
+		if !allowedPromotionValues[v] {
 			return fmt.Errorf("unsupported promote_to_fail value %q", item)
 		}
 	}
@@ -762,19 +762,19 @@ func resultValueMap(s *summary.Summary) map[string]float64 {
 	return m
 }
 
-func makeFailOn(policy *Policy) map[string]bool {
+func makePromotionSet(policy *Policy) map[string]bool {
 	result := map[string]bool{}
 	// FailOn (deprecated) and PromoteToFail are unioned: whichever field(s)
 	// are populated take effect, so a policy authored under either name
 	// behaves identically.
 	for _, item := range policy.FailOn {
-		item = normalizeFailOn(item)
+		item = normalizePromotionValue(item)
 		if item != "" {
 			result[item] = true
 		}
 	}
 	for _, item := range policy.PromoteToFail {
-		item = normalizeFailOn(item)
+		item = normalizePromotionValue(item)
 		if item != "" {
 			result[item] = true
 		}
@@ -786,12 +786,12 @@ func makeFailOn(policy *Policy) map[string]bool {
 	return result
 }
 
-var allowedPolicyFailOn = map[string]bool{
+var allowedPromotionValues = map[string]bool{
 	"threshold_miss":      true,
 	"regression_detected": true,
 }
 
-func normalizeFailOn(v string) string {
+func normalizePromotionValue(v string) string {
 	return strings.ToLower(strings.TrimSpace(v))
 }
 

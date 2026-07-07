@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -192,7 +193,7 @@ func runInit(args []string) error {
 	}
 
 	ns := strings.TrimSpace(*namespace)
-	svcName, candidates := resolveServiceName(ns, strings.TrimSpace(*service))
+	svcName, candidates, discoverErr := resolveServiceName(ns, strings.TrimSpace(*service))
 
 	data := initTemplateData{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
@@ -210,7 +211,7 @@ func runInit(args []string) error {
 	}
 
 	fmt.Printf("✓ policy.yaml written → %s\n", *output)
-	printDiscoveryResult(ns, candidates)
+	printDiscoveryResult(ns, candidates, discoverErr)
 
 	if rbacPath != "" {
 		if err := writeRBACManifest(rbacPath, snippetData(data)); err != nil {
@@ -223,22 +224,31 @@ func runInit(args []string) error {
 	return printSessionSnippet(snippetData(data))
 }
 
-func resolveServiceName(ns, override string) (string, []string) {
+func resolveServiceName(ns, override string) (string, []string, error) {
 	if override != "" {
-		return override, nil
+		return override, nil, nil
 	}
 	if ns == "" {
-		return "", nil
+		return "", nil, nil
 	}
-	candidates := discoverMetricsServices(ns)
+	candidates, err := discoverMetricsServices(ns)
+	if err != nil {
+		return "", nil, err
+	}
 	if len(candidates) > 0 {
-		return candidates[0], candidates
+		return candidates[0], candidates, nil
 	}
-	return "", candidates
+	return "", candidates, nil
 }
 
-func printDiscoveryResult(ns string, candidates []string) {
+func printDiscoveryResult(ns string, candidates []string, discoverErr error) {
 	if ns == "" {
+		return
+	}
+	if discoverErr != nil {
+		fmt.Printf("  could not auto-detect metrics services in namespace %q: %v\n", ns, discoverErr)
+		fmt.Printf("  run: kubectl get svc -n %s\n", ns)
+		fmt.Printf("  then re-run: slint-gate init --namespace %s --service <name>\n", ns)
 		return
 	}
 	if len(candidates) > 0 {
@@ -269,8 +279,11 @@ func snippetData(data initTemplateData) initTemplateData {
 
 // discoverMetricsServices lists services in the namespace and returns candidates
 // whose name suggests they expose /metrics (heuristic: contains "metrics" or
-// "controller-manager", or name ends with known kubebuilder suffix).
-func discoverMetricsServices(namespace string) []string {
+// "controller-manager", or name ends with known kubebuilder suffix). A non-nil
+// error means the kubectl call itself failed (not found on PATH, no cluster
+// access, timeout, etc.) — distinct from a nil error with zero candidates,
+// which means kubectl ran fine but found nothing metrics-shaped.
+func discoverMetricsServices(namespace string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -279,7 +292,7 @@ func discoverMetricsServices(namespace string) []string {
 		"-o", "jsonpath={range .items[*]}{.metadata.name}{'\\n'}{end}",
 	).Output()
 	if err != nil {
-		return nil
+		return nil, describeKubectlError(err)
 	}
 
 	var candidates []string
@@ -292,7 +305,21 @@ func discoverMetricsServices(namespace string) []string {
 			candidates = append(candidates, name)
 		}
 	}
-	return candidates
+	return candidates, nil
+}
+
+// describeKubectlError extracts a concise, single-line reason from a failed
+// kubectl invocation: an ExitError surfaces kubectl's own stderr (e.g. "the
+// server doesn't have a resource type", "Unauthorized"); anything else (not
+// found on PATH, context deadline exceeded) surfaces Go's own error text.
+func describeKubectlError(err error) error {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if msg := strings.TrimSpace(string(exitErr.Stderr)); msg != "" {
+			return fmt.Errorf("kubectl get svc: %s", msg)
+		}
+	}
+	return fmt.Errorf("kubectl get svc: %w", err)
 }
 
 func isMetricsServiceCandidate(name string) bool {

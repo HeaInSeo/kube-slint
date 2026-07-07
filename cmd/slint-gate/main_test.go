@@ -171,10 +171,10 @@ func TestRenderGitHubStepSummary_CheckWithNilObserved(t *testing.T) {
 	assert.True(t, strings.Contains(string(data), "| c |"))
 }
 
-func TestIsValidFailOn(t *testing.T) {
-	assert.True(t, isValidFailOn("NEVER"))
-	assert.True(t, isValidFailOn("FAIL_OR_NOGRADE"))
-	assert.False(t, isValidFailOn("FAIL_OR_NO_GRADE"))
+func TestIsValidExitOn(t *testing.T) {
+	assert.True(t, isValidExitOn("NEVER"))
+	assert.True(t, isValidExitOn("FAIL_OR_NOGRADE"))
+	assert.False(t, isValidExitOn("FAIL_OR_NO_GRADE"))
 }
 
 func TestResolveExitOn(t *testing.T) {

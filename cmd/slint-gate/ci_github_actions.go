@@ -32,7 +32,7 @@ func runCIGithubActions(args []string) error {
 	}
 
 	mode := strings.ToUpper(strings.TrimSpace(*exitOnMode))
-	if !isValidFailOn(mode) {
+	if !isValidExitOn(mode) {
 		return fmt.Errorf("invalid --exit-on-mode: %s", *exitOnMode)
 	}
 
