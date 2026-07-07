@@ -155,6 +155,24 @@ Expected namespace-scoped permissions:
 | `services` | `get` | Find target metrics Service. |
 | `endpoints` | `get` | Confirm Service endpoint shape where needed. |
 
+## Container Image Pinning Policy
+
+See `docs/DECISIONS.md` D-019 for the full rationale. Summary:
+
+- The repo `Dockerfile` (builder + runtime) and the curlpod default image
+  (`pkg/slo/fetch/curlpod/client.go`'s `Image` field) are pinned to specific
+  **version tags**, not `:latest` and not digests: `golang:1.25`,
+  `gcr.io/distroless/static:nonroot`, `curlimages/curl:8.11.0`.
+- Full digest pinning (`@sha256:...`) is **not** the repo default. It would
+  require an update process (e.g. Renovate/Dependabot) that doesn't exist in
+  this repo yet — unmaintained digests rot silently (no upstream security
+  fixes) in a way that's worse than a readable, intentionally-bumped tag.
+- Consumers who need supply-chain-grade reproducibility should pin to
+  digests in their own environment/registry mirror; this repo's examples
+  intentionally stay tag-based for readability.
+- Any future move to digest pinning must land together with an automated
+  update process — not as a one-time manual edit that then goes stale.
+
 ## Static Guardrail Plan — implemented
 
 All six planned rules are implemented as custom Semgrep rules in

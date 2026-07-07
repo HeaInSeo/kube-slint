@@ -5,6 +5,10 @@
 //   - PreFetch() captures object state at session start.
 //   - First Fetch() returns the cached start snapshot.
 //   - Second Fetch() queries end state and computes derived metrics.
+//
+// Known limitation: the "ownerref_missing" metric only resolves owners
+// within the same listed Resource kind — see the comment on
+// toEndMetrics in list.go and docs/DECISIONS.md D-018.
 package k8sobject
 
 import (

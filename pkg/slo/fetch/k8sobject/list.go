@@ -106,7 +106,16 @@ func toEndMetrics(objs []k8sObject, prefix string, stuckThreshold time.Duration,
 		if len(o.Metadata.OwnerReferences) == 0 {
 			orphan++
 		}
-		// ownerref_missing: at least one ownerRef UID not in current object set
+		// ownerref_missing: at least one ownerRef UID not in the current
+		// object set. IMPORTANT: this is a same-kind-only check — objs are
+		// all of a single Resource (e.g. all Pods), so an owner of a
+		// *different* kind (e.g. a Pod's usual ReplicaSet/Job owner) will
+		// never appear in uidSet and will always be flagged "missing," even
+		// though the owner exists and is healthy. This metric only reliably
+		// detects same-kind ownership gaps (e.g. a Pod owning another Pod);
+		// it is not a general "orphaned by a deleted owner of any kind"
+		// signal. See docs/DECISIONS.md D-018 for why this scope is kept
+		// rather than expanded to cross-kind resolution.
 		for _, ref := range o.Metadata.OwnerReferences {
 			if !uidSet[ref.UID] {
 				ownerrefMissing++

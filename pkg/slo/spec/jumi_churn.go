@@ -53,16 +53,24 @@ func JUMIChurnSpecs() []SLISpec {
 			},
 		},
 		{
-			ID:          "jumi_k8s_ownerref_missing_end",
-			Title:       "JUMI K8s OwnerRef Missing (end)",
-			Unit:        "count",
-			Kind:        "gauge",
-			Description: "Objects whose ownerReference UID does not exist in the current object set.",
+			ID:    "jumi_k8s_ownerref_missing_end",
+			Title: "JUMI K8s OwnerRef Missing (end)",
+			Unit:  "count",
+			Kind:  "gauge",
+			// Same-kind-only check (see docs/DECISIONS.md D-018): this counts
+			// objects whose ownerReference UID is absent from *this same
+			// Resource kind's* listing. A Pod's usual owner (a ReplicaSet or
+			// Job) is a different kind and will never appear here, so a
+			// perfectly healthy Pod is indistinguishable from one whose owner
+			// was actually deleted. Judged as Warn, not Fail, for that reason
+			// — do not raise this to Fail without cross-kind owner
+			// resolution.
+			Description: "Objects whose ownerReference UID does not exist in the same-kind object set (same-kind check only; see D-018).",
 			Inputs:      []MetricRef{UnsafePromKey("k8s_pods_ownerref_missing_end")},
 			Compute:     ComputeSpec{Mode: ComputeEnd},
 			Judge: &JudgeSpec{
 				Rules: []Rule{
-					{Op: OpGT, Target: 0, Level: LevelFail},
+					{Op: OpGT, Target: 0, Level: LevelWarn},
 				},
 			},
 		},

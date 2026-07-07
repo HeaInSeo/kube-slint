@@ -242,3 +242,76 @@ This file records architecture/product-direction decisions that define the proje
     explicitly exempted") is exactly the condition met here — there was no
     reason to add an unblocking grace period once compliance was already
     verified.
+
+## D-018: k8sobject's ownerref_missing metric stays same-kind-only, documented as a known limitation
+
+- Date: 2026-07-07
+- Status: Accepted
+- Decision:
+  - `pkg/slo/fetch/k8sobject`'s `*_ownerref_missing_end` metric continues to
+    check ownership only within the single Resource kind being listed
+    (`Config.Resource`, e.g. "pods"). It does not gain cross-kind owner
+    resolution (fetching ReplicaSets/Jobs/etc. to validate a Pod's real
+    owner).
+  - This is now explicitly documented as a same-kind-only check, in
+    `pkg/slo/fetch/k8sobject/list.go`, the package doc comment in
+    `fetcher.go`, and a locked-in regression test
+    (`TestToEndMetrics_OwnerRefMissing_CrossKindOwnerIsNotResolved`) — a
+    normal Pod owned by a ReplicaSet/Job is indistinguishable from one
+    whose owner was actually deleted, since the owner's kind is never in
+    the listing.
+  - The one place this metric was wired into an example gate
+    (`pkg/slo/spec/jumi_churn.go`'s `jumi_k8s_ownerref_missing_end`) had its
+    Judge rule softened from `LevelFail` to `LevelWarn`, since gating hard
+    on a metric with this known false-positive shape for typical Pod
+    ownership would be actively bad example code to leave in the tree.
+- Rationale:
+  - `K8sObjectFetcher`/`ownerref_missing_end` is not part of any default
+    spec set (`BaselineV3Specs`/`DefaultSpecs`) — it's only reachable via
+    `pkg/slo/spec/jumi_churn.go`, which itself carries `//go:build ignore`
+    and isn't compiled into the module. So the "default policy usage does
+    not create false positives" bar is already met structurally; the real
+    fix needed was making the metric's actual, narrower meaning legible to
+    anyone who does wire it up.
+  - Implementing full cross-kind owner resolution (listing every plausible
+    owner kind — ReplicaSet, Job, StatefulSet, DaemonSet — cross-referencing
+    UIDs, and requiring broader RBAC for all of them) is a real architecture
+    expansion, not a small fix, and this feature isn't even connected to the
+    default `Session`/E2E path yet (see `docs/competition-submission.md`'s
+    own roadmap note). Building that out now would be exactly the kind of
+    invented, unrequested feature this project has repeatedly declined to
+    fabricate under deadline pressure (same judgment as D-016's "no invented
+    second profile").
+
+## D-019: container images stay tag-pinned; digest pinning requires an update process first
+
+- Date: 2026-07-07
+- Status: Accepted
+- Decision:
+  - The repo `Dockerfile` (`golang:1.25` builder, `gcr.io/distroless/static:nonroot`
+    runtime) and the curlpod default image
+    (`pkg/slo/fetch/curlpod/client.go`'s `Image: "curlimages/curl:8.11.0"`)
+    stay pinned to specific version tags. None move to digest pinning
+    (`@sha256:...`) as part of this decision.
+  - This is recorded in `docs/security-model.md` under "Container Image
+    Pinning Policy", with an inline comment at each image reference pointing
+    back to this entry.
+- Rationale:
+  - Digest pinning only actually improves reproducibility/supply-chain
+    posture if something keeps the digests current (a Renovate/Dependabot
+    job or equivalent). This repo has neither today. A manually-pinned
+    digest that nobody refreshes is worse than a version tag: it silently
+    stops receiving upstream security fixes while looking more "locked
+    down" than it is.
+  - Version tags (not `:latest`, already specific — `golang:1.25`,
+    `curlimages/curl:8.11.0`) give most of the practical reproducibility
+    benefit for a CI gate tool while staying human-readable and diffable in
+    PRs, which is a real value for a security-relevant file that reviewers
+    need to read at a glance.
+  - Consumers who need stronger reproducibility guarantees (e.g. air-gapped
+    or regulated environments) are expected to pin to digests themselves in
+    their own build/registry mirror — that's a per-consumer operational
+    decision, not something this repo's examples should force on everyone.
+  - If digest pinning is adopted later, it must ship together with the
+    automated update process, not as a one-time manual edit — otherwise the
+    same rot problem just gets introduced disguised as a hardening step.

@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+### Documented
+
+- **`pkg/slo/fetch/k8sobject`'s `ownerref_missing` metric**: documented as a
+  same-kind-only check (a Pod's usual ReplicaSet/Job owner is a different
+  kind and is never resolved, so a healthy Pod looks identical to one whose
+  owner was actually deleted) instead of silently implying general
+  owner-deletion detection. Locked in with a regression test
+  (`TestToEndMetrics_OwnerRefMissing_CrossKindOwnerIsNotResolved`). The one
+  example gate using this metric (`pkg/slo/spec/jumi_churn.go`) had its
+  Judge rule softened from `LevelFail` to `LevelWarn` accordingly. See
+  `docs/DECISIONS.md` D-018.
+- **Container image pinning policy**: recorded that the Dockerfile and
+  curlpod default image stay tag-pinned (not digest-pinned) until an
+  automated digest-refresh process exists, with inline comments at each
+  image reference. See `docs/security-model.md` "Container Image Pinning
+  Policy" and `docs/DECISIONS.md` D-019.
+
 ## [1.5.1] - 2026-07-07
 
 ### Fixed

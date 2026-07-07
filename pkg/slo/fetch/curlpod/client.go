@@ -59,8 +59,9 @@ func New(logger slo.Logger, r kubeutil.CmdRunner) *Client {
 		r = kubeutil.DefaultRunner{}
 	}
 	return &Client{
-		Logger:           slo.NewLogger(logger),
-		Runner:           r,
+		Logger: slo.NewLogger(logger),
+		Runner: r,
+		// Version tag, not a digest — see docs/DECISIONS.md D-019.
 		Image:            "curlimages/curl:8.11.0",
 		LabelSelector:    PodLabelSelector,
 		PodNamePrefix:    "curl-metrics",

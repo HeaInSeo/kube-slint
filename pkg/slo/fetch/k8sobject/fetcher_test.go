@@ -107,6 +107,25 @@ func TestToEndMetrics_OwnerRefPresent(t *testing.T) {
 	assert.Equal(t, 0.0, m["k8s_pods_ownerref_missing_end"])
 }
 
+// TestToEndMetrics_OwnerRefMissing_CrossKindOwnerIsNotResolved locks in a
+// documented limitation (see D-018 in docs/DECISIONS.md): ownerref_missing
+// is a same-kind-only check. A Pod normally owned by a ReplicaSet/Job (a
+// different kind, never present in a Pod-only listing) is indistinguishable
+// here from a Pod whose owner was actually deleted — both report "missing."
+// This is intentional scope, not a bug to fix silently; if this test starts
+// failing, either the limitation was resolved (update D-018) or the
+// same-kind semantics regressed (real bug).
+func TestToEndMetrics_OwnerRefMissing_CrossKindOwnerIsNotResolved(t *testing.T) {
+	objs := []k8sObject{
+		// A normal, healthy Pod owned by a ReplicaSet — the ReplicaSet's UID
+		// is never in this Pod-only listing, so it looks identical to a
+		// Pod whose owner was truly deleted.
+		{Metadata: k8sObjectMeta{UID: "pod-1", OwnerReferences: []k8sOwnerRef{{UID: "replicaset-uid-not-listed"}}}},
+	}
+	m := toEndMetrics(objs, "k8s_pods", 0, time.Now())
+	assert.Equal(t, 1.0, m["k8s_pods_ownerref_missing_end"], "cross-kind owners are not resolved and are always counted as missing")
+}
+
 func TestToEndMetrics_StuckTerminating_NoThreshold(t *testing.T) {
 	// any pod with DeletionTimestamp is stuck when threshold=0
 	ts := time.Now().Add(-10 * time.Second)
