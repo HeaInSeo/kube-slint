@@ -1,5 +1,13 @@
 # kube-slint
 
+[![Tests](https://github.com/HeaInSeo/kube-slint/actions/workflows/test.yml/badge.svg)](https://github.com/HeaInSeo/kube-slint/actions/workflows/test.yml)
+[![Lint](https://github.com/HeaInSeo/kube-slint/actions/workflows/lint.yml/badge.svg)](https://github.com/HeaInSeo/kube-slint/actions/workflows/lint.yml)
+[![Semgrep](https://github.com/HeaInSeo/kube-slint/actions/workflows/semgrep.yml/badge.svg)](https://github.com/HeaInSeo/kube-slint/actions/workflows/semgrep.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/HeaInSeo/kube-slint)](https://goreportcard.com/report/github.com/HeaInSeo/kube-slint)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/HeaInSeo/kube-slint)](go.mod)
+[![Release](https://img.shields.io/github/v/release/HeaInSeo/kube-slint)](https://github.com/HeaInSeo/kube-slint/releases)
+[![License](https://img.shields.io/github/license/HeaInSeo/kube-slint)](LICENSE)
+
 English documentation is available in [README.md](README.md).
 
 **kube-slint는 여러분의 테스트를 대체하지 않습니다. 테스트 중에 일어나는 일을 측정합니다.**
