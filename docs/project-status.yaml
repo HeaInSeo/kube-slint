@@ -2,6 +2,7 @@ current_stage: "v1.5.2 tagged; competition submission prep"
 roadmap_percent: 94
 roadmap_status: "post_rc"
 current_focus:
+  - "Unreleased: go.mod's go directive lowered from an exact-patch pin (1.25.5) to 1.22 for consumer compatibility, verified in real golang:1.20/1.22 containers; see docs/DECISIONS.md D-020 (not yet tagged)"
   - "v1.5.2 tagged: closed GitHub issues #2/#3 via documentation (D-018 same-kind ownerRef limitation, D-019 image pinning policy) rather than fabricated code fixes, plus README(Kor).md tone unification"
   - "v1.5.1 tagged: patch fix for the slint-gate composite action losing artifacts/outputs on gate failure, init overwrite guard, kubectl discovery error surfacing, English-unified comments/diagnostics on the public surface"
   - "v1.5.0 tagged: SLI Gate Onboarding UX roadmap (Sprint 1-6), dataplane-service static analyzer, custom Semgrep guardrails"

@@ -13,7 +13,7 @@
 
 Attach kube-slint to your existing Kubernetes operator E2E session. It reads `/metrics` before and after your workload, computes operational SLI deltas (reconcile rate, workqueue depth, REST errors), and evaluates them against a declarative policy — without modifying your operator code.
 
-**Try it now** (requires kind ≥ v0.22, Docker, and Go 1.25+):
+**Try it now** (requires kind ≥ v0.22, Docker, and Go 1.22+):
 
 ```bash
 cd examples/kind-hello-operator

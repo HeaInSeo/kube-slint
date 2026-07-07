@@ -315,3 +315,62 @@ This file records architecture/product-direction decisions that define the proje
   - If digest pinning is adopted later, it must ship together with the
     automated update process, not as a one-time manual edit — otherwise the
     same rot problem just gets introduced disguised as a hardening step.
+
+## D-020: go.mod's `go` directive lowered from an exact-patch pin to `1.22`
+
+- Date: 2026-07-07
+- Status: Accepted
+- Decision:
+  - `go.mod`'s `go` directive changes from `1.25.5` (the maintainer's
+    exact installed toolchain, pinned down to the patch level) to `1.22`
+    (major.minor only). Since Go 1.21, this directive is a strictly
+    enforced minimum, not a suggestion: a consumer with an older toolchain
+    either gets an automatic download (`GOTOOLCHAIN=auto`, the default) or
+    an outright build failure (`GOTOOLCHAIN=local`, common in offline/
+    security-hardened environments). Pinning the exact patch version the
+    maintainer happened to have installed was an unnecessarily strict
+    floor for a library meant to be consumed by others.
+  - Direct/indirect dependencies that had bumped their own `go` directive
+    above 1.22 were downgraded to versions that still declare `go <=1.22`:
+    `golang.org/x/net` v0.48.0→v0.35.0, `golang.org/x/sys` v0.39.0→v0.30.0,
+    `golang.org/x/tools` v0.39.0→v0.24.0, `golang.org/x/text`
+    v0.32.0→v0.22.0, `google.golang.org/protobuf` v1.36.11→v1.36.5. This
+    also auto-downgraded `github.com/onsi/ginkgo/v2` v2.22.0→v2.20.2 (a
+    test-only dependency) via Go's own MVS resolution.
+  - README.md/README(Kor).md/docs/demo.md's stated Go prerequisite updated
+    from "Go 1.25+" to "Go 1.22+" to match.
+- Verification:
+  - The actual language/stdlib feature ceiling of this repo's own code is
+    Go 1.20 (`errors.Join` in `pkg/kubeutil/poll.go`) — nothing here
+    requires 1.21+ syntax or stdlib additions (no generics-heavy code,
+    no `slices`/`maps`/`cmp`, no range-over-func, no `min`/`max` builtins).
+  - Both `go 1.20` and `go 1.22` were empirically verified: real
+    `golang:1.20` and `golang:1.22` container images (via `podman run`,
+    not just simulated with the installed 1.25.5 compiler) were used to
+    run `go build ./...`, `go vet ./...`, and `go test ./...` against this
+    repo, both passing cleanly.
+  - Targeting 1.20 required downgrading `github.com/onsi/gomega` to
+    v1.33.0 and `github.com/google/pprof` to a 2021-era pseudo-version —
+    a much larger, staler test-tooling diff for only a marginal
+    compatibility gain over 1.22, since these are test-only indirect
+    dependencies that Go's pruned module graph (1.17+) never loads for a
+    downstream consumer who only imports this module's production
+    packages. 1.22 was chosen as the better tradeoff: comparable
+    consumer-facing compatibility, far smaller and fresher dependency
+    diff.
+  - Testing at 1.20 also surfaced a genuine, unrelated bug: a classic
+    range-loop-variable pointer capture (`Value: &v` inside `for id, v :=
+    range values`) in two test fixtures (`pkg/gate/gate_test.go`'s
+    `makeMeasurement`, `cmd/slint-gate/baseline_diff_test.go`'s
+    `writeDiffSummary`) that Go 1.22's per-iteration loop variable
+    semantics had been silently masking. Since the repo settled on 1.22
+    (not 1.20) as the floor, no code fix was needed — the bug does not
+    manifest at 1.22+, and `golangci-lint`'s `copyloopvar` rule already
+    auto-disables below 1.22 and would have flagged a manual `v := v` copy
+    as redundant once the directive says 1.22 anyway.
+- Rationale:
+  - The Dockerfile's `golang:1.25` builder image is intentionally left
+    unchanged — a newer toolchain always satisfies a lower `go.mod`
+    directive, so the build environment and the consumer-facing minimum
+    are independent choices (same reasoning as D-019's image pinning
+    policy: don't conflate "what we build with" with "what we require").

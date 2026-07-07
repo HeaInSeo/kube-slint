@@ -13,7 +13,7 @@ English documentation is available in [README.md](README.md).
 
 기존 Kubernetes 오퍼레이터 E2E 세션에 kube-slint를 붙인다. 워크로드 전후의 `/metrics`를 읽어 운영 SLI 델타(reconcile 비율, 워크큐 깊이, REST 오류)를 계산하고, 선언적 정책과 대조해 평가한다 — 오퍼레이터 코드를 수정할 필요는 없다.
 
-**지금 바로 체험** (kind ≥ v0.22, Docker, Go 1.25+ 필요):
+**지금 바로 체험** (kind ≥ v0.22, Docker, Go 1.22+ 필요):
 
 ```bash
 cd examples/kind-hello-operator

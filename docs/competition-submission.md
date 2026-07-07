@@ -58,7 +58,7 @@ kube-slint는 두 문제를 동시에 해결합니다. 오퍼레이터 코드를
 
 | 항목 | 선택 | 이유 |
 |---|---|---|
-| 언어 | Go 1.25 | 쿠버네티스 생태계 표준 언어, 정적 바이너리 배포 용이 |
+| 언어 | Go (go.mod 최소 1.22, 개발/CI는 1.25 사용) | 쿠버네티스 생태계 표준 언어, 정적 바이너리 배포 용이 |
 | controller-runtime 의존성 | 없음 | go.mod에 `sigs.k8s.io/controller-runtime` 미포함. 어떤 오퍼레이터와도 버전 충돌 없음 |
 | 메트릭 수집 방식 | kubectl curl pod / port-forward | 클러스터 외부 테스트 프로세스에서 내부 네트워크에 직접 접근하지 않아도 됨 |
 | 파싱 | Prometheus text-format | 별도 클라이언트 라이브러리 없이 `/metrics` 텍스트를 직접 파싱 |

@@ -18,7 +18,7 @@ It demonstrates three outcomes:
 - kind v0.22 or newer
 - Docker
 - kubectl
-- Go 1.25 or newer
+- Go 1.22 or newer
 
 ## PASS Demo
 

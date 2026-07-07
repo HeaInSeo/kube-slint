@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Lowered `go.mod`'s `go` directive from an exact-patch pin (`1.25.5`) to
+  `1.22`. Since Go 1.21 this directive is a strictly enforced minimum, so
+  pinning the maintainer's exact installed toolchain was an unnecessarily
+  strict floor for consumers. Verified in real `golang:1.20` and
+  `golang:1.22` containers (not just the installed 1.25.5 compiler) that
+  both build/vet/test cleanly; 1.22 was chosen over 1.20 since it needs a
+  far smaller, fresher dependency downgrade (only `golang.org/x/net`,
+  `x/sys`, `x/tools`, `x/text`, `google.golang.org/protobuf`) for
+  comparable consumer-facing compatibility. README.md/README(Kor).md/
+  docs/demo.md's stated Go prerequisite updated to match. See
+  `docs/DECISIONS.md` D-020.
+
 ## [1.5.2] - 2026-07-07
 
 ### Documented
