@@ -168,6 +168,7 @@ func runInit(args []string) error {
 	output := fs.String("output", filepath.Join(".slint", "policy.yaml"), "Output path for policy.yaml")
 	emitRBAC := fs.String("emit-rbac", "", "Write RBAC manifest (ServiceAccount + Role + RoleBinding) to this path")
 	profile := fs.String("profile", "", "Onboarding profile preset (currently supported: kubebuilder-operator). Omit to keep today's default init behavior.")
+	force := fs.Bool("force", false, "Overwrite --output (and --emit-rbac, if set) if they already exist")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -176,6 +177,18 @@ func runInit(args []string) error {
 	profileName := strings.TrimSpace(*profile)
 	if profileName != "" && !isSupportedProfile(profileName) {
 		return fmt.Errorf("unknown profile %q (supported: kubebuilder-operator)", profileName)
+	}
+
+	rbacPath := strings.TrimSpace(*emitRBAC)
+	if !*force {
+		if _, statErr := os.Stat(*output); statErr == nil {
+			return fmt.Errorf("%s already exists; pass --force to overwrite", *output)
+		}
+		if rbacPath != "" {
+			if _, statErr := os.Stat(rbacPath); statErr == nil {
+				return fmt.Errorf("%s already exists; pass --force to overwrite", rbacPath)
+			}
+		}
 	}
 
 	ns := strings.TrimSpace(*namespace)
@@ -199,7 +212,7 @@ func runInit(args []string) error {
 	fmt.Printf("✓ policy.yaml written → %s\n", *output)
 	printDiscoveryResult(ns, candidates)
 
-	if rbacPath := strings.TrimSpace(*emitRBAC); rbacPath != "" {
+	if rbacPath != "" {
 		if err := writeRBACManifest(rbacPath, snippetData(data)); err != nil {
 			return fmt.Errorf("write RBAC manifest: %w", err)
 		}
@@ -308,6 +321,9 @@ func writePolicyFile(path string, data initTemplateData) error {
 		return err
 	}
 
+	// kube-slint-no-stat-before-write: single-user local CLI artifact write
+	// (the --output overwrite-refusal check in runInit), not a shared/multi-tenant race.
+	// nosemgrep
 	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 
@@ -323,6 +339,9 @@ func writeRBACManifest(path string, data initTemplateData) error {
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return err
 	}
+	// kube-slint-no-stat-before-write: single-user local CLI artifact write
+	// (the --emit-rbac overwrite-refusal check in runInit), not a shared/multi-tenant race.
+	// nosemgrep
 	return os.WriteFile(path, buf.Bytes(), 0o644)
 }
 

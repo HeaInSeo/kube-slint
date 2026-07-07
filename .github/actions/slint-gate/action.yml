@@ -29,6 +29,7 @@ inputs:
     description: >
       Gate result level that fails the job. Preferred over the deprecated
       fail-on input (both are honored; exit-on wins if both are set).
+      NEVER                — never fail the job; only inspect gate-result output.
       FAIL                 — only hard violations fail.
       FAIL_OR_WARN         — treat WARN as a failure too.
       FAIL_OR_NOGRADE      — treat NO_GRADE (missing measurement) as failure.
@@ -89,8 +90,12 @@ runs:
       run: |
         set -euo pipefail
 
-        RESOLVED_EXIT_ON="${INPUT_EXIT_ON:-$INPUT_FAIL_ON}"
-
+        # Always run the CLI with --exit-on NEVER so it never os.Exit(1)s here.
+        # The pass/fail decision for the job is made only in the final "Check
+        # gate result" step, after outputs/artifact are already captured —
+        # this guarantees diagnostics survive a policy failure instead of the
+        # CLI's own exit code short-circuiting the rest of this composite
+        # action's steps.
         EXTRA=""
         if [ "${INPUT_STEP_SUMMARY}" = "true" ]; then
           EXTRA="--github-step-summary"
@@ -101,7 +106,7 @@ runs:
           --policy             "${INPUT_POLICY}" \
           --baseline           "${INPUT_BASELINE}" \
           --output             "${INPUT_OUTPUT}" \
-          --exit-on            "${RESOLVED_EXIT_ON}" \
+          --exit-on            NEVER \
           ${EXTRA}
 
         GATE=$(jq -r '.gate_result'        "${INPUT_OUTPUT}")
@@ -113,7 +118,7 @@ runs:
         echo "summary_path=${ABS_PATH}"   >> "${GITHUB_OUTPUT}"
 
     - name: Upload gate summary artifact
-      if: inputs.upload-artifact == 'true'
+      if: always() && inputs.upload-artifact == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.artifact-name }}
@@ -122,6 +127,7 @@ runs:
         overwrite: true
 
     - name: Check gate result
+      if: always()
       shell: bash
       env:
         GATE_RESULT: ${{ steps.run-gate.outputs.gate_result }}
@@ -134,6 +140,8 @@ runs:
         RESOLVED_EXIT_ON="${INPUT_EXIT_ON:-$INPUT_FAIL_ON}"
 
         case "${RESOLVED_EXIT_ON}" in
+          NEVER)
+            ;;
           FAIL)
             if [ "${GATE_RESULT}" = "FAIL" ]; then
               echo "::error::slint-gate FAIL — policy violation detected."

@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`.github/actions/slint-gate` composite action**: the CLI is now always invoked
+  with `--exit-on NEVER` in the first step; the pass/fail decision (per the
+  action's `exit-on`/`fail-on` input) is made only in the final "Check gate
+  result" step, after the summary artifact and step outputs are already
+  captured. Previously, a default-configured run (`exit-on` unset, `fail-on`
+  defaulting to `FAIL_OR_NOGRADE`) would have the CLI itself exit 1 on a real
+  FAIL/NO_GRADE result, which — under `set -euo pipefail` — aborted the rest
+  of that step and skipped the artifact-upload and result-check steps
+  entirely (no `if: always()` guard), so a policy failure produced no
+  uploaded artifact and no `gate-result`/`evaluation-status` outputs.
+- **`slint-gate init`**: added `--force` to guard `--output` (`policy.yaml`)
+  and `--emit-rbac` against silent overwrite, matching the existing
+  `recommend-policy --force` / `baseline approve --force` convention. Previously
+  `init` was the only onboarding command that unconditionally overwrote an
+  existing file.
+
 ## [1.5.0] - 2026-07-07
 
 SLI Gate Onboarding UX roadmap (Sprint 1-6): a guided

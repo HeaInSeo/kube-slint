@@ -215,3 +215,61 @@ func TestRunInit_EmitRBAC_NoNamespace(t *testing.T) {
 	assert.Contains(t, string(data), "kind: RoleBinding")
 	assert.Contains(t, string(data), "<YOUR_NAMESPACE>")
 }
+
+func TestRunInit_RefusesOverwriteWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(out, []byte("existing content"), 0o644))
+
+	err := runInit([]string{"--output", out})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+
+	data, readErr := os.ReadFile(out)
+	require.NoError(t, readErr)
+	assert.Equal(t, "existing content", string(data), "existing file must not be touched without --force")
+}
+
+func TestRunInit_ForceOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(out, []byte("existing content"), 0o644))
+
+	err := runInit([]string{"--output", out, "--force"})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(out)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "schema_version")
+}
+
+func TestRunInit_RefusesRBACOverwriteWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	policyOut := filepath.Join(dir, "policy.yaml")
+	rbacOut := filepath.Join(dir, "rbac.yaml")
+	require.NoError(t, os.WriteFile(rbacOut, []byte("existing rbac"), 0o644))
+
+	err := runInit([]string{"--output", policyOut, "--emit-rbac", rbacOut})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+
+	assert.NoFileExists(t, policyOut, "policy.yaml must not be written when the RBAC overwrite check fails")
+
+	data, readErr := os.ReadFile(rbacOut)
+	require.NoError(t, readErr)
+	assert.Equal(t, "existing rbac", string(data), "existing RBAC file must not be touched without --force")
+}
+
+func TestRunInit_ForceOverwritesRBAC(t *testing.T) {
+	dir := t.TempDir()
+	policyOut := filepath.Join(dir, "policy.yaml")
+	rbacOut := filepath.Join(dir, "rbac.yaml")
+	require.NoError(t, os.WriteFile(rbacOut, []byte("existing rbac"), 0o644))
+
+	err := runInit([]string{"--output", policyOut, "--emit-rbac", rbacOut, "--force"})
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(rbacOut)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "ServiceAccount")
+}
