@@ -57,7 +57,7 @@
 - [x] CHANGELOG (CHANGELOG.md, v0.1.0 엔트리)
 - [x] `make coverage` 테스트 커버리지 리포트
 - [x] 공모전 제출 문서 (docs/competition-submission.md)
-- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.5.0` 태그 존재)
+- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.5.1` 태그 존재)
 
 #### Batch 4 — Post-RC Hardening Sprint ✅ (v1.4.0, 커밋 `4862544`~`9172d25`)
 
@@ -103,7 +103,15 @@ N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 
 - F4: quoted label parser 개선
 - **v1.5.0 태그/릴리스 완료** (2026-07-07) — Sprint 1-6 온보딩 UX + Semgrep 가드레일 + dataplane-service 분석기 전부 포함
 - **1차 코드 제출 마감은 2026-08-15가 아니라 2026-07-17.** (2026-07-07 기준 약 10일 남음 — 이전에 8월 중순으로 잘못 파악하고 있었음, 정정됨). 위 로드맵/가드레일/릴리스가 이미 다 끝나있어서 실제 마감 기준으로도 여유 있는 상태.
-- **버퍼 작업(회귀 재확인 + 제출 체크리스트 검토) 완료 (2026-07-07)**: `go build/vet/test`, `gofmt`, `make lint`(golangci-lint 0 issues), `make semgrep-test`(6개 fixture 전부 통과), `make semgrep`(실 코드베이스 0 findings), `bash hack/quality-guardrails.sh`(전체 통과) 재확인. LICENSE/NOTICE/SECURITY.md/THIRD_PARTY_LICENSES.md/CONTRIBUTING.md/CHANGELOG.md 전부 존재 및 go.mod와 정합. README/경쟁 제출 문서에 stale 버전 참조 없음(v1.5.0으로 통일). GitHub Release `v1.5.0`이 draft/prerelease 아닌 정식 published 상태로 `main`을 타겟팅 확인. `kind demo (hello-operator)` 워크플로우가 최신 실제 코드 변경 커밋(v1.5.0 릴리즈 커밋) 기준으로 green 확인. **결론: 제출 관점에서 추가로 급하게 처리해야 할 항목 없음.** (단, 위 "중요" 절에서 밝힌 대로 이 프로젝트는 사내 실사용 툴이기도 하므로, 공모전 제출 완료 이후에도 남은 항목(interactive wizard, MCP/IDE 연동, `pkg/policy`/`pkg/summary` 공개 API 정리, F4, baseline merge 나머지 모드)은 실사용 관점에서 별도로 재검토 필요.)
+- **버퍼 작업(회귀 재확인 + 제출 체크리스트 검토) 완료 (2026-07-07)**: `go build/vet/test`, `gofmt`, `make lint`(golangci-lint 0 issues), `make semgrep-test`(6개 fixture 전부 통과), `make semgrep`(실 코드베이스 0 findings), `bash hack/quality-guardrails.sh`(전체 통과) 재확인. LICENSE/NOTICE/SECURITY.md/THIRD_PARTY_LICENSES.md/CONTRIBUTING.md/CHANGELOG.md 전부 존재 및 go.mod와 정합. README/경쟁 제출 문서에 stale 버전 참조 없음(v1.5.0으로 통일). GitHub Release `v1.5.0`이 draft/prerelease 아닌 정식 published 상태로 `main`을 타겟팅 확인. `kind demo (hello-operator)` 워크플로우가 최신 실제 코드 변경 커밋(v1.5.0 릴리즈 커밋) 기준으로 green 확인.
+- **v1.5.1 태그/릴리스 (2026-07-07)** — 외부 코드 리뷰(6개 지적사항) 검증 후 수정:
+  - `.github/actions/slint-gate`가 정책 실패 시에도 아티팩트/output을 보존하도록 수정 (CLI를 항상 `--exit-on NEVER`로 실행, pass/fail 판단은 마지막 "Check gate result" 스텝에서만; 이전엔 기본 설정(`fail-on` 기본값 `FAIL_OR_NOGRADE`)에서 CLI가 바로 exit 1 해 `set -euo pipefail` 때문에 후속 스텝이 통째로 스킵됨 — 진단 정보가 실제 필요한 순간에 사라지는 버그였음)
+  - `slint-gate init`에 `--force` 추가 (`recommend-policy`/`baseline approve`와 동일한 overwrite 방지 패턴)
+  - `discoverMetricsServices`가 kubectl 실패를 침묵하지 않고 에러를 반환, "왜" 실패했는지 표시
+  - `pkg/gate`/`cmd/slint-gate` 내부 네이밍을 `fail_on` 계열에서 `promote_to_fail`/`--exit-on`에 맞춰 정리 (동작 변화 없음, `analyze-dataplane`의 별개 `--fail-on`은 미변경)
+  - `pkg/slint`(공개 API)와 `cmd/slint-gate`(CLI) 표면의 주석·진단 메시지를 영어로 통일 (내부 구현 패키지는 미변경 — 전체 재작성 아님)
+  - README/README(Kor).md에 CI·품질·라이선스 뱃지 추가
+  - **결론: 제출 관점에서 추가로 급하게 처리해야 할 항목 없음.** (단, 위 "중요" 절에서 밝힌 대로 이 프로젝트는 사내 실사용 툴이기도 하므로, 공모전 제출 완료 이후에도 남은 항목(interactive wizard, MCP/IDE 연동, `pkg/policy`/`pkg/summary` 공개 API 정리, F4, baseline merge 나머지 모드)은 실사용 관점에서 별도로 재검토 필요.)
 
 ---
 

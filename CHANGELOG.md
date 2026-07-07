@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-07-07
+
 ### Fixed
 
 - **`.github/actions/slint-gate` composite action**: the CLI is now always invoked
@@ -48,6 +50,11 @@
   `pkg/devutil`) are unaffected — this is a scoped consistency pass on the
   parts an external contributor or judge actually reads/runs, not a
   repo-wide rewrite.
+
+### Added
+
+- CI/quality/license badges (Tests, Lint, Semgrep, Go Report Card, Go
+  version, latest release, license) to `README.md`/`README(Kor).md`.
 
 ## [1.5.0] - 2026-07-07
 

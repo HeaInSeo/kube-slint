@@ -5,10 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.5.0 Tagged (Onboarding UX Roadmap + Semgrep Guardrails)
+## Current Status: v1.5.1 Tagged (Patch Fixes from External Code Review)
 
 **Branch:** `main`
-**Last updated:** 2026-07-07 (v1.5.0 tag + release)
+**Last updated:** 2026-07-07 (v1.5.1 tag + release)
+
+### v1.5.1 Release (2026-07-07)
+
+Patch release addressing 6 findings from an external code review, all
+verified against the actual code before fixing (one claimed finding — a
+duplicated `return` statement — did not reproduce and was left alone). See
+`CHANGELOG.md`'s `[1.5.1]` entry for the full list. Highlights:
+
+* [x] `.github/actions/slint-gate` no longer loses the summary artifact and
+  step outputs when the gate result is FAIL/NO_GRADE under default settings
+  — the CLI now always runs with `--exit-on NEVER`; the composite action's
+  own `exit-on`/`fail-on` decision happens only in the final step, which
+  (along with the artifact-upload step) now runs with `if: always()`.
+* [x] `slint-gate init` gained `--force`, matching `recommend-policy`/`baseline approve`'s existing overwrite-refusal convention.
+* [x] `discoverMetricsServices` (used by `init`'s namespace auto-discovery) now surfaces the underlying `kubectl` error instead of silently returning an empty candidate list.
+* [x] Internal (non-public-API) naming in `pkg/gate`/`cmd/slint-gate` no longer centers on the deprecated `fail_on` vocabulary now that the public names are `promote_to_fail`/`--exit-on`.
+* [x] Comments and `slint-gate`'s runtime diagnostic messages unified to English across the public-facing surface (`pkg/slint`, `cmd/slint-gate`); internal implementation packages are unaffected.
+* [x] README/README(Kor).md gained CI/quality/license badges.
 
 ### v1.5.0 Release (2026-07-07)
 
