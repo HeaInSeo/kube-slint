@@ -57,7 +57,7 @@
 - [x] CHANGELOG (CHANGELOG.md, v0.1.0 엔트리)
 - [x] `make coverage` 테스트 커버리지 리포트
 - [x] 공모전 제출 문서 (docs/competition-submission.md)
-- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.5.1` 태그 존재)
+- [x] git tag + GitHub release (v0.1.0 계획은 실제로는 v1.x 시맨틱 버저닝 체계로 대체됨 — `v1.0.0`~`v1.5.2` 태그 존재)
 
 #### Batch 4 — Post-RC Hardening Sprint ✅ (v1.4.0, 커밋 `4862544`~`9172d25`)
 
@@ -110,8 +110,13 @@ N6(workflow demo-fixture 라벨링)도 이번 스프린트에서 완료. 남은 
   - `discoverMetricsServices`가 kubectl 실패를 침묵하지 않고 에러를 반환, "왜" 실패했는지 표시
   - `pkg/gate`/`cmd/slint-gate` 내부 네이밍을 `fail_on` 계열에서 `promote_to_fail`/`--exit-on`에 맞춰 정리 (동작 변화 없음, `analyze-dataplane`의 별개 `--fail-on`은 미변경)
   - `pkg/slint`(공개 API)와 `cmd/slint-gate`(CLI) 표면의 주석·진단 메시지를 영어로 통일 (내부 구현 패키지는 미변경 — 전체 재작성 아님)
-  - README/README(Kor).md에 CI·품질·라이선스 뱃지 추가
+  - README/README(Kor).md에 CI·품질 뱃지 추가 (라이선스/Go Report Card는 이후 제외, pkg.go.dev Go Reference 뱃지로 교체 — v1.5.2에서 최종 확정)
   - **결론: 제출 관점에서 추가로 급하게 처리해야 할 항목 없음.** (단, 위 "중요" 절에서 밝힌 대로 이 프로젝트는 사내 실사용 툴이기도 하므로, 공모전 제출 완료 이후에도 남은 항목(interactive wizard, MCP/IDE 연동, `pkg/policy`/`pkg/summary` 공개 API 정리, F4, baseline merge 나머지 모드)은 실사용 관점에서 별도로 재검토 필요.)
+- **v1.5.2 태그/릴리스 (2026-07-07)** — GitHub 이슈 #1~#3 검증 및 후속 정리:
+  - 이슈 #1(direction-aware regression policy)은 검증 결과 v1.4.0 post-RC 하드닝(R2)에서 이미 완전히 해결된 상태 확인 후 종료 처리
+  - 이슈 #2(k8sobject ownerRef 메트릭 의미)는 `pkg/slo/fetch/k8sobject`의 `ownerref_missing`이 같은 kind 내에서만 owner UID를 확인하는 한계(Pod의 실제 owner인 ReplicaSet/Job은 다른 kind라 절대 해소 안 됨)를 코드/테스트/`docs/DECISIONS.md` D-018로 문서화하고, 예시 게이트(`jumi_churn.go`)의 판정을 `LevelFail`→`LevelWarn`으로 완화하는 방식으로 해결 (cross-kind 해석 기능을 새로 만들지 않음 — 아직 기본 Session 경로에 연결되지도 않은 기능을 이 시점에 확장하는 건 지어내는 데 가까움)
+  - 이슈 #3(이미지 digest pinning 정책)은 Dockerfile/curlpod 기본 이미지를 tag pinning으로 유지하기로 결정하고 `docs/DECISIONS.md` D-019 + `docs/security-model.md`에 근거 기록 (digest pinning은 자동 갱신 프로세스(Renovate 등) 없이는 오히려 방치된 digest가 조용히 썩는 역효과만 있음)
+  - `README(Kor).md` 전체 어투를 존댓말에서 건조한 평서형(-다/-함)으로 통일
 
 ---
 

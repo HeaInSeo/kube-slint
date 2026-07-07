@@ -5,10 +5,34 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.5.1 Tagged (Patch Fixes from External Code Review)
+## Current Status: v1.5.2 Tagged (GitHub Issue Cleanup + README Tone)
 
 **Branch:** `main`
-**Last updated:** 2026-07-07 (v1.5.1 tag + release)
+**Last updated:** 2026-07-07 (v1.5.2 tag + release)
+
+### v1.5.2 Release (2026-07-07)
+
+Closes out the 3 open GitHub issues tracked from the post-RC hardening
+sprint and unifies `README(Kor).md`'s tone. See `CHANGELOG.md`'s `[1.5.2]`
+entry for the full list.
+
+* [x] Issue #1 (direction-aware regression policy) — verified already fully
+  resolved by the v1.4.0 post-RC hardening sprint (R2); closed with no code
+  change needed.
+* [x] Issue #2 (k8sobject `ownerref_missing` metric semantics) — resolved via
+  documentation, not a fabricated fix: the metric only resolves owners
+  within the same listed Resource kind (a Pod's usual ReplicaSet/Job owner
+  is a different kind and is never resolved). Documented in code, locked in
+  with a regression test, and the one example gate using it
+  (`jumi_churn.go`) had its Judge rule softened from `LevelFail` to
+  `LevelWarn`. See `docs/DECISIONS.md` D-018.
+* [x] Issue #3 (container image digest pinning policy) — resolved via
+  documented decision: stay tag-pinned, not digest-pinned, until an
+  automated digest-refresh process exists (no Renovate/Dependabot-equivalent
+  in this repo today). See `docs/DECISIONS.md` D-019 and
+  `docs/security-model.md`.
+* [x] `README(Kor).md` tone unified from polite/formal endings
+  (-습니다/-하세요) to a plain declarative style (-다/-함) throughout.
 
 ### v1.5.1 Release (2026-07-07)
 

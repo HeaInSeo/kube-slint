@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-07-07
+
 ### Documented
 
 - **`pkg/slo/fetch/k8sobject`'s `ownerref_missing` metric**: documented as a
@@ -21,6 +23,13 @@
   automated digest-refresh process exists, with inline comments at each
   image reference. See `docs/security-model.md` "Container Image Pinning
   Policy" and `docs/DECISIONS.md` D-019.
+
+### Changed
+
+- `README(Kor).md` switched from polite/formal endings (-습니다/-하세요) to
+  a plain declarative tone (-다/-함) throughout, matching a dry, expository
+  technical-doc style. Code blocks and literal config values are
+  untouched.
 
 ## [1.5.1] - 2026-07-07
 
