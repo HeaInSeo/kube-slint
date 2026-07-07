@@ -53,8 +53,8 @@
 
 ### Added
 
-- CI/quality/license badges (Tests, Lint, Semgrep, Go Report Card, Go
-  version, latest release, license) to `README.md`/`README(Kor).md`.
+- CI/quality badges (Tests, Lint, Semgrep, Go Reference, Go version, latest
+  release) to `README.md`/`README(Kor).md`.
 
 ## [1.5.0] - 2026-07-07
 
