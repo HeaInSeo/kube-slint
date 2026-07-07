@@ -7,96 +7,97 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/gate"
 )
 
-// diagEntry는 하나의 reason 코드에 대한 진단 항목이다.
+// diagEntry is a diagnostic entry for one reason code.
 type diagEntry struct {
 	summary string
 	hints   []string
 }
 
-// diagMessages는 reason 코드를 사람이 읽을 수 있는 진단 메시지로 변환한다.
+// diagMessages maps reason codes to human-readable diagnostic messages.
 var diagMessages = map[string]diagEntry{
 	"MEASUREMENT_INPUT_MISSING": {
-		summary: "sli-summary.json 파일이 없거나 비어 있습니다.",
+		summary: "sli-summary.json is missing or empty.",
 		hints: []string{
-			"E2E 테스트(sess.End(ctx)) 실행 후에 slint-gate를 실행하세요.",
-			"SessionConfig.ArtifactsDir 경로가 올바른지 확인하세요.",
-			"E2E 로그에서 'fetch failed' 메시지를 확인하세요.",
-			"RBAC 확인:\n    kubectl auth can-i create pods" +
+			"Run slint-gate only after the E2E test (sess.End(ctx)) has completed.",
+			"Check that SessionConfig.ArtifactsDir points to the right path.",
+			"Check the E2E logs for a 'fetch failed' message.",
+			"Check RBAC:\n    kubectl auth can-i create pods" +
 				" --as=system:serviceaccount:<ns>:<sa> -n <ns>",
 		},
 	},
 	"MEASUREMENT_INPUT_CORRUPT": {
-		summary: "sli-summary.json 파일을 파싱할 수 없습니다.",
+		summary: "sli-summary.json could not be parsed.",
 		hints: []string{
-			"파일이 완전한 JSON인지 확인하세요: cat artifacts/sli-summary.json | python3 -m json.tool",
-			"E2E 테스트가 중간에 중단되어 파일이 불완전하게 쓰였을 수 있습니다.",
+			"Check that the file is complete JSON: cat artifacts/sli-summary.json | python3 -m json.tool",
+			"The E2E test may have been interrupted mid-run, leaving the file incomplete.",
 		},
 	},
 	"POLICY_MISSING": {
-		summary: ".slint/policy.yaml 파일이 없습니다.",
+		summary: ".slint/policy.yaml is missing.",
 		hints: []string{
-			"다음 명령으로 기본 policy.yaml을 생성하세요:\n    slint-gate init",
-			"--policy 플래그로 경로를 직접 지정할 수도 있습니다:\n    slint-gate --policy path/to/policy.yaml",
+			"Generate a default policy.yaml:\n    slint-gate init",
+			"Or point directly at a path with --policy:\n    slint-gate --policy path/to/policy.yaml",
 		},
 	},
 	"POLICY_INVALID": {
-		summary: "policy.yaml 파일이 올바르지 않습니다.",
+		summary: "policy.yaml is invalid.",
 		hints: []string{
-			"YAML 문법 오류가 없는지 확인하세요: cat .slint/policy.yaml",
-			"schema_version 필드가 있는지, 정확히 \"slint.policy.v1\"인지 확인하세요 (누락되거나 다른 값이면 무효 처리됩니다):\n    schema_version: slint.policy.v1",
-			"fail_on 필드에 지원되지 않는 값이 있는지 확인하세요. 지원 값: threshold_miss, regression_detected",
-			"reliability.min_level 필드가 partial 또는 complete인지 확인하세요.",
-			"operator 필드에 지원되지 않는 연산자(예: !=)가 있는지 확인하세요.",
-			"지원 연산자: <=, >=, <, >, ==",
+			"Check for YAML syntax errors: cat .slint/policy.yaml",
+			"Check that schema_version is present and exactly \"slint.policy.v1\" (missing or any other value is treated as invalid):\n    schema_version: slint.policy.v1",
+			"Check for unsupported values in fail_on. Supported values: threshold_miss, regression_detected",
+			"Check that reliability.min_level is partial or complete.",
+			"Check for an unsupported operator (e.g. !=) in an operator field.",
+			"Supported operators: <=, >=, <, >, ==",
 		},
 	},
 	"THRESHOLD_MISS": {
-		summary: "하나 이상의 임계값 조건을 위반했습니다.",
+		summary: "One or more threshold conditions were violated.",
 		hints: []string{
-			"slint-gate-summary.json의 checks 항목에서 fail 상태인 항목을 확인하세요.",
-			"임계값을 조정하거나 오퍼레이터 동작을 검토하세요.",
+			"Check slint-gate-summary.json's checks entries for any in a fail status.",
+			"Adjust the threshold or review the operator's behavior.",
 		},
 	},
 	"REGRESSION_DETECTED": {
-		summary: "baseline 대비 지표가 허용 오차를 초과했습니다.",
+		summary: "A metric exceeded the allowed tolerance versus the baseline.",
 		hints: []string{
-			"slint-gate-summary.json의 regression 검사 항목을 확인하세요.",
-			"정상적인 변경이라면 baseline을 업데이트하세요:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
-			"일시적인 변동이라면 policy.yaml의 tolerance_percent를 조정하세요.",
+			"Check slint-gate-summary.json's regression check entries.",
+			"If the change is expected, update the baseline:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
+			"If it's transient variance, adjust tolerance_percent in policy.yaml.",
 		},
 	},
 	"BASELINE_ABSENT_FIRST_RUN": {
-		summary: "baseline이 없습니다 (첫 실행). 회귀 비교가 생략됩니다.",
+		summary: "No baseline exists (first run). Regression comparison is skipped.",
 		hints: []string{
-			"이것은 경고입니다. 첫 실행에서는 정상입니다.",
-			"baseline을 저장하려면:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
-			"baseline 없이 계속하려면 policy.yaml에서 regression.enabled: false로 설정하세요.",
+			"This is a warning; it's expected on the first run.",
+			"To save a baseline:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
+			"To proceed without a baseline, set regression.enabled: false in policy.yaml.",
 		},
 	},
 	"BASELINE_UNAVAILABLE": {
-		summary: "--baseline으로 지정한 파일을 찾을 수 없습니다.",
+		summary: "The file specified via --baseline could not be found.",
 		hints: []string{
-			"--baseline 플래그에 전달한 경로가 올바른지 확인하세요.",
-			"baseline이 없으면 --baseline 플래그를 생략하세요.",
+			"Check that the path passed to --baseline is correct.",
+			"If you don't have a baseline yet, omit the --baseline flag.",
 		},
 	},
 	"BASELINE_CORRUPT": {
-		summary: "baseline 파일을 파싱할 수 없습니다.",
+		summary: "The baseline file could not be parsed.",
 		hints: []string{
-			"baseline 파일이 완전한 JSON인지 확인하세요.",
-			"baseline을 새로 갱신하세요:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
+			"Check that the baseline file is complete JSON.",
+			"Refresh the baseline:\n    make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json",
 		},
 	},
 	"RELIABILITY_INSUFFICIENT": {
-		summary: "메트릭 수집 신뢰도가 policy.yaml의 최소 요구 수준 미만입니다.",
+		summary: "Metric collection reliability is below policy.yaml's minimum required level.",
 		hints: []string{
-			"E2E 로그에서 fetch 오류가 있는지 확인하세요.",
-			"허용하려면 policy.yaml에서 reliability.required: false로 설정하세요.",
+			"Check the E2E logs for fetch errors.",
+			"To allow this, set reliability.required: false in policy.yaml.",
 		},
 	},
 }
 
-// printDiagnostics는 gate 결과가 PASS가 아닐 때 진단 메시지를 stdout에 출력한다.
+// printDiagnostics prints a diagnostic message to stdout when the gate
+// result is not PASS.
 func printDiagnostics(result *gate.Summary) {
 	if result.GateResult == gate.GatePass {
 		return
@@ -115,7 +116,7 @@ func printDiagnostics(result *gate.Summary) {
 	for _, reason := range result.Reasons {
 		entry, ok := diagMessages[reason]
 		if !ok {
-			fmt.Fprintf(&sb, "\n[%s]\n  (추가 진단 정보 없음)\n", reason)
+			fmt.Fprintf(&sb, "\n[%s]\n  (no additional diagnostic info)\n", reason)
 			continue
 		}
 		fmt.Fprintf(&sb, "\n[%s]\n  %s\n", reason, entry.summary)

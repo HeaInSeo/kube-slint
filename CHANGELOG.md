@@ -40,6 +40,14 @@
   `analyze-dataplane` subcommand's own unrelated `--fail-on` flag (which was
   never renamed to `--exit-on` and isn't part of this migration) is
   untouched.
+- Unified code comments and `slint-gate`'s runtime diagnostic messages
+  (`cmd/slint-gate/diagnose.go`'s `MEASUREMENT_INPUT_MISSING`/`POLICY_INVALID`/
+  etc. summaries and hints, previously Korean-only) to English across the
+  public-facing surface: `pkg/slint` (the public API) and `cmd/slint-gate`
+  (the CLI). Internal implementation packages (`pkg/slo/*`, `pkg/kubeutil`,
+  `pkg/devutil`) are unaffected — this is a scoped consistency pass on the
+  parts an external contributor or judge actually reads/runs, not a
+  repo-wide rewrite.
 
 ## [1.5.0] - 2026-07-07
 

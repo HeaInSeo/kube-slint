@@ -18,15 +18,15 @@ const (
 
 var execCommandContext = exec.CommandContext
 
-// OrphanSweepOptions 는 고아(orphan) 리소스 정리 동작을 설정함.
+// OrphanSweepOptions configures orphan-resource cleanup behavior.
 type OrphanSweepOptions struct {
 	Enabled bool
-	Mode    string        // "report-only" (기본값) | "delete"
-	Limit   int           // 한 번에 삭제/보고할 최대 고아 리소스 수 (0이면 무제한)
-	MaxAge  time.Duration // 이 시간보다 오래된 리소스만 대상으로 함 (0이면 검사 안 함)
+	Mode    string        // "report-only" (default) | "delete"
+	Limit   int           // max orphan resources to delete/report per run (0 = unlimited)
+	MaxAge  time.Duration // only target resources older than this (0 = no age check)
 }
 
-// DevSweepOptions 제공: 로컬 개발 시 짧은 MaxAge와 적은 Limit
+// DevSweepOptions provides a short MaxAge and small Limit for local development.
 var DevSweepOptions = OrphanSweepOptions{
 	Enabled: true,
 	Mode:    modeReportOnly,
@@ -34,7 +34,7 @@ var DevSweepOptions = OrphanSweepOptions{
 	MaxAge:  10 * time.Minute,
 }
 
-// CISweepOptions 제공: CI 환경에서 적절한 Limit 부여
+// CISweepOptions provides a Limit sized appropriately for CI environments.
 var CISweepOptions = OrphanSweepOptions{
 	Enabled: true,
 	Mode:    "report-only",
@@ -104,8 +104,9 @@ func WriteSweepResultJSON(w io.Writer, r SweepResult) error {
 	return enc.Encode(r)
 }
 
-// SweepOrphans 는 이전 kube-slint run-id의 리소스를 탐지하고 선택적으로 삭제함.
-// 기존 API 호환성을 위해 SweepOrphansWithResult 결과를 버리고 성공 여부만 반환함.
+// SweepOrphans detects and optionally deletes resources from previous
+// kube-slint run-ids. It discards the SweepOrphansWithResult result and
+// returns only success/failure, for existing API compatibility.
 func (s *Session) SweepOrphans(ctx context.Context, opts OrphanSweepOptions) error {
 	_, err := s.SweepOrphansWithResult(ctx, opts)
 	return err

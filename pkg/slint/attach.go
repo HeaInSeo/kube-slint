@@ -10,9 +10,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-// Config는 SLO 측정 세션에 대한 입력을 정의함.
+// Config defines the inputs to an SLO measurement session.
 // type Config struct {
-// 	Enabled bool	// false면 계측 훅 완전 스킵
+// 	Enabled bool	// false skips instrumentation hooks entirely
 // 	Namespace          string
 // 	MetricsServiceName string
 // 	TestCase           string
@@ -22,22 +22,22 @@ import (
 // 	Token              string
 // 	ArtifactsDir string
 // 	Tags         map[string]string
-// 	// 계측 코드에서 선택할 수 있도록 해줌.
+// 	// Lets instrumentation code select this.
 // 	Method engine.Method
 //     Fetcher fetch.MetricsFetcher
 // }
 
-// Attach 는 제공자 함수를 호출하는 BeforeEach/AfterEach 훅을 등록하여
-// 현재 테스트의 구성을 가져오고 측정 세션을 관리함.
+// Attach registers BeforeEach/AfterEach hooks that call provider to fetch
+// the current test's config and manage the measurement session.
 func Attach(provider func() SessionConfig) (*Session, error) {
-	session := &Session{} // 자리 표시자 (impl은 BeforeEach에서 설정됨)
+	session := &Session{} // placeholder; impl is set in BeforeEach
 
-	// 하네스 레벨 토글 (오퍼레이터의 테스트 코드에 노출되지 않음)
+	// Harness-level toggle, not exposed to the operator's test code.
 	enabled := isEnabledByEnv()
 
 	ginkgo.BeforeEach(func() {
 		if !enabled {
-			session.reset(nil) // impl=nil이므로 End()는 아무 작업도 수행하지 않음/안전함
+			session.reset(nil) // impl=nil, so End() is a safe no-op
 			return
 		}
 

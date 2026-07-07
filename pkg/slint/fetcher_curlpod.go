@@ -13,20 +13,22 @@ import (
 
 // ---- Default Fetcher: curlpod + promtext ----
 
-// curlPodFetcher 는 curlpod를 실행하여 /metrics를 수집하는 fetcher 구현체임.
-// fetch.SnapshotFetcher 를 구현하므로 Session.Start() 시점에 시작 스냅샷을 미리 캡처한다.
-// 이를 통해 Gap G(engine.Execute()의 두 번의 Fetch() 모두 post-workload 상태를 반환하는 문제)를 해소함.
+// curlPodFetcher is the fetcher implementation that runs a curl pod to
+// collect /metrics. It implements fetch.SnapshotFetcher, so Session.Start()
+// pre-captures a start snapshot, closing Gap G (where both of
+// engine.Execute()'s two Fetch() calls would otherwise return post-workload
+// state).
 type curlPodFetcher struct {
 	impl       *sessionImpl
 	pod        *curlpod.CurlPod
-	startCache *fetch.Sample // PreFetch() 성공 시 설정, 첫 번째 Fetch()에서 반환
-	startErr   error         // PreFetch() 실패 시 첫 번째 Fetch()에서 신뢰 불가 상태로 전파
-	fetchCount int           // Fetch() 호출 횟수 추적
+	startCache *fetch.Sample // set on PreFetch() success, returned by the first Fetch()
+	startErr   error         // set on PreFetch() failure, propagated as unreliable by the first Fetch()
+	fetchCount int           // tracks the number of Fetch() calls
 }
 
 func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
 	client := curlpod.New(nil, nil)
-	// 필요한 안전 레이블을 추가함
+	// Add the required safety label.
 	client.LabelSelector = fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", SanitizeKubernetesLabelValue(impl.RunID))
 	// Apply TLS integration knob and dangerous security-boundary opt-ins.
 	//nolint:staticcheck // SA1019: intentional bridge for the deprecated legacy field, kept for backward compatibility.
@@ -49,9 +51,10 @@ func newCurlPodFetcher(impl *sessionImpl) fetch.MetricsFetcher {
 	}
 }
 
-// PreFetch 는 측정 창 시작 시점의 스냅샷을 미리 캡처함.
-// Session.Start()에서 호출되며, fetch.SnapshotFetcher 인터페이스를 구현함.
-// 실패 시 startCache를 설정하지 않고, 첫 번째 Fetch()에서 실패를 전파한다.
+// PreFetch pre-captures a snapshot at the start of the measurement window.
+// Called from Session.Start(); implements the fetch.SnapshotFetcher
+// interface. On failure it leaves startCache unset and propagates the
+// failure from the first Fetch() instead.
 func (f *curlPodFetcher) PreFetch(ctx context.Context) error {
 	raw, err := f.pod.Run(ctx, f.impl.WaitPodDoneTimeout, f.impl.LogsTimeout)
 	if err != nil {
@@ -69,16 +72,16 @@ func (f *curlPodFetcher) PreFetch(ctx context.Context) error {
 	return nil
 }
 
-// Fetch retrieves a metric sample.
-// Fetch는 메트릭 샘플을 조회함.
-// 첫 번째 호출 시 PreFetch()로 캐시된 시작 스냅샷이 있으면 그것을 반환하고, 이후 호출은 curlpod를 실행함.
+// Fetch retrieves a metric sample. On the first call, if PreFetch() cached
+// a start snapshot, it's returned as-is; subsequent calls run the curl pod.
 func (f *curlPodFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, error) {
 	f.fetchCount++
 	if f.fetchCount == 1 && f.startErr != nil {
 		return fetch.Sample{}, fmt.Errorf("prefetch start snapshot failed: %w", f.startErr)
 	}
-	// 첫 번째 Fetch() 호출이고 startCache가 있으면 캐시된 시작 스냅샷을 반환함.
-	// engine.Execute()가 첫 번째로 Fetch(startedAt)을 호출할 때 pre-workload 상태를 반환하게 됨.
+	// If this is the first Fetch() call and startCache is set, return the
+	// cached start snapshot — so engine.Execute()'s first Fetch(startedAt)
+	// call returns pre-workload state.
 	if f.fetchCount == 1 && f.startCache != nil {
 		cached := *f.startCache
 		cached.At = at

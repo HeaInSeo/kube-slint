@@ -19,7 +19,6 @@ import (
 )
 
 // SessionConfig contains session inputs and defaults.
-// SessionConfig는 세션 입력값과 기본값을 포함함.
 type SessionConfig struct {
 	Namespace          string
 	MetricsServiceName string
@@ -119,13 +118,12 @@ type sessionImpl struct {
 	hasFailed bool
 }
 
-// Session 은 측정 세션을 관리함.
+// Session manages a measurement session.
 type Session struct {
 	impl *sessionImpl
 }
 
 // NewSession builds a session with defaults applied.
-// NewSession은 기본값이 적용된 세션을 생성함.
 func NewSession(cfg SessionConfig) *Session {
 	cfg = applySessionBaseDefaults(cfg)
 	cfg = discoverAndApplyConfig(cfg)
@@ -253,8 +251,9 @@ func mergeDiscoveredConfig(cfg SessionConfig, d *DiscoveredConfig) SessionConfig
 	return cfg
 }
 
-// reset은 전체 Session 구조체를 복사하지 않고 내부 런타임 상태를 교체함.
-// 참고: 깊은 복사(deep copy)가 아니므로 reset 호출 후 from을 사용해서는 안 됨.
+// reset swaps in from's internal runtime state without copying the whole
+// Session struct. Note: this is not a deep copy, so from must not be used
+// after reset is called.
 func (s *Session) reset(from *Session) {
 	if s == nil {
 		return
@@ -268,15 +267,16 @@ func (s *Session) reset(from *Session) {
 	s.impl = from.impl
 }
 
-// ShouldWriteArtifacts 는 세션이 요약 출력을 기록할지 여부를 보고함.
+// ShouldWriteArtifacts reports whether the session should write summary output.
 func (s *Session) ShouldWriteArtifacts() bool {
-	// Ginkgo 훅과 placeholder 패턴 때문에 s != nil 체크를 추가하여 패닉을 방지함.
+	// The s != nil check guards against panics from the Ginkgo hook +
+	// placeholder-session pattern.
 	return s != nil && s.impl != nil && s.impl.Config.ArtifactsDir != ""
 }
 
-// NextSummaryPath 는 충돌 시 -<n>을 추가하여 고유한 요약 경로를 반환함.
+// NextSummaryPath returns a unique summary path, appending -<n> on collision.
 func (s *Session) NextSummaryPath(filename string) (string, error) {
-	// s == nil 체크는 현재 구조상 예외적으로 필요하므로 포함됨.
+	// The s == nil check is exceptionally needed given the current call pattern.
 	if s == nil || s.impl == nil {
 		return "", fmt.Errorf("slint: session not initialized")
 	}
@@ -299,7 +299,7 @@ func (s *Session) NextSummaryPath(filename string) (string, error) {
 	}
 }
 
-// AddWarning 은 BestEffort 모드에 대한 경고 메시지를 기록함.
+// AddWarning records a warning message for BestEffort mode.
 func (s *Session) AddWarning(message string) {
 	if s == nil || s.impl == nil || strings.TrimSpace(message) == "" {
 		return
@@ -307,8 +307,9 @@ func (s *Session) AddWarning(message string) {
 	s.impl.Warnings = append(s.impl.Warnings, message)
 }
 
-// MarkFailed 는 세션을 명시적으로 실패 상태로 플래그하여 CleanupMode 평가에 영향을 줌.
-// 단조적(한 번 실패로 표시되면 되돌릴 수 없음)이며 멱등성을 가짐.
+// MarkFailed explicitly flags the session as failed, affecting CleanupMode
+// evaluation. It is monotonic (once marked failed, it cannot be undone) and
+// idempotent.
 func (s *Session) MarkFailed() {
 	if s == nil || s.impl == nil {
 		return
@@ -316,8 +317,8 @@ func (s *Session) MarkFailed() {
 	s.impl.hasFailed = true
 }
 
-// Cleanup 은 세션에서 생성된 임시 리소스를 제거함.
-// 광범위한 삭제를 방지하기 위해 run-id와 namespace를 안전 장치로 사용함.
+// Cleanup removes temporary resources created by the session, using
+// run-id and namespace as safeguards against overly broad deletes.
 func (s *Session) Cleanup(ctx context.Context) {
 	if s == nil || s.impl == nil {
 		return
@@ -380,19 +381,20 @@ func runCleanupActions(ctx context.Context, ns, runID string) {
 }
 
 // Start begins measurement.
-// Start는 측정을 시작함.
 //
-// fetcher가 fetch.SnapshotFetcher를 구현하는 경우(예: curlPodFetcher),
-// 시작 시점 스냅샷을 미리 캡처한다. 이를 통해 engine.Execute()가 End() 내부에서
-// Fetch()를 두 번 호출할 때 첫 번째 호출이 workload 실행 전 상태를 반환하도록 보장함.
+// If the fetcher implements fetch.SnapshotFetcher (e.g. curlPodFetcher), it
+// pre-captures a start-time snapshot. This guarantees that when
+// engine.Execute() calls Fetch() twice inside End(), the first call returns
+// the pre-workload state.
 //
-// 주의: SnapshotFetcher.PreFetch()가 구현된 경우 Start()는 curlpod 실행 시간만큼 블로킹됨.
-// 실패 시 경고를 출력하고 계속 진행함 (non-fatal, kube-slint safety-first 원칙).
+// Note: when SnapshotFetcher.PreFetch() is implemented, Start() blocks for
+// as long as the curl pod takes to run. On failure it prints a warning and
+// continues (non-fatal, per kube-slint's safety-first principle).
 func (s *Session) Start() {
 	if s == nil || s.impl == nil {
 		return
 	}
-	// 방어 코드: nil 또는 유효하지 않은 Now() 주입 처리
+	// Defensive: handle a nil or otherwise invalid injected Now().
 	now := s.impl.Config.Now
 	if now == nil {
 		now = time.Now
@@ -404,14 +406,16 @@ func (s *Session) Start() {
 	}
 	s.impl.started = t
 
-	// fetcher가 nil이면(기본 curlpod 경로) 지금 생성하여 End()와 같은 인스턴스를 공유.
-	// startCache는 인스턴스에 저장되므로 동일 인스턴스여야 PreFetch 결과가 Fetch()에서 사용됨.
+	// If fetcher is nil (default curlpod path), construct it now so End()
+	// shares the same instance — startCache lives on the instance, so it
+	// must be the same one for PreFetch's result to reach Fetch().
 	if s.impl.fetcher == nil {
 		s.impl.fetcher = newCurlPodFetcher(s.impl)
 	}
 
-	// fetcher가 SnapshotFetcher를 구현하면 시작 스냅샷을 미리 캡처함 (Gap G 해소).
-	// 구현하지 않는 fetcher(Mock, httptest 등)는 그대로 동작하며 영향을 받지 않음.
+	// If the fetcher implements SnapshotFetcher, pre-capture a start
+	// snapshot (closes Gap G). Fetchers that don't implement it (Mock,
+	// httptest, etc.) are unaffected and behave as before.
 	if sf, ok := s.impl.fetcher.(fetch.SnapshotFetcher); ok {
 		ctx, cancel := context.WithTimeout(context.Background(), s.impl.podRunTimeout())
 		defer cancel()
@@ -429,8 +433,6 @@ func (impl *sessionImpl) podRunTimeout() time.Duration {
 	return impl.WaitPodDoneTimeout + impl.LogsTimeout + 30*time.Second
 }
 
-// End는 측정을 완료함.
-
 // End concludes the measurement session.
 func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	if s == nil || s.impl == nil {
@@ -447,7 +449,8 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	}
 
-	// 중요: 시간 동기화 및 주입 시간은 별도로 논의되고 문서화되어야 함
+	// Important: time synchronization and injection timing deserve separate
+	// discussion and documentation.
 	now := s.impl.Config.Now
 	if now == nil {
 		now = time.Now
@@ -474,8 +477,8 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	eng := engine.New(fetcher, s.impl.writer, nil)
 
-	// uniquePath: 감사 추적용 고유 파일 (덮어쓰기 없음)
-	// staticPath: slint-gate 기본 입력과 일치하는 latest alias
+	// uniquePath: a unique file for the audit trail (never overwritten)
+	// staticPath: the latest alias matching slint-gate's default input
 	uniquePath := ""
 	staticPath := ""
 	if s.ShouldWriteArtifacts() {
@@ -516,21 +519,21 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		return sum, err
 	}
 
-	// static alias: slint-gate 기본 입력 경로와 일치시킴.
-	// 병렬/멀티 테스트에서는 --measurement-summary 로 uniquePath를 명시할 것.
+	// static alias: kept aligned with slint-gate's default input path.
+	// For parallel/multi-test runs, point --measurement-summary at uniquePath explicitly.
 	if staticPath != "" && sum != nil {
 		if writeErr := s.impl.writer.Write(staticPath, *sum); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "kube-slint [session]: warning - static alias write failed: %v\n", writeErr)
 		}
 	}
 
-	// 1. Strictness Check (파이프라인 신뢰도 검증)
+	// 1. Strictness check (pipeline reliability validation)
 	if strictErr := CheckStrictness(s.impl.Config, sum); strictErr != nil {
 		s.impl.hasFailed = true
 		return sum, strictErr
 	}
 
-	// 2. Gating Check (정상 결과 승격 검증)
+	// 2. Gating check (validates promotion of a healthy result)
 	if gatingErr := CheckGating(s.impl.Config, sum); gatingErr != nil {
 		s.impl.hasFailed = true
 		return sum, gatingErr
