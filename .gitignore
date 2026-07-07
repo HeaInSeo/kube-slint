@@ -31,6 +31,8 @@ bin/
 .agent/
 .claude/
 .codex/
+/CLAUDE.md
+/AGENTS.md
 
 # Local Python/cache and cross-repo convenience links
 __pycache__/
