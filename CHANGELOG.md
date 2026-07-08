@@ -15,6 +15,19 @@
 
 - **F4**: `pkg/slo/fetch/promtext`'s exposition-format parser could not handle a label value containing whitespace (e.g. `metric{path="/foo bar"} 1`) — a naive `strings.Fields` split broke the label block apart, handing a truncated fragment to `strconv.ParseFloat` and erroring out the entire scrape over one line. Replaced with a parser that locates the label block's matching unquoted `}` instead of whitespace-splitting the whole line.
 
+A second `pre-release-adversarial-review` run against this batch (see
+`CLAUDE.md`'s standing pre-tag rule) found 8 more issues, all confirmed
+real, all fixed (none deferred):
+
+- **Security (high)**: `pkg/slo/fetch/curlpod/client.go`'s `RunOnce` spliced `serviceAccountName`/`Image` unescaped into a hand-built `--overrides` JSON payload via `fmt.Sprintf` — a crafted `serviceAccountName` could inject sibling PodSpec fields (`hostNetwork`, a `hostPath` volume, a privileged container), defeating the documented "never privileged / never hostPath" invariant. Independently reproduced. Fixed by validating `serviceAccountName` as a DNS-1123 label and rebuilding the entire payload via `encoding/json.Marshal` of a typed struct instead of string interpolation. See D-025.
+- `cmd/slint-gate/main.go`'s `inspect` and `quickstart` dispatch cases exited silently on error, unlike every sibling case (`init`/`recommend-policy`/`wizard`/`ci github-actions`), which print `slint-gate <cmd>: %v` first. Verified live: `slint-gate inspect --profile does-not-exist` printed nothing.
+- `README.md`/`README(Kor).md`'s flag table self-referentially called `--summary` its own deprecated alias; the real deprecated alias is `--measurement-summary`.
+- `docs/competition-submission.md` cited a stale "latest release: v1.5.2" and its subcommand table omitted the shipped `wizard` command.
+- `.github/actions/slint-gate/action.yml` never gained a `summary` input alias matching the CLI's `--summary`/`--measurement-summary` rename, unlike the fully-symmetric `exit-on`/`fail-on` treatment elsewhere in the same file.
+- `cmd/slint-gate/inspect_test.go`'s shared `captureStdout` test helper (used across 8 test files) drained its pipe only after `fn()` returned — any CLI output larger than the OS pipe buffer (~64KiB on Linux) would deadlock the test. Independently reproduced the deadlock in a standalone repro before fixing. See D-026.
+
+Permanent guardrails added for the repeatable patterns: `.semgrep/rules/kube-slint-no-raw-json-splice-in-podspec`, and two new `hack/quality-guardrails.sh` checks (`check_cli_dispatch_error_printing`, `check_flag_deprecation_docs`).
+
 ### Changed
 
 - `pkg/gate/gate.go` (866 lines) split into `types.go`, `policy.go`, `measurement.go`, `threshold.go`, `regression.go`, `reliability.go`, and a slimmed-down orchestration-only `gate.go`. No behavior change.

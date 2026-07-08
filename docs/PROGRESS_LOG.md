@@ -16,7 +16,7 @@ Following v1.5.3, closed 4 of the 5 items on the internal-usage backlog
 (`docs/project-status.yaml`'s `current_focus_deferred`) — MCP/IDE
 integration intentionally left out, still a separate paused track. See
 `CHANGELOG.md`'s `[Unreleased]` entry and `docs/DECISIONS.md` D-022 through
-D-024 for full rationale.
+D-026 for full rationale.
 
 * [x] `pkg/gate/gate.go` (866 lines, a known tech-debt item) split into 7
   per-concern files (`types.go`, `policy.go`, `measurement.go`,
@@ -41,7 +41,26 @@ D-024 for full rationale.
   `/dev/null` is itself a character device). `quickstart` remains the
   correct non-interactive choice for CI/scripted use.
 * [x] Second `pre-release-adversarial-review` run against this batch (see
-  `CLAUDE.md`'s standing pre-tag rule) — result recorded once complete.
+  `CLAUDE.md`'s standing pre-tag rule): the first attempt's 7 agents all hit
+  a session rate limit and produced no real result (0 confirmed out of a
+  meaningless 0 raw — not a genuine "clean" outcome); resumed and the retry
+  completed cleanly with 8 raw findings, all 8 confirmed real, all fixed
+  (none deferred). Findings were mostly new (only tangentially related to
+  the first round's territory), including one high-severity security bug:
+  `pkg/slo/fetch/curlpod/client.go`'s `RunOnce` spliced `serviceAccountName`/
+  `Image` unescaped into a hand-built `--overrides` JSON payload, letting a
+  crafted `serviceAccountName` inject sibling PodSpec fields (`hostNetwork`,
+  a `hostPath` volume, a privileged container) — independently reproduced,
+  fixed by DNS-label validation plus rebuilding the payload via
+  `encoding/json.Marshal` of a typed struct (D-025). Also fixed: `inspect`/
+  `quickstart` CLI dispatch silently swallowing errors; both READMEs'
+  flag table self-referentially calling `--summary` its own deprecated
+  alias; `docs/competition-submission.md`'s stale version and missing
+  `wizard` mention; the GitHub composite action never gaining a `summary`
+  input alias matching the CLI rename; and a real deadlock risk in the
+  shared `captureStdout` test helper on output larger than the OS pipe
+  buffer (D-026, independently reproduced via a standalone repro before
+  fixing). See `CHANGELOG.md`'s `[Unreleased]` entry for the full list.
 
 ### v1.5.3 Release (2026-07-08)
 
