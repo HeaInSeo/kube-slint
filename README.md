@@ -247,7 +247,7 @@ go run ./cmd/slint-gate [flags]
 
 | Flag | Default | Description |
 |---|---|---|
-| `--summary` | `artifacts/sli-summary.json` | Path to the SLI summary produced by the harness. (`--summary` still works as a deprecated alias.) |
+| `--summary` | `artifacts/sli-summary.json` | Path to the SLI summary produced by the harness. (`--measurement-summary` still works as a deprecated alias.) |
 | `--policy` | `.slint/policy.yaml` | Path to the policy file |
 | `--baseline` | `""` (disabled) | Path to a baseline summary for regression comparison; omit to skip |
 | `--output` | `slint-gate-summary.json` | Path to write the gate result JSON |

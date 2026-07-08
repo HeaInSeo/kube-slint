@@ -218,6 +218,22 @@ check_test_strategy() {
     "E2E acceptance rejects invalid-input PASS"
 }
 
+check_flag_deprecation_docs() {
+  echo "== flag deprecation docs guardrails =="
+  # --summary is the current/preferred flag; --measurement-summary is the
+  # deprecated alias (cmd/slint-gate/main.go). Both READMEs' flag tables
+  # previously called --summary its own deprecated alias (self-referential
+  # and backwards) - found by the second pre-release-adversarial-review pass.
+  reject_grep '`--summary` still works as a deprecated alias' README.md \
+    "README.md does not call --summary its own deprecated alias"
+  reject_grep '`--summary`는 하위호환용 deprecated alias' "README(Kor).md" \
+    "README(Kor).md does not call --summary its own deprecated alias"
+  require_grep '`--measurement-summary` still works as a deprecated alias' README.md \
+    "README.md correctly names --measurement-summary as the deprecated alias"
+  require_grep '`--measurement-summary`는 하위호환용 deprecated alias' "README(Kor).md" \
+    "README(Kor).md correctly names --measurement-summary as the deprecated alias"
+}
+
 check_identity_wording() {
   echo "== product identity guardrails =="
   require_grep 'does not replace your tests\. It measures what happens during them\.' README.md \
@@ -248,6 +264,7 @@ check_curlpod_security_contract
 check_cli_dispatch_error_printing
 check_gate_contract
 check_test_strategy
+check_flag_deprecation_docs
 check_identity_wording
 check_release_and_ux_contract
 

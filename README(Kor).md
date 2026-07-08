@@ -256,7 +256,7 @@ go run ./cmd/slint-gate [flags]
 
 | 플래그 | 기본값 | 설명 |
 |---|---|---|
-| `--summary` | `artifacts/sli-summary.json` | 하네스가 생성한 SLI 요약 파일 경로 (`--summary`는 하위호환용 deprecated alias로 계속 동작한다) |
+| `--summary` | `artifacts/sli-summary.json` | 하네스가 생성한 SLI 요약 파일 경로 (`--measurement-summary`는 하위호환용 deprecated alias로 계속 동작한다) |
 | `--policy` | `.slint/policy.yaml` | 정책 파일 경로 |
 | `--baseline` | `""` (비활성) | 회귀 비교용 기준선 요약 경로; 생략하면 건너뜀 |
 | `--output` | `slint-gate-summary.json` | 게이트 결과 JSON 작성 경로 |
