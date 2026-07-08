@@ -44,14 +44,8 @@ func loadMeasurement(path string) (*summary.Summary, string) {
 }
 
 func resultValueMap(s *summary.Summary) map[string]float64 {
-	m := map[string]float64{}
 	if s == nil {
-		return m
+		return map[string]float64{}
 	}
-	for _, r := range s.Results {
-		if r.Value != nil {
-			m[r.ID] = *r.Value
-		}
-	}
-	return m
+	return s.ResultValues()
 }

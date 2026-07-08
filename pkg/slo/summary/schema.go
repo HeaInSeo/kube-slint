@@ -1,3 +1,8 @@
+// Package summary defines the sli-summary.json contract (schema slo.v3):
+// the Summary/SLIResult shape every kube-slint measurement fetcher produces
+// and every consumer (pkg/gate, cmd/slint-gate, pkg/slint) reads. A baseline
+// file is not a distinct type — it is a plain Summary saved via WriteFile
+// and reloaded via LoadFile, same as a regular measurement.
 package summary
 
 import (
@@ -141,6 +146,21 @@ type SLIResult struct {
 
 	InputsUsed    []string `json:"inputsUsed,omitempty"`
 	InputsMissing []string `json:"inputsMissing,omitempty"`
+}
+
+// ResultValues flattens Results into a map of SLI ID to value, omitting any
+// result whose Value is nil (e.g. a skipped SLI). This is the single
+// canonical way to go from a Summary to a comparable value map — gate
+// evaluation, baseline diff, and baseline merge all need the same
+// flattening and previously each reimplemented it separately.
+func (s Summary) ResultValues() map[string]float64 {
+	m := make(map[string]float64, len(s.Results))
+	for _, r := range s.Results {
+		if r.Value != nil {
+			m[r.ID] = *r.Value
+		}
+	}
+	return m
 }
 
 // EnsureFormat 은 schemaVersion을 보존하면서 포맷 힌트(기본값 v4)를 설정함.

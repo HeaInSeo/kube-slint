@@ -78,8 +78,8 @@ func runBaselineMerge(args []string) error {
 		return fmt.Errorf("could not load summary: %w", err)
 	}
 
-	baseValues := resultValues(baseline)
-	curValues := resultValues(cur)
+	baseValues := baseline.ResultValues()
+	curValues := cur.ResultValues()
 
 	var appended []summary.SLIResult
 	var rejected []string

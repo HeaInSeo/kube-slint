@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/HeaInSeo/kube-slint/pkg/gate"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
@@ -61,8 +62,8 @@ func runBaselineDiff(args []string) error {
 		return fmt.Errorf("could not load summary: %w", err)
 	}
 
-	baseValues := resultValues(baseline)
-	curValues := resultValues(cur)
+	baseValues := baseline.ResultValues()
+	curValues := cur.ResultValues()
 	directions := loadMetricDirections(*policyPath)
 
 	var newIDs, changedIDs, missingIDs []string
@@ -134,16 +135,6 @@ func runBaselineDiff(args []string) error {
 	return nil
 }
 
-func resultValues(s summary.Summary) map[string]float64 {
-	m := make(map[string]float64, len(s.Results))
-	for _, r := range s.Results {
-		if r.Value != nil {
-			m[r.ID] = *r.Value
-		}
-	}
-	return m
-}
-
 // loadMetricDirections best-effort loads a policy.yaml and returns, for each
 // metric with a threshold rule, whether lower or higher values are better.
 // A missing or invalid policy file simply yields an empty map — diff still
@@ -159,34 +150,13 @@ func loadMetricDirections(policyPath string) map[string]string {
 	}
 	directions := make(map[string]string, len(doc.Thresholds))
 	for _, t := range doc.Thresholds {
-		if lowerIsBetterOperator(t.Operator) {
+		if gate.LowerIsBetter(t.Operator) {
 			directions[t.Metric] = "lower"
-		} else if higherIsBetterOperator(t.Operator) {
+		} else if gate.HigherIsBetter(t.Operator) {
 			directions[t.Metric] = "higher"
 		}
 	}
 	return directions
-}
-
-// lowerIsBetterOperator/higherIsBetterOperator mirror pkg/gate/gate.go's
-// unexported lowerIsBetter/higherIsBetter — duplicated locally since this is
-// a CLI-only concern and doesn't warrant expanding pkg/gate's public API.
-func lowerIsBetterOperator(operator string) bool {
-	switch strings.TrimSpace(operator) {
-	case "<=", "<", "=<":
-		return true
-	default:
-		return false
-	}
-}
-
-func higherIsBetterOperator(operator string) bool {
-	switch strings.TrimSpace(operator) {
-	case ">=", ">", "=>":
-		return true
-	default:
-		return false
-	}
 }
 
 func printChangeGuidance(id string, baseVal, curVal float64, direction string) {

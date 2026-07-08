@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/HeaInSeo/kube-slint/pkg/gate"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
@@ -224,25 +225,13 @@ func renderActiveThresholds(items []recommendedThreshold) string {
 
 // violatesDefault reports whether measured fails the rule "measured operator
 // target" — i.e. whether the candidate's own default threshold is already
-// violated by what was actually observed. Mirrors pkg/gate/gate.go's
-// compareOp semantics for the 5 supported operators (duplicated locally for
-// the same reason as baseline_diff.go's direction helpers: this is a
-// CLI-only concern, not worth expanding pkg/gate's public API for).
+// violated by what was actually observed.
 func violatesDefault(operator string, target, measured float64) bool {
-	switch strings.TrimSpace(operator) {
-	case "<=", "=<":
-		return !(measured <= target)
-	case ">=", "=>":
-		return !(measured >= target)
-	case "<":
-		return !(measured < target)
-	case ">":
-		return !(measured > target)
-	case "==", "=":
-		return measured != target
-	default:
+	matched, err := gate.CompareOp(measured, operator, target)
+	if err != nil {
 		return false
 	}
+	return !matched
 }
 
 // commentedEntry pairs a candidate not promoted to an active rule with the

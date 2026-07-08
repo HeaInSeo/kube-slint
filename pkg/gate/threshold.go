@@ -56,7 +56,7 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, promote map[strin
 	}
 
 	c.Observed = observed
-	matched, err := compareOp(observed, rule.Operator, rule.Value)
+	matched, err := CompareOp(observed, rule.Operator, rule.Value)
 	if err != nil {
 		c.Message = "invalid operator"
 		c.pendingReasons = []string{reasonPolicyInvalid}
@@ -78,7 +78,12 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, promote map[strin
 	return c, false, true, false
 }
 
-func compareOp(v float64, op string, target float64) (bool, error) {
+// CompareOp evaluates "v op target" for the operators supported in
+// policy.yaml threshold rules (<=, >=, <, >, ==, and the =</=> aliases).
+// Exported so CLI-only consumers (e.g. recommend-policy's default-threshold
+// mismatch check) share the same operator semantics instead of
+// reimplementing them.
+func CompareOp(v float64, op string, target float64) (bool, error) {
 	switch strings.TrimSpace(op) {
 	case "<=", "=<":
 		return v <= target, nil

@@ -64,7 +64,7 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 	// baseline=0, current≠0: unquantifiable percent change from zero.
 	// Guard here to prevent math.Inf(1) from reaching JSON encoding.
 	if baseVal == 0 && curVal != 0 {
-		if higherIsBetter(rule.Operator) {
+		if HigherIsBetter(rule.Operator) {
 			// e.g. reconcile rate going from 0 to nonzero is an improvement, not a regression.
 			c.Status = "pass"
 			c.Observed = "baseline_zero_current_nonzero"
@@ -105,16 +105,20 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 // direction (e.g. "==") fall back to a symmetric tolerance check.
 func isRegression(d, tolerancePct float64, operator string) bool {
 	switch {
-	case lowerIsBetter(operator):
+	case LowerIsBetter(operator):
 		return d > tolerancePct
-	case higherIsBetter(operator):
+	case HigherIsBetter(operator):
 		return d < -tolerancePct
 	default:
 		return math.Abs(d) > tolerancePct
 	}
 }
 
-func lowerIsBetter(operator string) bool {
+// LowerIsBetter reports whether a threshold rule's operator implies that a
+// lower metric value is an improvement (<=, <, =<). Exported so CLI-only
+// direction-aware consumers (baseline diff/merge wording) share the same
+// operator-to-direction mapping instead of reimplementing it.
+func LowerIsBetter(operator string) bool {
 	switch strings.TrimSpace(operator) {
 	case "<=", "<", "=<":
 		return true
@@ -123,7 +127,9 @@ func lowerIsBetter(operator string) bool {
 	}
 }
 
-func higherIsBetter(operator string) bool {
+// HigherIsBetter is the higher-is-better counterpart to LowerIsBetter
+// (>=, >, =>).
+func HigherIsBetter(operator string) bool {
 	switch strings.TrimSpace(operator) {
 	case ">=", ">", "=>":
 		return true
