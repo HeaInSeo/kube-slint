@@ -175,10 +175,12 @@ See `docs/DECISIONS.md` D-019 for the full rationale. Summary:
 
 ## Static Guardrail Plan — implemented
 
-All six planned rules are implemented as custom Semgrep rules in
-`.semgrep/rules/` (one `.yaml` + one paired positive/negative Go test
-fixture per rule, run via `semgrep --test .semgrep/rules`), enabled as
-**blocking CI** (`.github/workflows/semgrep.yml`, `semgrep scan --error`):
+The six originally planned rules, plus a seventh added 2026-07-08 after a
+real vulnerability of the shape it targets was found and fixed, are
+implemented as custom Semgrep rules in `.semgrep/rules/` (one `.yaml` + one
+paired positive/negative Go test fixture per rule, run via
+`semgrep --test .semgrep/rules`), enabled as **blocking CI**
+(`.github/workflows/semgrep.yml`, `semgrep scan --error`):
 
 - `kube-slint-no-direct-service-url-format` — flags building the metrics URL
   via a raw `fmt.Sprintf($X.ServiceURLFormat, ...)` instead of going through
@@ -198,6 +200,18 @@ fixture per rule, run via `semgrep --test .semgrep/rules`), enabled as
 - `kube-slint-no-unsafe-cleanup` — flags a `kubectl delete pods <name>`
   construction (via `exec.Command` or a context-taking wrapper) with no
   label selector in the same call.
+- `kube-slint-no-raw-json-splice-in-podspec` (added 2026-07-08) — flags a
+  `fmt.Sprintf` call whose format string contains a JSON key literal
+  (`"key":"%s"`/`%q`-shaped). Added after the second
+  `pre-release-adversarial-review` pass found exactly this pattern in
+  `pkg/slo/fetch/curlpod/client.go`'s `--overrides` payload construction:
+  `ServiceAccountName`/`Image` were spliced unescaped into a hand-built JSON
+  string, letting a crafted `ServiceAccountName` inject sibling PodSpec
+  fields (`hostNetwork`, a `hostPath` volume, a privileged container) past
+  the "never privileged / never hostPath" invariant below. Fixed by
+  replacing the `fmt.Sprintf` JSON construction with `encoding/json.Marshal`
+  of a typed struct (`podOverride` in `client.go`), which the rule's
+  `good()` fixture example mirrors.
 
 Per the bar this section originally set ("do not enable as blocking CI
 until each rule has positive/negative examples and the current codebase is

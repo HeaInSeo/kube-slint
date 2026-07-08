@@ -98,6 +98,9 @@ func (c *Client) RunOnce(ctx context.Context, ns, token, metricsSvcName, service
 	if err != nil {
 		return "", err
 	}
+	if !isValidDNSLabel(serviceAccountName) {
+		return "", fmt.Errorf("invalid ServiceAccount name %q: must be a valid DNS label", serviceAccountName)
+	}
 
 	// 이전 curl-metrics 파드 최선(best-effort) 정리
 	_ = c.CleanupByLabel(ctx, ns)
@@ -120,7 +123,36 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer ${TOKEN}" "%s";`, insecur
 	if _, ok := podLabels["app"]; !ok {
 		podLabels["app"] = "curl-metrics"
 	}
-	labelsJSON, _ := json.Marshal(podLabels) // map[string]string never fails Marshal
+
+	overridesJSON, err := json.Marshal(podOverride{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Metadata: podOverrideMetadata{
+			Name:      podName,
+			Namespace: ns,
+			Labels:    podLabels,
+		},
+		Spec: podOverrideSpec{
+			ServiceAccountName:           serviceAccountName,
+			AutomountServiceAccountToken: true,
+			RestartPolicy:                "Never",
+			Containers: []podOverrideContainer{{
+				Name:    "curl",
+				Image:   c.Image,
+				Command: []string{"/bin/sh", "-c", curlCmd},
+				SecurityContext: podOverrideSecurityContext{
+					AllowPrivilegeEscalation: false,
+					Capabilities:             podOverrideCapabilities{Drop: []string{"ALL"}},
+					RunAsNonRoot:             true,
+					RunAsUser:                1000,
+					SeccompProfile:           podOverrideSeccompProfile{Type: "RuntimeDefault"},
+				},
+			}},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshal pod overrides: %w", err)
+	}
 
 	cmd := exec.Command(
 		"kubectl", "run", podName,
@@ -128,37 +160,60 @@ curl %s -sS --fail-with-body -H "Authorization: Bearer ${TOKEN}" "%s";`, insecur
 		"--namespace", ns,
 		"--image", c.Image,
 		"--labels", c.LabelSelector,
-		"--overrides",
-		fmt.Sprintf(`{
-  "apiVersion":"v1",
-  "kind":"Pod",
-  "metadata":{
-    "name":"%s",
-    "namespace":"%s",
-    "labels":%s
-  },
-  "spec":{
-    "serviceAccountName":"%s",
-    "automountServiceAccountToken": true,
-    "restartPolicy":"Never",
-    "containers":[{
-      "name":"curl",
-      "image":"%s",
-      "command":["/bin/sh","-c",%q],
-      "securityContext":{
-        "allowPrivilegeEscalation": false,
-        "capabilities": { "drop": ["ALL"] },
-        "runAsNonRoot": true,
-        "runAsUser": 1000,
-        "seccompProfile": { "type": "RuntimeDefault" }
-      }
-    }]
-  }
-}`, podName, ns, string(labelsJSON), serviceAccountName, c.Image, curlCmd),
+		"--overrides", string(overridesJSON),
 	)
 
 	_, err = c.Runner.Run(ctx, c.Logger, cmd)
 	return podName, err
+}
+
+// podOverride and its nested types mirror just the fields RunOnce needs from
+// a Kubernetes Pod spec. Marshaled via encoding/json rather than built with
+// fmt.Sprintf string interpolation, so every field (including
+// caller-supplied ones like ServiceAccountName and Image) is properly JSON-
+// escaped — no field can smuggle extra keys (e.g. hostNetwork, hostPath
+// volumes) into the --overrides payload the way raw string splicing could.
+type podOverride struct {
+	APIVersion string              `json:"apiVersion"`
+	Kind       string              `json:"kind"`
+	Metadata   podOverrideMetadata `json:"metadata"`
+	Spec       podOverrideSpec     `json:"spec"`
+}
+
+type podOverrideMetadata struct {
+	Name      string            `json:"name"`
+	Namespace string            `json:"namespace"`
+	Labels    map[string]string `json:"labels"`
+}
+
+type podOverrideSpec struct {
+	ServiceAccountName           string                 `json:"serviceAccountName"`
+	AutomountServiceAccountToken bool                   `json:"automountServiceAccountToken"`
+	RestartPolicy                string                 `json:"restartPolicy"`
+	Containers                   []podOverrideContainer `json:"containers"`
+}
+
+type podOverrideContainer struct {
+	Name            string                     `json:"name"`
+	Image           string                     `json:"image"`
+	Command         []string                   `json:"command"`
+	SecurityContext podOverrideSecurityContext `json:"securityContext"`
+}
+
+type podOverrideSecurityContext struct {
+	AllowPrivilegeEscalation bool                      `json:"allowPrivilegeEscalation"`
+	Capabilities             podOverrideCapabilities   `json:"capabilities"`
+	RunAsNonRoot             bool                      `json:"runAsNonRoot"`
+	RunAsUser                int64                     `json:"runAsUser"`
+	SeccompProfile           podOverrideSeccompProfile `json:"seccompProfile"`
+}
+
+type podOverrideCapabilities struct {
+	Drop []string `json:"drop"`
+}
+
+type podOverrideSeccompProfile struct {
+	Type string `json:"type"`
 }
 
 // WaitDone 은 curl 파드가 종료 단계(Succeeded/Failed)에 도달할 때까지 기다림.

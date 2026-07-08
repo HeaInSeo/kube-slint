@@ -152,17 +152,23 @@ check_secret_redaction_contract() {
 }
 
 check_curlpod_security_contract() {
+  # As of 2026-07-08 (PodSpec/JSON-injection fix), the --overrides payload is
+  # built via encoding/json.Marshal of a typed struct (podOverride in
+  # client.go) rather than a raw fmt.Sprintf JSON template, so these check
+  # for the Go struct-literal field assignments, not literal JSON text.
   echo "== curlpod securityContext guardrails =="
-  require_grep '"automountServiceAccountToken": true' pkg/slo/fetch/curlpod/client.go \
+  require_grep 'AutomountServiceAccountToken: true' pkg/slo/fetch/curlpod/client.go \
     "curlpod explicitly mounts ServiceAccount token"
-  require_grep '"allowPrivilegeEscalation": false' pkg/slo/fetch/curlpod/client.go \
+  require_grep 'AllowPrivilegeEscalation: false' pkg/slo/fetch/curlpod/client.go \
     "curlpod disables privilege escalation"
-  require_grep '"capabilities": \{ "drop": \["ALL"\] \}' pkg/slo/fetch/curlpod/client.go \
+  require_grep 'Capabilities:.*Drop: \[\]string{"ALL"}' pkg/slo/fetch/curlpod/client.go \
     "curlpod drops Linux capabilities"
-  require_grep '"runAsNonRoot": true' pkg/slo/fetch/curlpod/client.go \
+  require_grep 'RunAsNonRoot: *true' pkg/slo/fetch/curlpod/client.go \
     "curlpod runs as non-root"
-  require_grep '"seccompProfile": \{ "type": "RuntimeDefault" \}' pkg/slo/fetch/curlpod/client.go \
+  require_grep 'SeccompProfile:.*Type: "RuntimeDefault"' pkg/slo/fetch/curlpod/client.go \
     "curlpod uses RuntimeDefault seccomp"
+  require_grep 'isValidDNSLabel\(serviceAccountName\)' pkg/slo/fetch/curlpod/client.go \
+    "curlpod validates ServiceAccountName before use (PodSpec-injection guard)"
 }
 
 check_gate_contract() {

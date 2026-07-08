@@ -235,6 +235,78 @@ func TestRunOnce_PodOverrides_NeverPrivilegedOrHostPath(t *testing.T) {
 	}
 }
 
+// TestRunOnce_RejectsServiceAccountNamePodSpecInjection reproduces the
+// finding from the second pre-release-adversarial-review pass (2026-07-08):
+// a crafted ServiceAccount name used to be spliced unescaped into a
+// hand-built --overrides JSON string via fmt.Sprintf, letting an attacker
+// smuggle extra PodSpec fields (hostNetwork, hostPath volumes, a privileged
+// initContainer) past the "never privileged / never hostPath" invariant.
+// RunOnce now validates serviceAccountName as a DNS-1123 label before it
+// ever reaches JSON construction, so this must be rejected outright.
+func TestRunOnce_RejectsServiceAccountNamePodSpecInjection(t *testing.T) {
+	r := &argsCaptureRunner{}
+	c := New(nil, r)
+
+	malicious := `x","hostNetwork":true,"hostPID":true,"volumes":[{"name":"host","hostPath":{"path":"/"}}],"initContainers":[{"name":"evil","image":"alpine","command":["sh","-c","sleep 3600"],"securityContext":{"privileged":true},"volumeMounts":[{"name":"host","mountPath":"/host"}]}],"z":"z`
+
+	_, err := c.RunOnce(context.Background(), "ns", "", "metrics-svc", malicious)
+	if err == nil {
+		t.Fatal("expected RunOnce to reject an invalid ServiceAccount name, got nil error")
+	}
+	if !strings.Contains(err.Error(), "invalid ServiceAccount name") {
+		t.Fatalf("expected an 'invalid ServiceAccount name' error, got: %v", err)
+	}
+	if len(r.args) != 0 {
+		t.Fatalf("kubectl must never be invoked for a rejected ServiceAccount name, got args: %v", r.args)
+	}
+}
+
+// TestPodOverrideMarshal_ServiceAccountNameCannotBreakOutOfJSON verifies the
+// structural fix independent of the DNS-label validation guard above: even
+// a string containing raw quotes/braces cannot inject sibling JSON keys once
+// the --overrides payload is built via encoding/json.Marshal of a typed
+// struct instead of fmt.Sprintf string interpolation. This is the same
+// property the pre-fix code was missing for ServiceAccountName and Image.
+func TestPodOverrideMarshal_ServiceAccountNameCannotBreakOutOfJSON(t *testing.T) {
+	malicious := `x","hostNetwork":true,"z":"z`
+
+	data, err := json.Marshal(podOverride{
+		APIVersion: "v1",
+		Kind:       "Pod",
+		Metadata:   podOverrideMetadata{Name: "p", Namespace: "ns", Labels: map[string]string{"app": "curl-metrics"}},
+		Spec: podOverrideSpec{
+			ServiceAccountName: malicious,
+			RestartPolicy:      "Never",
+			Containers:         []podOverrideContainer{{Name: "curl", Image: malicious}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded struct {
+		Spec struct {
+			ServiceAccountName string `json:"serviceAccountName"`
+			HostNetwork        *bool  `json:"hostNetwork"`
+			Containers         []struct {
+				Image string `json:"image"`
+			} `json:"containers"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("--overrides is not valid JSON: %v\n%s", err, data)
+	}
+	if decoded.Spec.HostNetwork != nil {
+		t.Fatalf("malicious ServiceAccountName must not be able to inject a sibling hostNetwork field: %s", data)
+	}
+	if decoded.Spec.ServiceAccountName != malicious {
+		t.Fatalf("serviceAccountName must round-trip as a literal string, got %q", decoded.Spec.ServiceAccountName)
+	}
+	if len(decoded.Spec.Containers) != 1 || decoded.Spec.Containers[0].Image != malicious {
+		t.Fatalf("image must round-trip as a literal string: %s", data)
+	}
+}
+
 // security/kube-system-target.yaml
 func TestRunOnce_RejectsKubeSystemNamespaceByDefault(t *testing.T) {
 	r := &argsCaptureRunner{}

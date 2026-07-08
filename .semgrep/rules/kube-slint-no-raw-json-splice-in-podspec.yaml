@@ -1,0 +1,17 @@
+rules:
+  - id: kube-slint-no-raw-json-splice-in-podspec
+    languages: [go]
+    severity: ERROR
+    message: >
+      Do not build a Kubernetes PodSpec/--overrides JSON payload with a raw
+      fmt.Sprintf format string containing a JSON key literal. Any %s/%q
+      substitution can inject sibling JSON keys (hostNetwork, hostPath
+      volumes, a privileged container) past validated fields — this is
+      exactly the PodSpec-injection bug fixed via serviceAccountName/Image
+      in pkg/slo/fetch/curlpod/client.go. Marshal a typed struct via
+      encoding/json instead (see podOverride in client.go for the pattern).
+    patterns:
+      - pattern: fmt.Sprintf($FMT, ...)
+      - metavariable-regex:
+          metavariable: $FMT
+          regex: '.*"[a-zA-Z]+"\s*:\s*"?%[sq].*'
