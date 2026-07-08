@@ -171,6 +171,23 @@ check_curlpod_security_contract() {
     "curlpod validates ServiceAccountName before use (PodSpec-injection guard)"
 }
 
+check_cli_dispatch_error_printing() {
+  echo "== CLI dispatch error printing guardrails =="
+  local file="cmd/slint-gate/main.go"
+  # Every dispatch case in main() must print the error it received before
+  # calling os.Exit(1) - a case that exits silently with no diagnostic is a
+  # real regression (the `inspect` dispatch bug found by the second
+  # pre-release-adversarial-review pass, 2026-07-08: every sibling case
+  # printed "slint-gate <cmd>: %v" before exiting, but `inspect` didn't).
+  # This fails if `os.Exit(1)` is the ONLY statement inside an
+  # `err != nil { ... }` block anywhere in the file (no Fprintf between).
+  if grep -Pzoq 'err != nil \{\n\t+os\.Exit\(1\)\n\t+\}' "$file"; then
+    fail "a CLI dispatch case in $file calls os.Exit(1) without printing the error first"
+  else
+    pass "every CLI dispatch case in $file prints its error before os.Exit(1)"
+  fi
+}
+
 check_gate_contract() {
   echo "== gate workflow guardrails =="
   require_grep 'default: FAIL_OR_NOGRADE' .github/actions/slint-gate/action.yml \
@@ -228,6 +245,7 @@ check_security_contract
 check_rbac_contract
 check_secret_redaction_contract
 check_curlpod_security_contract
+check_cli_dispatch_error_printing
 check_gate_contract
 check_test_strategy
 check_identity_wording

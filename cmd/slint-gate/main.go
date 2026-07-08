@@ -27,6 +27,7 @@ func main() {
 			return
 		case "inspect":
 			if err := runInspect(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate inspect: %v\n", err)
 				os.Exit(1)
 			}
 			return
@@ -41,6 +42,7 @@ func main() {
 			return
 		case "quickstart":
 			if err := runQuickstart(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate quickstart: %v\n", err)
 				os.Exit(1)
 			}
 			return
