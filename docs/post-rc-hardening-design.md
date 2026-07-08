@@ -210,10 +210,18 @@ Closed in a follow-up pass, same day:
      cumulative/positional and summing them is meaningless.
 
    Not in scope for this pass: full `# TYPE` comment parsing (the `le`/
-   `quantile` label heuristic covers the common case without it) and the
-   `strings.Fields`-based parser's inability to handle label values
-   containing spaces (mapping table item P0-FETCH-004 / F4) — both remain
+   `quantile` label heuristic covers the common case without it) — remains
    open, deferred alongside N5/N6/R6.
+
+   **F4 fixed (2026-07-08):** `ParseTextToMap`'s `strings.Fields`-based line
+   split (mapping table item P0-FETCH-004) could not handle label values
+   containing whitespace — e.g. `metric{path="/foo bar"} 1` would be split
+   into 3+ tokens, handing a truncated fragment to `strconv.ParseFloat` and
+   erroring out the entire scrape over one line. Replaced with
+   `splitMetricLine`, which locates the label block's matching unquoted
+   `}` (mirroring `pkg/slo/common/promkey`'s own quote/escape-aware label
+   parser) instead of whitespace-splitting the whole line. See
+   `pkg/slo/fetch/promtext/parse.go` and its `parse_f4_test.go` fixtures.
 
 ## Sprint Plan follow-up (N3)
 
