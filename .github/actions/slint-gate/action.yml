@@ -5,8 +5,17 @@ description: >
   Requires Go to be installed in the calling workflow (actions/setup-go).
 
 inputs:
+  summary:
+    description: >
+      Path to sli-summary.json (relative to workspace). Preferred over the
+      deprecated measurement-summary input (both are honored; summary wins
+      if both are set).
+    required: false
+    default: ''
+
   measurement-summary:
-    description: Path to sli-summary.json (relative to workspace)
+    description: >
+      Deprecated: use summary instead. Same value shape.
     required: false
     default: artifacts/sli-summary.json
 
@@ -80,6 +89,7 @@ runs:
       working-directory: ${{ github.workspace }}
       env:
         ACTION_PATH: ${{ github.action_path }}
+        INPUT_SUMMARY: ${{ inputs.summary }}
         INPUT_MEASUREMENT: ${{ inputs.measurement-summary }}
         INPUT_POLICY: ${{ inputs.policy }}
         INPUT_BASELINE: ${{ inputs.baseline }}
@@ -101,8 +111,12 @@ runs:
           EXTRA="--github-step-summary"
         fi
 
+        # summary is preferred; measurement-summary is the deprecated alias
+        # (same dual-support pattern as exit-on/fail-on below).
+        RESOLVED_SUMMARY="${INPUT_SUMMARY:-$INPUT_MEASUREMENT}"
+
         go run "${ACTION_PATH}/../../../cmd/slint-gate" \
-          --summary  "${INPUT_MEASUREMENT}" \
+          --summary  "${RESOLVED_SUMMARY}" \
           --policy   "${INPUT_POLICY}" \
           --baseline "${INPUT_BASELINE}" \
           --output   "${INPUT_OUTPUT}" \

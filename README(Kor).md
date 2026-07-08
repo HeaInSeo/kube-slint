@@ -428,16 +428,17 @@ jobs:
       - name: slint-gate
         uses: HeaInSeo/kube-slint/.github/actions/slint-gate@main
         with:
-          measurement-summary: artifacts/sli-summary.json   # 기본값
-          policy:              .slint/policy.yaml            # 기본값
-          exit-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
+          summary:              artifacts/sli-summary.json   # 기본값
+          policy:               .slint/policy.yaml            # 기본값
+          exit-on:              FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **입력값**
 
 | 입력 | 기본값 | 설명 |
 |---|---|---|
-| `measurement-summary` | `artifacts/sli-summary.json` | sli-summary.json 경로 |
+| `summary` | `` (`measurement-summary`로 폴백) | sli-summary.json 경로. `measurement-summary`보다 우선 적용됨 (`measurement-summary`는 deprecated, 기본값 `artifacts/sli-summary.json`로 계속 동작). |
+| `measurement-summary` | `artifacts/sli-summary.json` | Deprecated: `summary`를 대신 사용할 것. |
 | `policy` | `.slint/policy.yaml` | 정책 YAML 경로 |
 | `baseline` | `` | 선택적 기준선 경로 |
 | `output` | `slint-gate-summary.json` | 게이트 결과 출력 경로 |

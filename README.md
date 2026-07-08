@@ -403,16 +403,17 @@ jobs:
       - name: slint-gate
         uses: HeaInSeo/kube-slint/.github/actions/slint-gate@main
         with:
-          measurement-summary: artifacts/sli-summary.json   # default
-          policy:              .slint/policy.yaml            # default
-          exit-on:             FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
+          summary:              artifacts/sli-summary.json   # default
+          policy:               .slint/policy.yaml            # default
+          exit-on:              FAIL_OR_NOGRADE               # NEVER | FAIL | FAIL_OR_WARN | FAIL_OR_NOGRADE | FAIL_WARN_OR_NOGRADE
 ```
 
 **Inputs**
 
 | Input | Default | Description |
 |---|---|---|
-| `measurement-summary` | `artifacts/sli-summary.json` | Path to sli-summary.json |
+| `summary` | `` (falls back to `measurement-summary`) | Path to sli-summary.json. Preferred over `measurement-summary` (deprecated, still works — default `artifacts/sli-summary.json`). |
+| `measurement-summary` | `artifacts/sli-summary.json` | Deprecated: use `summary` instead. |
 | `policy` | `.slint/policy.yaml` | Path to policy YAML |
 | `baseline` | `` | Optional baseline summary path |
 | `output` | `slint-gate-summary.json` | Output path for gate result |
