@@ -421,7 +421,8 @@ the riskier/novel option under ambiguous scope (`baseline merge`'s deferred
 profile) — this shipped as a **non-interactive status command** instead. It
 delivers the same practical value (tell the user where they are and what to
 run next) without introducing stdin-driven interaction. A true interactive
-flow remains possible later if actually requested.
+flow remains possible later if actually requested. (It was — see "Interactive
+Wizard" below, added 2026-07-08.)
 
 Actual behavior: a read-only check over the onboarding artifacts (policy
 file, measurement summary, optional `--baseline`) that reuses `gate.Evaluate`
@@ -442,6 +443,43 @@ UX goal:
 
 ```text
 Answer "where am I and what do I run next?" without re-reading this doc.
+```
+
+### 9. Interactive Wizard — implemented (added 2026-07-08, D-024)
+
+```sh
+slint-gate wizard [--policy] [--summary] [--baseline]
+```
+
+The real stdin-prompted flow Sprint 6 deferred, now built once the previously
+unanswered scope question (how does it behave under non-interactive/CI
+stdin?) had a concrete answer: refuse to run at all unless stdin is a real
+terminal (`golang.org/x/term.IsTerminal`, not a bare `os.ModeCharDevice`
+check — `/dev/null` is itself a character device, so that check alone would
+let a piped/CI invocation through and then hang forever on the first
+prompt). `quickstart` remains the correct choice for CI or scripted use;
+`wizard` is for a human sitting at a terminal.
+
+Actual behavior: shares its state detection with `quickstart` (both call the
+same `inspectOnboardingState`/`nextOnboardingStep` in
+`cmd/slint-gate/onboarding_state.go`, so the two commands can never disagree
+about what state the project is in) but, instead of printing one suggested
+command, it confirms with the user and then calls the corresponding
+subcommand's own unexported `run*(args []string) error` function directly
+with programmatically-built args — `runInit`, `runRecommendPolicy`,
+`runBaselineApprove`, `runInspect`, `runCIGithubActions` — the same
+functions the flag-driven commands use, so there is exactly one
+implementation of each step's behavior. Loops until a terminal step
+(`ci github-actions`, or a step that requires action outside the CLI's
+control, like running the E2E test) or the user declines a confirmation
+prompt, either of which stops the loop without error — the user can always
+resume by re-running `wizard`.
+
+UX goal:
+
+```text
+Same value as quickstart, but for someone who wants the tool to just do it
+instead of telling them the command to copy-paste.
 ```
 
 ## Profiles

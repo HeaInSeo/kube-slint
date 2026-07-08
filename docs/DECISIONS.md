@@ -445,5 +445,19 @@ This file records architecture/product-direction decisions that define the proje
   - `printMergeReview` now reports an "Existing SLIs updated" section (mode-dependent, shown for `review-existing`/`force-replace` only) distinct from "Existing SLIs unchanged" and "Rejected changes".
   - `runBaselineMerge`'s merge-decision logic was extracted into `computeMergePlan`/`mergeChangeApplies`/`applyMergePlan` — the original single-function version hit `gocyclo`'s complexity-20 threshold (27) once the second mode branch was added.
 - Rationale:
-  - Both modes stay fully non-interactive (no stdin prompting) — orthogonal to the interactive-wizard work, consistent with every other onboarding command.
+  - Both modes stay fully non-interactive (no stdin prompting) — orthogonal to the interactive-wizard work (D-024, below), consistent with every other onboarding command.
   - `review-existing`'s direction-aware auto-update deliberately mirrors the already-established regression-detection direction logic (R2 in the post-RC hardening sprint) rather than inventing new semantics — same metric-direction concept, applied to baseline maintenance instead of gate evaluation.
+
+## D-024: a real interactive wizard, gated on an actual TTY check
+
+- Date: 2026-07-08
+- Status: Accepted
+- Decision:
+  - Added `slint-gate wizard` (`cmd/slint-gate/wizard.go`): an interactive, stdin-prompted walk through the same init → recommend-policy → baseline approve → ci github-actions loop `quickstart` already describes, but confirming with the user and running each step instead of just printing a suggested command.
+  - It refuses to run unless stdin is a real terminal, checked via `golang.org/x/term.IsTerminal(int(os.Stdin.Fd()))` — not a bare `fi.Mode()&os.ModeCharDevice != 0` check, which was tried first and is wrong: `/dev/null` is itself a character device, so that check alone reports "interactive" for a piped/CI/`/dev/null`-redirected invocation and the wizard would then hang forever on its first prompt, exactly the failure mode this command was originally deferred to avoid. `golang.org/x/term` was added as a new direct dependency for this (an official, minimal `golang.org/x` package, same trust tier as the `x/net`/`x/sys`/`x/tools` already depended on) — picked at `v0.29.0` specifically (not `@latest`) since a bare `go get ... @latest` re-bumped `go.mod`'s `go` directive back up past `1.22` and `golang.org/x/sys` back up, undoing D-020; pinning the version kept both unchanged.
+  - State detection is shared with `quickstart` via a new `cmd/slint-gate/onboarding_state.go` (`inspectOnboardingState`/`nextOnboardingStep`), extracted out of `quickstart.go` so the two commands can never disagree about what state the project is in. `quickstart.go`'s `nextCommand` now formats the same `onboardingStep` enum into a string rather than duplicating the precedence logic.
+  - Each confirmed step calls the corresponding subcommand's own unexported `run*(args []string) error` directly (`runInit`, `runRecommendPolicy`, `runBaselineApprove`, `runInspect`, `runCIGithubActions`) with programmatically-built args — there is exactly one implementation of each step's behavior, not a wizard-specific reimplementation.
+  - `runWizardStep`'s per-step logic was split into one function per step (`wizardStepInit`, `wizardStepRecommendPolicy`, etc.) to stay under `gocyclo`'s complexity threshold, same pattern as D-023's `baseline_merge.go` extraction.
+- Rationale:
+  - This directly answers the concern the original Sprint 6 deferral (see "Quickstart Status" in `docs/sli-gate-onboarding-ux.md`) left open without a response: a stdin-prompting wizard is safe to build once it can reliably tell a real terminal apart from CI/piped stdin and hard-refuse the latter instead of hanging.
+  - `quickstart` is unchanged in behavior and remains the correct choice for CI/scripted use; `wizard` is strictly additive, not a replacement.

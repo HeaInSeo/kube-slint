@@ -4,9 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/HeaInSeo/kube-slint/pkg/gate"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
@@ -33,45 +31,24 @@ func runQuickstart(args []string) error {
 		return err
 	}
 
-	hasPolicy := fileExists(*policyPath)
-
-	summaryFileExists := fileExists(*summaryPath)
-	s, summaryErr := summary.LoadFile(*summaryPath)
-	// A summary that exists but fails to load is a different problem
-	// ("it's broken, go inspect it") than one that was never produced yet
-	// ("go run your E2E test") -- both are hasSummary=false, but nextCommand
-	// needs to tell them apart.
-	summaryInvalid := summaryFileExists && summaryErr != nil
-	hasSummary := summaryErr == nil
-
-	var gateResult string
-	if hasPolicy && hasSummary {
-		result := gate.Evaluate(gate.Request{
-			MeasurementPath: *summaryPath,
-			PolicyPath:      *policyPath,
-		})
-		gateResult = result.GateResult
-	}
-
-	baselineRequested := strings.TrimSpace(*baselinePath) != ""
-	hasBaseline := baselineRequested && fileExists(*baselinePath)
+	st := inspectOnboardingState(*policyPath, *summaryPath, *baselinePath)
 
 	fmt.Println("Status:")
-	fmt.Printf("  Policy:      %s\n", statusLine(hasPolicy, *policyPath))
-	fmt.Printf("  Measurement: %s\n", measurementStatusLine(hasSummary, summaryErr, s, *summaryPath))
-	if hasPolicy && hasSummary {
-		fmt.Printf("  Gate:        %s\n", gateResult)
+	fmt.Printf("  Policy:      %s\n", statusLine(st.HasPolicy, *policyPath))
+	fmt.Printf("  Measurement: %s\n", measurementStatusLine(st.HasSummary, st.SummaryLoadErr, st.Summary, *summaryPath))
+	if st.HasPolicy && st.HasSummary {
+		fmt.Printf("  Gate:        %s\n", st.GateResult)
 	} else {
 		fmt.Println("  Gate:        not evaluated yet")
 	}
-	if baselineRequested {
-		fmt.Printf("  Baseline:    %s\n", statusLine(hasBaseline, *baselinePath))
+	if st.BaselineRequested {
+		fmt.Printf("  Baseline:    %s\n", statusLine(st.HasBaseline, *baselinePath))
 	} else {
 		fmt.Println("  Baseline:    not yet approved (or --baseline not given)")
 	}
 
 	fmt.Println("\nNext:")
-	fmt.Println("  " + nextCommand(hasPolicy, hasSummary, summaryInvalid, gateResult, hasBaseline, *summaryPath, *policyPath, *baselinePath))
+	fmt.Println("  " + nextCommand(st, *summaryPath, *policyPath, *baselinePath))
 
 	return nil
 }
@@ -95,27 +72,25 @@ func measurementStatusLine(ok bool, err error, s summary.Summary, path string) s
 	return fmt.Sprintf("✗ %s (%v)", path, err)
 }
 
-// nextCommand picks a single next step, following the precedence: get a
-// policy in place; get a measurement in place; make it PASS; approve a
-// baseline; wire CI.
-func nextCommand(hasPolicy, hasSummary, summaryInvalid bool, gateResult string, hasBaseline bool, summaryPath, policyPath, baselinePath string) string {
-	switch {
-	case summaryInvalid:
+// nextCommand formats nextOnboardingStep(st) into the single suggested
+// command quickstart prints. wizard uses nextOnboardingStep directly to act
+// on the same decision instead of printing it.
+func nextCommand(st onboardingState, summaryPath, policyPath, baselinePath string) string {
+	switch nextOnboardingStep(st) {
+	case stepInspectInvalidSummary, stepInspectFailedGate:
 		return fmt.Sprintf("slint-gate inspect --summary %s", summaryPath)
-	case !hasPolicy && !hasSummary:
+	case stepInit:
 		return "slint-gate init --profile kubebuilder-operator"
-	case !hasPolicy:
+	case stepRecommendPolicy:
 		return fmt.Sprintf("slint-gate recommend-policy --summary %s --output %s", summaryPath, policyPath)
-	case !hasSummary:
+	case stepRunE2E:
 		return "run your E2E test with kube-slint attached, then re-run 'slint-gate quickstart'"
-	case gateResult != gate.GatePass:
-		return fmt.Sprintf("slint-gate inspect --summary %s", summaryPath)
-	case !hasBaseline:
+	case stepApproveBaseline:
 		if baselinePath == "" {
 			return fmt.Sprintf("slint-gate baseline approve --summary %s --policy %s --output docs/baselines/<name>-sli-summary.json", summaryPath, policyPath)
 		}
 		return fmt.Sprintf("slint-gate baseline approve --summary %s --policy %s --output %s", summaryPath, policyPath, baselinePath)
-	default:
+	default: // stepWireCI
 		return fmt.Sprintf("slint-gate ci github-actions --summary %s --policy %s --baseline %s", summaryPath, policyPath, baselinePath)
 	}
 }

@@ -44,6 +44,12 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "wizard":
+			if err := runWizard(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "slint-gate wizard: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		case "ci":
 			if len(os.Args) < 3 || os.Args[2] != "github-actions" {
 				fmt.Fprintln(os.Stderr, "usage: slint-gate ci github-actions [flags]")
