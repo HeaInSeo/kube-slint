@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-07-08
+
 ### Fixed
 
 Findings from a `pre-release-adversarial-review` workflow run (6 review

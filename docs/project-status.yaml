@@ -1,9 +1,8 @@
-current_stage: "v1.5.2 tagged; competition submission prep"
+current_stage: "v1.5.3 tagged; competition submission prep"
 roadmap_percent: 94
 roadmap_status: "post_rc"
 current_focus:
-  - "Unreleased: pre-release-adversarial-review workflow (D-021) found and fixed 8 real issues CI green had been reporting as healthy (baseline merge overwrite guard, kube-system namespace guard on Cleanup/SweepOrphans, silent kubectl-error swallowing x2, gate.go IO-error surfacing, README InsideAnnotation caveat, StrictnessMode doc gap, and two flag renames: analyze-dataplane --fail-on -> --severity-threshold, gate --measurement-summary -> --summary, both dual-supported); permanent guardrail checks added for the repeatable-pattern findings"
-  - "Unreleased: go.mod's go directive lowered from an exact-patch pin (1.25.5) to 1.22 for consumer compatibility, verified in real golang:1.20/1.22 containers; see docs/DECISIONS.md D-020 (not yet tagged)"
+  - "v1.5.3 tagged: pre-release-adversarial-review workflow (D-021) found and fixed 8 real issues CI green had been reporting as healthy (baseline merge overwrite guard, kube-system namespace guard on Cleanup/SweepOrphans, silent kubectl-error swallowing x2, gate.go IO-error surfacing, README InsideAnnotation caveat, StrictnessMode doc gap, and two flag renames: analyze-dataplane --fail-on -> --severity-threshold, gate --measurement-summary -> --summary, both dual-supported); permanent guardrail checks added for the repeatable-pattern findings; also includes go.mod's go directive lowered from an exact-patch pin (1.25.5) to 1.22 for consumer compatibility (D-020) and CLAUDE.md/AGENTS.md untracked from the public repo (local-only, same pattern as .codex/)"
   - "v1.5.2 tagged: closed GitHub issues #2/#3 via documentation (D-018 same-kind ownerRef limitation, D-019 image pinning policy) rather than fabricated code fixes, plus README(Kor).md tone unification"
   - "v1.5.1 tagged: patch fix for the slint-gate composite action losing artifacts/outputs on gate failure, init overwrite guard, kubectl discovery error surfacing, English-unified comments/diagnostics on the public surface"
   - "v1.5.0 tagged: SLI Gate Onboarding UX roadmap (Sprint 1-6), dataplane-service static analyzer, custom Semgrep guardrails"
@@ -21,7 +20,7 @@ current_focus_deferred:
   - "pkg/policy and pkg/summary public package cleanup"
   - "F4: quoted label parser improvement"
 next_milestone: "Documentation submission due 2026-07-17; code submission due ~2026-08-15 (re-corrected 2026-07-08 — 7/17 is docs-only, not the full submission deadline as previously believed)"
-active_hardening_sprint: "v1.5.2-released"
+active_hardening_sprint: "v1.5.3-released"
 capabilities:
   identity_aligned: "done"
   decision_log_added: "done"

@@ -2,4 +2,4 @@ package main
 
 // Version is the current slint-gate version.
 // Consumers (e.g. bori) run `slint-gate version` to verify compatibility.
-const Version = "v1.5.2"
+const Version = "v1.5.3"

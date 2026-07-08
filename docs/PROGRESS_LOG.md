@@ -5,10 +5,45 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.5.2 Tagged (GitHub Issue Cleanup + README Tone)
+## Current Status: v1.5.3 Tagged (Pre-Release Adversarial Review + go.mod Compatibility)
 
 **Branch:** `main`
-**Last updated:** 2026-07-07 (v1.5.2 tag + release)
+**Last updated:** 2026-07-08 (v1.5.3 tag + release)
+
+### v1.5.3 Release (2026-07-08)
+
+Introduces a new mandatory-before-tag process (D-021): the
+`pre-release-adversarial-review` workflow (saved at
+`.claude/workflows/pre-release-adversarial-review.js`, local-only) runs 6
+independent review dimensions in parallel, each finding adversarially
+verified before being acted on. See `CHANGELOG.md`'s `[1.5.3]` entry for
+the full list. Highlights:
+
+* [x] First run found 8 issues, all confirmed real, all fixed — every one
+  of them was something `go build`/`go vet`/`go test`/`golangci-lint`/
+  semgrep had been reporting as healthy. The clearest example:
+  `Session.Cleanup()`/`SweepOrphansWithResult()` didn't enforce the
+  kube-system namespace guard `docs/security-model.md` documents as
+  unconditional — only `curlpod.Client.RunOnce` ever checked it. Fixed by
+  extracting a shared `kubeutil.IsDangerousNamespace` used by both paths.
+* [x] `baseline merge --output` gained the same `--force` overwrite guard
+  every sibling onboarding command already had.
+* [x] `IsCertManagerCRDsInstalled`/`IsPrometheusOperatorCRDsInstalled` and
+  `pkg/gate`'s `loadPolicy`/`loadMeasurement` no longer silently swallow
+  real I/O errors into a generic "not installed"/"corrupt" state.
+* [x] Two CLI flag renames, both dual-supported (same pattern as D-016):
+  `analyze-dataplane --fail-on` → `--severity-threshold` (it collided in
+  name with the unrelated, deprecated gate `--fail-on`), and the main gate
+  invocation's `--measurement-summary` → `--summary` (matching every
+  onboarding subcommand).
+* [x] `go.mod`'s `go` directive lowered from an exact-patch pin (`1.25.5`)
+  to `1.22` (D-020) — verified in real `golang:1.20`/`golang:1.22`
+  containers, not just the installed compiler.
+* [x] `CLAUDE.md`/`AGENTS.md` untracked from the public repo (kept local,
+  same pattern as `.codex/`); `docs/CODEX_OPERATING_RULES.md` stays public
+  since CI's `quality-guardrails.sh` depends on it.
+* [x] Submission deadline understanding re-corrected: 2026-07-17 is
+  documentation-only; the code deadline is ~2026-08-15.
 
 ### v1.5.2 Release (2026-07-07)
 
