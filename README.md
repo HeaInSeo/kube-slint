@@ -489,6 +489,7 @@ make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json
 - Gate contract: `docs/gate-contract.md`
 - Test strategy: `docs/test-strategy.md`
 - Release and DevEx plan: `docs/release-devex-plan.md`
+- Onboarding CLI reference (`init`, `inspect`, `recommend-policy`, `baseline approve/diff/merge`, `ci github-actions`, `quickstart`, `wizard`): `docs/sli-gate-onboarding-ux.md`
 
 ---
 

@@ -529,6 +529,7 @@ make baseline-update-prepare BASELINE_SUMMARY=artifacts/sli-summary.json
 - 게이트 계약: `docs/gate-contract.md`
 - 테스트 전략: `docs/test-strategy.md`
 - 릴리즈/DevEx 계획: `docs/release-devex-plan.md`
+- 온보딩 CLI 레퍼런스(`init`, `inspect`, `recommend-policy`, `baseline approve/diff/merge`, `ci github-actions`, `quickstart`, `wizard`): `docs/sli-gate-onboarding-ux.md`
 
 ---
 

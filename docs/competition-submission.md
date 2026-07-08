@@ -6,7 +6,9 @@
 
 kube-slint는 쿠버네티스 오퍼레이터 E2E 테스트 세션에 내장하는 **shift-left 운영 SLI 가드레일 라이브러리**입니다. 오퍼레이터를 수정하지 않고 외부 curl pod 또는 port-forward로 `/metrics` 엔드포인트를 스크랩하여 reconcile rate, workqueue depth, REST client error 등의 SLI를 측정하고, 선언적 `policy.yaml`로 CI 게이트 판정을 내립니다. 기능 정확성을 검증하는 E2E 테스트와 독립적으로 동작하며, 계측 실패가 테스트를 중단시키지 않는 safety-first 원칙을 준수합니다.
 
-**최신 릴리즈**: v1.5.2 (v1.5.0의 SLI Gate Onboarding UX 로드맵 Sprint 1-6, dataplane-service 정적 분석기, 커스텀 Semgrep 가드레일 / v1.5.1의 GitHub Action 아티팩트 보존 수정, `init` overwrite 방지, 공개 API 표면 주석/진단 메시지 영어 통일에 더해, ownerRef 메트릭 한계 문서화 및 이미지 pinning 정책 결정 포함)
+**최신 릴리즈**: v1.5.3 (태그 전 필수화된 `pre-release-adversarial-review` 워크플로우 도입 및 첫 실행에서 발견한 8개 실버그 수정, `go.mod` 최소 Go 버전을 `1.25.5` 정확한 patch 고정에서 `1.22`로 인하해 소비자 호환성 개선. 이전 v1.5.0의 SLI Gate Onboarding UX 로드맵 Sprint 1-6·dataplane-service 정적 분석기·커스텀 Semgrep 가드레일, v1.5.1의 GitHub Action 아티팩트 보존 수정, v1.5.2의 ownerRef 메트릭 한계 문서화 및 이미지 pinning 정책 결정 포함)
+
+**태그 이후(unreleased) 진행 중인 실사용 하드닝**: `pkg/gate/gate.go`(866줄) 7개 파일로 분리, Prometheus label 값에 공백이 포함된 경우 파싱이 깨지던 버그 수정, `baseline merge`의 `review-existing`/`force-replace` 모드 구현, 진짜 interactive 온보딩 명령 `slint-gate wizard` 추가(실제 TTY 아니면 거부). 두 번째 `pre-release-adversarial-review` 실행에서 발견한 PodSpec/JSON injection 취약점(curl pod `--overrides` 페이로드) 등 8건도 확정·수정 완료.
 
 ---
 
@@ -49,8 +51,8 @@ kube-slint는 두 문제를 동시에 해결합니다. 오퍼레이터 코드를
 | evidence redaction | `evidence.RedactString()` / `RedactMap()` — Bearer 토큰, token=/password=/secret= 값 마스킹 |
 | curlpod 식별 레이블 | 모든 curlpod에 `app.kubernetes.io/managed-by=kube-slint`, `slint-run-id=<RunID>` 레이블 자동 부착. 삭제 실패 시 경고 로그 출력 |
 | PortForward fetcher | `kubectl port-forward` 기반 fetcher — curl pod 생성 없이 로컬 개발 환경에서 사용 가능 |
-| 온보딩 CLI 루프 | `slint-gate init → inspect → recommend-policy → baseline approve → ci github-actions`: 정책 스키마를 몰라도 측정 결과를 기반으로 정책 초안을 생성하고 CI에 연결. `slint-gate quickstart`가 현재 온보딩 단계와 다음 실행 명령을 알려줌 |
-| 커스텀 Semgrep 보안 가드레일 | `.semgrep/rules/`의 6개 규칙(토큰 노출, insecure TLS, ClusterRoleBinding, TOCTOU, 안전하지 않은 cleanup)이 CI에서 blocking으로 실행되어 프로젝트 고유 보안 불변조건의 회귀를 코드 리뷰 없이 자동 차단 |
+| 온보딩 CLI 루프 | `slint-gate init → inspect → recommend-policy → baseline approve → ci github-actions`: 정책 스키마를 몰라도 측정 결과를 기반으로 정책 초안을 생성하고 CI에 연결. `slint-gate quickstart`가 현재 온보딩 단계와 다음 실행 명령을 알려줌(비대화형, CI/스크립트용). `slint-gate wizard`는 동일 루프를 실제 interactive하게(stdin 프롬프트) 안내 — 실제 TTY가 아니면 무조건 거부 |
+| 커스텀 Semgrep 보안 가드레일 | `.semgrep/rules/`의 7개 규칙(토큰 노출, insecure TLS, ClusterRoleBinding, TOCTOU, 안전하지 않은 cleanup, PodSpec/JSON injection)이 CI에서 blocking으로 실행되어 프로젝트 고유 보안 불변조건의 회귀를 코드 리뷰 없이 자동 차단 |
 
 ---
 
@@ -113,7 +115,7 @@ E2E 테스트 세션
 | `pkg/slo/summary` | 출력 스키마 타입 + SchemaVersion 상수 + LoadFile/WriteFile/Validate 공개 API |
 | `pkg/slo/evidence` | RedactString / RedactMap — 토큰·패스워드 마스킹 유틸리티 |
 | `pkg/gate` | policy 평가 (schemaVersion 검증, result_status, threshold, regression, reliability) |
-| `cmd/slint-gate` | CLI 진입점: 게이트 평가(`--exit-on`, `--github-step-summary`) + 온보딩 서브커맨드(`init`, `inspect`, `recommend-policy`, `baseline approve/diff/merge`, `ci github-actions`, `quickstart`, `analyze-dataplane`) |
+| `cmd/slint-gate` | CLI 진입점: 게이트 평가(`--exit-on`, `--github-step-summary`) + 온보딩 서브커맨드(`init`, `inspect`, `recommend-policy`, `baseline approve/diff/merge`, `ci github-actions`, `quickstart`, `wizard`, `analyze-dataplane`) |
 | `.github/actions/slint-gate` | GitHub Composite Action; 4단계 exit-on 지원 |
 | `pkg/kubeutil` | 클러스터 유틸리티 (토큰, RBAC, WaitForReady, PollUntil) |
 | `.semgrep/rules` | 프로젝트 전용 Semgrep 보안/안정성 가드레일 6종 (positive/negative fixture 포함, CI blocking) |

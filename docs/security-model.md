@@ -254,7 +254,7 @@ The quality guardrail workflow currently checks:
 - ServiceURLFormat external-host handling remains a Priority 0 policy.
 
 The Semgrep workflow (`.github/workflows/semgrep.yml`) additionally
-blocks on any of the six rules above firing, unrelated to and
+blocks on any of the seven rules above firing, unrelated to and
 independent from the onboarding-UX sprint tracker.
 
 ## Acceptance Checklist
