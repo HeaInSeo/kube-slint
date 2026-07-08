@@ -475,3 +475,14 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - Both layers (validate + marshal-don't-splice) are kept rather than picking one: validation gives a clear, early, human-readable error for the common case; the typed-struct marshal is the actual structural fix and protects any future field added to the payload without needing its own bespoke validation.
   - `Image` was not given DNS-label validation (image references have a different, more permissive grammar) — the marshal fix alone closes its injection vector, and inventing an image-reference validator was judged out of scope for this fix (the vulnerability was the injection, not "is this a syntactically valid image reference").
+
+## D-026: `captureStdout` test helper now drains concurrently, not after `fn()` returns
+
+- Date: 2026-07-08
+- Status: Accepted
+- Decision:
+  - `cmd/slint-gate/inspect_test.go`'s `captureStdout` (shared across 8 test files) redirected `os.Stdout` to an `os.Pipe()`, ran `fn()` to completion, and only then started draining the read end. `os.Pipe()`'s write end has a bounded kernel buffer (commonly 64KiB on Linux, not a portable guarantee) — any `fn()` writing more than that in one call would block on `write(2)` forever, since nothing was reading yet. Found by the second `pre-release-adversarial-review` pass; independently confirmed by reproducing the old implementation's deadlock in a standalone throwaway test (killed by `go test`'s own timeout after >1 minute).
+  - Fixed by starting a goroutine that drains the pipe into a `bytes.Buffer` via `io.Copy` *before* `fn()` runs, synchronized by a `done` channel closed when the drain completes; `captureStdout` waits on that channel after closing the write end before returning the buffer's contents.
+  - Added `TestCaptureStdout_DoesNotDeadlockOnOutputLargerThanPipeBuffer`, which writes 512KiB inside `fn()` and asserts completion within a bounded timeout via `select`.
+- Rationale:
+  - This doesn't fire today (no current CLI output exceeds 64KiB in one `captureStdout` call), but it's exactly the kind of incidental/version-dependent-behavior bug this project's test-correctness review dimension targets — a future CLI feature with larger output would otherwise hang the entire `go test` run with no useful diagnostic.

@@ -1,9 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,12 @@ func writeInspectSummary(t *testing.T, dir string, ids []string, collectionStatu
 	return path
 }
 
+// captureStdout redirects os.Stdout to a pipe and returns everything fn()
+// wrote to it. The read end is drained concurrently in a goroutine started
+// before fn() runs (not after), since os.Pipe()'s write end has a bounded
+// kernel buffer (commonly 64KiB on Linux, not a portable guarantee) — code
+// under test that writes more than that in one fn() call would otherwise
+// block on write() forever, because nothing would be reading yet.
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	old := os.Stdout
@@ -39,21 +46,53 @@ func captureStdout(t *testing.T, fn func()) string {
 	require.NoError(t, err)
 	os.Stdout = w
 
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+
 	fn()
 
 	_ = w.Close()
 	os.Stdout = old
+	<-done // wait for the drain goroutine to finish before reading buf
 
-	var buf strings.Builder
-	tmp := make([]byte, 4096)
-	for {
-		n, _ := r.Read(tmp)
-		if n == 0 {
-			break
-		}
-		buf.Write(tmp[:n])
-	}
 	return buf.String()
+}
+
+// TestCaptureStdout_DoesNotDeadlockOnOutputLargerThanPipeBuffer reproduces
+// the finding from the second pre-release-adversarial-review pass
+// (2026-07-08): captureStdout used to drain the pipe only after fn()
+// returned, so writing more than the OS pipe's kernel buffer (commonly
+// 64KiB on Linux) in one fn() call would block forever. This writes well
+// past that with a bounded per-test timeout, so a regression here fails
+// the test instead of hanging the whole `go test` run.
+func TestCaptureStdout_DoesNotDeadlockOnOutputLargerThanPipeBuffer(t *testing.T) {
+	const totalBytes = 512 * 1024 // 512KiB, comfortably past a 64KiB pipe buffer
+	const chunk = "0123456789abcdef\n"
+
+	done := make(chan string, 1)
+	go func() {
+		out := captureStdout(t, func() {
+			written := 0
+			for written < totalBytes {
+				n, _ := os.Stdout.WriteString(chunk)
+				written += n
+			}
+		})
+		done <- out
+	}()
+
+	select {
+	case out := <-done:
+		if len(out) < totalBytes {
+			t.Fatalf("expected at least %d bytes captured, got %d", totalBytes, len(out))
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("captureStdout deadlocked on output larger than the pipe buffer")
+	}
 }
 
 func TestRunInspect_FullyMeasured(t *testing.T) {
