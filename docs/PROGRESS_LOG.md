@@ -5,10 +5,43 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.5.3 Tagged (Pre-Release Adversarial Review + go.mod Compatibility)
+## Current Status: Unreleased — Internal-Usage Backlog Batch
 
 **Branch:** `main`
-**Last updated:** 2026-07-08 (v1.5.3 tag + release)
+**Last updated:** 2026-07-08
+
+### Unreleased: Real-Usage Hardening Batch (2026-07-08)
+
+Following v1.5.3, closed 4 of the 5 items on the internal-usage backlog
+(`docs/project-status.yaml`'s `current_focus_deferred`) — MCP/IDE
+integration intentionally left out, still a separate paused track. See
+`CHANGELOG.md`'s `[Unreleased]` entry and `docs/DECISIONS.md` D-022 through
+D-024 for full rationale.
+
+* [x] `pkg/gate/gate.go` (866 lines, a known tech-debt item) split into 7
+  per-concern files (`types.go`, `policy.go`, `measurement.go`,
+  `threshold.go`, `regression.go`, `reliability.go`, and an
+  orchestration-only `gate.go`). No behavior change.
+* [x] `pkg/policy`/`pkg/summary` "public API cleanup" backlog item resolved
+  (D-022): no standalone `pkg/policy` package was created, since
+  `gate.Policy` et al. have zero external consumers — that would have been
+  fabricating public API for a consumer that doesn't exist. What *was* real:
+  3 independent copies of "flatten a `Summary` into a `map[id]value`" and 2
+  independent copies each of policy-operator comparison / improvement-
+  direction inference, consolidated into `summary.Summary.ResultValues()`
+  and exported `gate.CompareOp`/`gate.LowerIsBetter`/`gate.HigherIsBetter`.
+* [x] F4 fixed: `pkg/slo/fetch/promtext`'s parser no longer breaks on a
+  Prometheus label value containing whitespace.
+* [x] `baseline merge --mode review-existing`/`--mode force-replace`
+  implemented (D-023) — `append-new-only` remains the default.
+* [x] `slint-gate wizard` added (D-024): a real interactive, stdin-prompted
+  onboarding flow, the thing Sprint 6 deferred pending a TTY/CI-safety
+  answer. Hard-refuses to run unless stdin is a real terminal
+  (`golang.org/x/term.IsTerminal`, not a bare `os.ModeCharDevice` check —
+  `/dev/null` is itself a character device). `quickstart` remains the
+  correct non-interactive choice for CI/scripted use.
+* [x] Second `pre-release-adversarial-review` run against this batch (see
+  `CLAUDE.md`'s standing pre-tag rule) — result recorded once complete.
 
 ### v1.5.3 Release (2026-07-08)
 
@@ -109,6 +142,7 @@ without learning the full policy schema first.
 * [x] Sprint 6 (`54f2112`): `slint-gate quickstart` (non-interactive status command, substituted for the originally-scoped stdin-prompted "interactive wizard"); `recommend-policy` threshold-mismatch warnings
 
 **Deferred (tracked, not forgotten):** `baseline merge`'s `review-existing`/`force-replace` modes; a true interactive wizard; MCP/IDE integration (separate, paused track); `pkg/policy`/`pkg/summary` public API cleanup; F4 quoted label parser.
+**Update (2026-07-08):** all four of these except MCP/IDE integration were completed in the "Real-Usage Hardening Batch" above.
 
 ### Custom Semgrep Guardrails (COMPLETE)
 

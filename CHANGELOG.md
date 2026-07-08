@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- `slint-gate wizard`: a real interactive, stdin-prompted onboarding flow (init → recommend-policy → baseline approve → ci github-actions), previously deferred in Sprint 6 pending a TTY/CI-safety answer. Refuses to run unless stdin is a real terminal (`golang.org/x/term.IsTerminal`), so CI/piped invocations never hang on a prompt. Shares state detection with `quickstart` (`cmd/slint-gate/onboarding_state.go`) and calls each subcommand's own function directly rather than reimplementing it. See D-024.
+- `slint-gate baseline merge --mode review-existing`: updates an existing baseline SLI's value only when the current measurement is a confirmed improvement in the direction implied by `policy.yaml`'s threshold operator for that metric. A change with no recognized direction, or a regression, is still rejected and left unchanged.
+- `slint-gate baseline merge --mode force-replace`: unconditionally overwrites existing baseline values regardless of direction — an explicit escape hatch for deliberate rebaselining, not the default. `append-new-only` remains the default mode. See D-023.
+
+### Fixed
+
+- **F4**: `pkg/slo/fetch/promtext`'s exposition-format parser could not handle a label value containing whitespace (e.g. `metric{path="/foo bar"} 1`) — a naive `strings.Fields` split broke the label block apart, handing a truncated fragment to `strconv.ParseFloat` and erroring out the entire scrape over one line. Replaced with a parser that locates the label block's matching unquoted `}` instead of whitespace-splitting the whole line.
+
+### Changed
+
+- `pkg/gate/gate.go` (866 lines) split into `types.go`, `policy.go`, `measurement.go`, `threshold.go`, `regression.go`, `reliability.go`, and a slimmed-down orchestration-only `gate.go`. No behavior change.
+- Deduplicated three independent "flatten a Summary into a `map[id]value`" implementations into `summary.Summary.ResultValues()`, and two independent copies each of policy-operator comparison and improvement-direction inference into exported `gate.CompareOp`/`gate.LowerIsBetter`/`gate.HigherIsBetter`. `pkg/policy` was not created as a standalone package — `gate.Policy` et al. have zero external consumers, so that would have been building public API for a consumer that doesn't exist. See D-022.
+
 ## [1.5.3] - 2026-07-08
 
 ### Fixed

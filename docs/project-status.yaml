@@ -1,7 +1,8 @@
-current_stage: "v1.5.3 tagged; competition submission prep"
-roadmap_percent: 94
+current_stage: "post-v1.5.3 real-usage hardening batch; competition submission prep"
+roadmap_percent: 97
 roadmap_status: "post_rc"
 current_focus:
+  - "Unreleased: internal-usage backlog batch (2026-07-08) closing 4 of 5 items from the deferred list below (MCP/IDE integration intentionally excluded, still deferred). pkg/gate/gate.go (866 lines) split into 7 per-concern files, no behavior change. Deduplicated 3 copies of Summary-to-value-map flattening and 2 copies each of operator-comparison/direction-inference logic into summary.Summary.ResultValues()/gate.CompareOp/gate.LowerIsBetter/gate.HigherIsBetter (D-022) - no standalone pkg/policy package created, since gate.Policy et al have zero external consumers. F4 fixed: promtext parser no longer breaks on label values containing spaces. baseline merge review-existing/force-replace modes implemented (D-023), append-new-only remains default. slint-gate wizard added: real interactive onboarding, hard-refuses non-TTY stdin via golang.org/x/term.IsTerminal (D-024)."
   - "v1.5.3 tagged: pre-release-adversarial-review workflow (D-021) found and fixed 8 real issues CI green had been reporting as healthy (baseline merge overwrite guard, kube-system namespace guard on Cleanup/SweepOrphans, silent kubectl-error swallowing x2, gate.go IO-error surfacing, README InsideAnnotation caveat, StrictnessMode doc gap, and two flag renames: analyze-dataplane --fail-on -> --severity-threshold, gate --measurement-summary -> --summary, both dual-supported); permanent guardrail checks added for the repeatable-pattern findings; also includes go.mod's go directive lowered from an exact-patch pin (1.25.5) to 1.22 for consumer compatibility (D-020) and CLAUDE.md/AGENTS.md untracked from the public repo (local-only, same pattern as .codex/)"
   - "v1.5.2 tagged: closed GitHub issues #2/#3 via documentation (D-018 same-kind ownerRef limitation, D-019 image pinning policy) rather than fabricated code fixes, plus README(Kor).md tone unification"
   - "v1.5.1 tagged: patch fix for the slint-gate composite action losing artifacts/outputs on gate failure, init overwrite guard, kubectl discovery error surfacing, English-unified comments/diagnostics on the public surface"
@@ -14,11 +15,11 @@ current_focus:
   - "kubebuilder-operator profile expanded 6->9 real SLIs (BaselineV3Specs already defined these); no fabricated second built-in profile added"
   - "Custom Semgrep guardrails implemented and blocking in CI, shipped in v1.5.0: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"
 current_focus_deferred:
-  - "baseline merge review-existing/force-replace modes (only append-new-only implemented)"
-  - "True interactive wizard (stdin-prompted); quickstart shipped as the non-interactive alternative"
-  - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused)"
-  - "pkg/policy and pkg/summary public package cleanup"
-  - "F4: quoted label parser improvement"
+  - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused - the one item intentionally excluded from the 2026-07-08 backlog batch)"
+  - "baseline merge review-existing/force-replace modes: DONE 2026-07-08 (D-023)"
+  - "True interactive wizard: DONE 2026-07-08 (D-024) - slint-gate wizard, quickstart remains the non-interactive alternative for CI/scripted use"
+  - "pkg/policy and pkg/summary public package cleanup: resolved 2026-07-08 (D-022) - no pkg/policy package exists or was created (zero external consumers of gate.Policy et al); real duplication (value-map flattening, operator logic) was consolidated instead"
+  - "F4: quoted label parser: DONE 2026-07-08"
 next_milestone: "Documentation submission due 2026-07-17; code submission due ~2026-08-15 (re-corrected 2026-07-08 — 7/17 is docs-only, not the full submission deadline as previously believed)"
 active_hardening_sprint: "v1.5.3-released"
 capabilities:
