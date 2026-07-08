@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/engine"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
@@ -72,7 +72,7 @@ type SessionConfig struct {
 	ConfigSourceType string
 	ConfigSourcePath string
 
-	StrictnessMode     string // BestEffort | StrictCollection | StrictEvaluation
+	StrictnessMode     string // BestEffort | StrictCollection | StrictEvaluation | RequiredSLIs
 	MaxStartSkewMs     int64
 	MaxEndSkewMs       int64
 	MaxScrapeLatencyMs int64
@@ -337,6 +337,11 @@ func (s *Session) Cleanup(ctx context.Context) {
 		return
 	}
 
+	if kubeutil.IsDangerousNamespace(ns) && !s.impl.DangerouslyAllowKubeSystemNamespace {
+		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: skip cleanup - namespace %q is cluster-critical and rejected by default; set DangerouslyAllowKubeSystemNamespace to override\n", ns)
+		return
+	}
+
 	runCleanupActions(ctx, ns, runID)
 }
 
@@ -368,7 +373,7 @@ func shouldRunCleanup(mode string, enabled, hasFailed bool) bool {
 func runCleanupActions(ctx context.Context, ns, runID string) {
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", SanitizeKubernetesLabelValue(runID))
 
-	cmd := exec.CommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
+	cmd := execCommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: failed for run-id %s: %v (output: %s)\n", runID, err, string(out))
@@ -520,7 +525,7 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	}
 
 	// static alias: kept aligned with slint-gate's default input path.
-	// For parallel/multi-test runs, point --measurement-summary at uniquePath explicitly.
+	// For parallel/multi-test runs, point --summary at uniquePath explicitly.
 	if staticPath != "" && sum != nil {
 		if writeErr := s.impl.writer.Write(staticPath, *sum); writeErr != nil {
 			fmt.Fprintf(os.Stderr, "kube-slint [session]: warning - static alias write failed: %v\n", writeErr)

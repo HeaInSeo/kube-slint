@@ -217,3 +217,37 @@ func TestSweepOrphansWithResult_MissingGuard(t *testing.T) {
 	assert.Equal(t, 1, res.Summary.SkippedByReason["missing_guard"])
 	assert.Contains(t, res.Warnings[0], "missing namespace or run-id")
 }
+
+func TestSweepOrphansWithResult_RejectsDangerousNamespaceByDefault(t *testing.T) {
+	execCommandContext = fakeExecCommand
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	sess := NewSession(SessionConfig{Namespace: "kube-system", RunID: "run-1"})
+	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
+		Enabled: true,
+		Mode:    modeReportOnly,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, res.Summary.Skipped)
+	assert.Equal(t, 1, res.Summary.SkippedByReason["dangerous_namespace"])
+	assert.Contains(t, res.Warnings[0], "cluster-critical")
+}
+
+func TestSweepOrphansWithResult_DangerouslyAllowKubeSystemNamespaceOverrides(t *testing.T) {
+	execCommandContext = fakeExecCommand
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	sess := NewSession(SessionConfig{
+		Namespace:                           "kube-system",
+		RunID:                               "run-1",
+		DangerouslyAllowKubeSystemNamespace: true,
+	})
+	res, err := sess.SweepOrphansWithResult(context.Background(), OrphanSweepOptions{
+		Enabled: true,
+		Mode:    modeReportOnly,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, res.Summary.SkippedByReason["dangerous_namespace"])
+}

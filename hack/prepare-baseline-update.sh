@@ -62,13 +62,13 @@ fi
 
 # Evaluate gate for current baseline and candidate using the Go CLI.
 go run "${REPO_ROOT}/cmd/slint-gate" \
-  --measurement-summary "${CURRENT_BASELINE}" \
+  --summary "${CURRENT_BASELINE}" \
   --policy             "${RC_POLICY}" \
   --baseline           "${CURRENT_BASELINE}" \
   --output             "${CURRENT_GATE_FILE}" >/dev/null
 
 go run "${REPO_ROOT}/cmd/slint-gate" \
-  --measurement-summary "${CANDIDATE_FILE}" \
+  --summary "${CANDIDATE_FILE}" \
   --policy             "${RC_POLICY}" \
   --baseline           "${CURRENT_BASELINE}" \
   --output             "${CANDIDATE_GATE_FILE}" >/dev/null

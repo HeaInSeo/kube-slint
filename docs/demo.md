@@ -65,7 +65,7 @@ The `gate` target uses:
 
 ```sh
 go run ../../cmd/slint-gate \
-  --measurement-summary artifacts/sli-summary.json \
+  --summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --exit-on FAIL_OR_NOGRADE
 ```
@@ -86,7 +86,7 @@ Re-run the gate against the same measurement:
 
 ```sh
 go run ../../cmd/slint-gate \
-  --measurement-summary artifacts/sli-summary.json \
+  --summary artifacts/sli-summary.json \
   --policy /tmp/kube-slint-fail-policy.yaml \
   --output slint-gate-summary.fail.json \
   --exit-on FAIL_OR_NOGRADE
@@ -107,7 +107,7 @@ Run the gate with a missing measurement file:
 
 ```sh
 go run ../../cmd/slint-gate \
-  --measurement-summary artifacts/does-not-exist.json \
+  --summary artifacts/does-not-exist.json \
   --policy .slint/policy.yaml \
   --output slint-gate-summary.nograde.json \
   --exit-on FAIL_OR_NOGRADE

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -294,4 +295,41 @@ func TestShouldRunCleanup(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestCleanup_RejectsDangerousNamespaceByDefault(t *testing.T) {
+	called := false
+	execCommandContext = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		called = true
+		return fakeExecCommand(ctx, command, args...)
+	}
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	sess := NewSession(SessionConfig{
+		Namespace:   "kube-system",
+		RunID:       "run-1",
+		CleanupMode: "always",
+	})
+	sess.Cleanup(context.Background())
+
+	assert.False(t, called, "kubectl delete must not run against a cluster-critical namespace by default")
+}
+
+func TestCleanup_DangerouslyAllowKubeSystemNamespaceOverrides(t *testing.T) {
+	called := false
+	execCommandContext = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		called = true
+		return fakeExecCommand(ctx, command, args...)
+	}
+	defer func() { execCommandContext = exec.CommandContext }()
+
+	sess := NewSession(SessionConfig{
+		Namespace:                           "kube-system",
+		RunID:                               "run-1",
+		CleanupMode:                         "always",
+		DangerouslyAllowKubeSystemNamespace: true,
+	})
+	sess.Cleanup(context.Background())
+
+	assert.True(t, called, "the explicit override must let cleanup proceed")
 }

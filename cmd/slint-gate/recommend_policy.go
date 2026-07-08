@@ -153,7 +153,7 @@ func runRecommendPolicy(args []string) error {
 
 	fmt.Printf("✓ policy.yaml written → %s\n", *output)
 	fmt.Println("\nNext:")
-	fmt.Printf("  slint-gate --policy %s --measurement-summary %s\n", *output, *summaryPath)
+	fmt.Printf("  slint-gate --policy %s --summary %s\n", *output, *summaryPath)
 
 	return nil
 }

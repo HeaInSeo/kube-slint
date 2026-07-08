@@ -31,6 +31,7 @@ func runBaselineMerge(args []string) error {
 	policyPath := fs.String("policy", ".slint/policy.yaml", "Path to the policy YAML the current summary must pass")
 	mode := fs.String("mode", "append-new-only", "Merge mode (only append-new-only is currently supported)")
 	output := fs.String("output", "", "Output path (defaults to --baseline, i.e. merge in place)")
+	force := fs.Bool("force", false, "Overwrite --output if it already exists and differs from --baseline")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -48,6 +49,16 @@ func runBaselineMerge(args []string) error {
 
 	if _, statErr := os.Stat(*baselinePath); statErr != nil {
 		return fmt.Errorf("--baseline %s does not exist; run 'slint-gate baseline approve' first", *baselinePath)
+	}
+
+	// In-place merge (outPath == baselinePath, the default) is expected to
+	// overwrite the baseline it just read from — that's the point of merge.
+	// Only guard the case where --output explicitly points somewhere else,
+	// so a typo'd or pre-existing unrelated path isn't silently clobbered.
+	if outPath != *baselinePath && !*force {
+		if _, statErr := os.Stat(outPath); statErr == nil {
+			return fmt.Errorf("%s already exists; pass --force to overwrite", outPath)
+		}
 	}
 
 	result := gate.Evaluate(gate.Request{
@@ -90,9 +101,10 @@ func runBaselineMerge(args []string) error {
 
 	baseline.Results = append(baseline.Results, appended...)
 
-	// kube-slint-no-stat-before-write: the earlier os.Stat only checks that
-	// --baseline already exists (a precondition, not an overwrite guard);
-	// this is a single-user local CLI artifact write, not a shared/multi-tenant race.
+	// kube-slint-no-stat-before-write: the os.Stat calls above are a
+	// --baseline existence precondition and a --force overwrite guard on
+	// outPath; this is a single-user local CLI artifact write, not a
+	// shared/multi-tenant race.
 	// nosemgrep
 	if err := summary.WriteFile(outPath, baseline); err != nil {
 		return fmt.Errorf("write merged baseline: %w", err)

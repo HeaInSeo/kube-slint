@@ -41,11 +41,17 @@ func runAnalyzeDataplane(args []string) {
 	outputJSON := fs.String("output-json", "dataplane-report.json", "Output path for JSON report")
 	outputSARIF := fs.String("output-sarif", "", "Optional output path for SARIF 2.1.0 report (empty = skip)")
 	githubStepSummary := fs.Bool("github-step-summary", false, "Append markdown result table to $GITHUB_STEP_SUMMARY")
-	failOn := fs.String("fail-on", "error",
+	severityThreshold := fs.String("severity-threshold", "",
 		"Finding severity that causes non-zero exit.\n"+
 			"  none    — always exit 0\n"+
 			"  error   — exit 1 if any error-severity finding exists (default)\n"+
 			"  warning — exit 1 if any error OR warning-severity finding exists")
+	// Deprecated: named --fail-on before this collided in name (not meaning)
+	// with the gate command's deprecated --fail-on/--exit-on pair — this
+	// flag's value domain (none/error/warning, finding-severity based) was
+	// never related to that one (gate-result based). Kept as a working
+	// alias so existing invocations don't break.
+	failOn := fs.String("fail-on", "", "Deprecated: use --severity-threshold instead. Same values.")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -54,9 +60,23 @@ func runAnalyzeDataplane(args []string) {
 		os.Exit(2)
 	}
 
-	failOnValue := strings.ToLower(strings.TrimSpace(*failOn))
+	thresholdSet, failOnSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "severity-threshold":
+			thresholdSet = true
+		case "fail-on":
+			failOnSet = true
+		}
+	})
+	resolvedThreshold, deprecated := resolveDataplaneSeverityThreshold(thresholdSet, *severityThreshold, failOnSet, *failOn)
+	if deprecated {
+		fmt.Fprintln(os.Stderr, "slint-gate analyze-dataplane: --fail-on is deprecated; use --severity-threshold instead (still honored)")
+	}
+
+	failOnValue := strings.ToLower(strings.TrimSpace(resolvedThreshold))
 	if !isValidDataplaneFailOn(failOnValue) {
-		fmt.Fprintf(os.Stderr, "invalid --fail-on: %s\n", *failOn)
+		fmt.Fprintf(os.Stderr, "invalid --severity-threshold: %s\n", resolvedThreshold)
 		os.Exit(2)
 	}
 
@@ -99,10 +119,24 @@ func runAnalyzeDataplane(args []string) {
 	}
 
 	if shouldFailOnDataplane(rep.Summary, failOnValue) {
-		fmt.Fprintf(os.Stderr, "slint-gate analyze-dataplane: exit 1 (errors=%d warnings=%d, fail-on=%s)\n",
-			rep.Summary.ErrorCount, rep.Summary.WarningCount, *failOn)
+		fmt.Fprintf(os.Stderr, "slint-gate analyze-dataplane: exit 1 (errors=%d warnings=%d, severity-threshold=%s)\n",
+			rep.Summary.ErrorCount, rep.Summary.WarningCount, failOnValue)
 		os.Exit(1)
 	}
+}
+
+// resolveDataplaneSeverityThreshold applies --severity-threshold/--fail-on
+// precedence: an explicitly-passed --severity-threshold always wins;
+// otherwise an explicitly-passed --fail-on is honored (and flagged as
+// deprecated); otherwise the default is "error".
+func resolveDataplaneSeverityThreshold(thresholdSet bool, thresholdVal string, failOnSet bool, failOnVal string) (resolved string, deprecated bool) {
+	if thresholdSet {
+		return thresholdVal, false
+	}
+	if failOnSet {
+		return failOnVal, true
+	}
+	return "error", false
 }
 
 func printDataplaneDiagnostics(rep *report.Report) {

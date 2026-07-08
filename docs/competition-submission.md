@@ -278,7 +278,7 @@ go run ./cmd/slint-gate recommend-policy \
 
 # 게이트 평가
 go run ./cmd/slint-gate \
-  --measurement-summary artifacts/sli-summary.json \
+  --summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --baseline docs/baselines/current.json \
   --exit-on FAIL_OR_NOGRADE \

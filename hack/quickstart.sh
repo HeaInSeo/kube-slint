@@ -83,7 +83,7 @@ echo ""
 echo "[3/3] Running slint-gate..."
 "${GATE}" \
   --policy "${POLICY}" \
-  --measurement-summary "${SUMMARY}" \
+  --summary "${SUMMARY}" \
   --output "${OUTPUT}"
 
 GATE_RESULT="$(python3 -c "import json,sys; d=json.load(open('${OUTPUT}')); print(d['gate_result'])" 2>/dev/null \

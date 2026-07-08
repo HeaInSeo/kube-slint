@@ -374,3 +374,50 @@ This file records architecture/product-direction decisions that define the proje
     directive, so the build environment and the consumer-facing minimum
     are independent choices (same reasoning as D-019's image pinning
     policy: don't conflate "what we build with" with "what we require").
+
+## D-021: mandatory pre-release adversarial review; two more flag renames land under the dual-support pattern
+
+- Date: 2026-07-08
+- Status: Accepted
+- Decision:
+  - Before every `git tag`, run the `pre-release-adversarial-review`
+    workflow (saved at `.claude/workflows/pre-release-adversarial-review.js`,
+    local-only like `CLAUDE.md`/`AGENTS.md`) — 6 independent review
+    dimensions (consistency, error-handling, security, test-correctness,
+    docs-code alignment, API-naming-consistency) run in parallel, each
+    finding is adversarially verified by a separate pass before being
+    acted on. This is now a standing rule recorded in `CLAUDE.md`, not a
+    one-off exercise.
+  - The first run (2026-07-08) found 8 issues, all confirmed real, all
+    fixed (see `CHANGELOG.md`'s `[Unreleased]` entry for the full list).
+    Two were flag renames following the same dual-support pattern as
+    D-016's `promote_to_fail`/`--exit-on` migration:
+    - `analyze-dataplane`'s `--fail-on` → `--severity-threshold`
+      (`--fail-on` kept as a deprecated alias).
+    - The main gate invocation's `--measurement-summary` → `--summary`
+      (`--measurement-summary` kept as a deprecated alias), matching what
+      every onboarding subcommand already used.
+  - Findings that represent a repeatable pattern (not just a one-off bug)
+    were also codified as permanent `hack/quality-guardrails.sh` checks —
+    e.g. any file shelling out to `kubectl delete` against a
+    session/config namespace must reference the shared
+    `kubeutil.IsDangerousNamespace` guard, and `SessionConfig`'s
+    `StrictnessMode` doc comment must list `RequiredSLIs`. The goal is
+    that the next review run (or CI on every push) catches a regression
+    of the same shape without needing another full adversarial pass.
+- Rationale:
+  - Every finding in this review's first run was something CI green had
+    already been reporting as "healthy" — none of them were caught by
+    `go build`/`go vet`/`go test`/`golangci-lint`/semgrep on their own.
+    CI green verifies "it compiles and the tests that exist pass," not
+    "the invariants this project claims to guarantee actually hold" — the
+    kube-system namespace guard gap is the clearest example: the code
+    silently didn't do what `docs/security-model.md` said it
+    unconditionally does.
+  - Deferring the two flag renames (as originally planned, given the
+    2026-07-17 date that was believed to be the full submission deadline)
+    was reconsidered once it was clarified that 7/17 is a documentation-only
+    milestone and the actual code deadline is mid-August — there was no
+    longer a reason to ship a known naming inconsistency instead of fixing
+    it under the same safe dual-support pattern already used three times
+    in this project (D-016, and now these two).

@@ -102,11 +102,11 @@ runs:
         fi
 
         go run "${ACTION_PATH}/../../../cmd/slint-gate" \
-          --measurement-summary "${INPUT_MEASUREMENT}" \
-          --policy             "${INPUT_POLICY}" \
-          --baseline           "${INPUT_BASELINE}" \
-          --output             "${INPUT_OUTPUT}" \
-          --exit-on            NEVER \
+          --summary  "${INPUT_MEASUREMENT}" \
+          --policy   "${INPUT_POLICY}" \
+          --baseline "${INPUT_BASELINE}" \
+          --output   "${INPUT_OUTPUT}" \
+          --exit-on  NEVER \
           ${EXTRA}
 
         GATE=$(jq -r '.gate_result'        "${INPUT_OUTPUT}")

@@ -91,7 +91,7 @@ sess.End(ctx)
 
 ```sh
 make slint-gate   # builds bin/slint-gate
-./bin/slint-gate --measurement-summary artifacts/sli-summary.json \
+./bin/slint-gate --summary artifacts/sli-summary.json \
                  --policy .slint/policy.yaml \
                  --output slint-gate-summary.json
 ```
@@ -247,7 +247,7 @@ go run ./cmd/slint-gate [flags]
 
 | Flag | Default | Description |
 |---|---|---|
-| `--measurement-summary` | `artifacts/sli-summary.json` | Path to the SLI summary produced by the harness |
+| `--summary` | `artifacts/sli-summary.json` | Path to the SLI summary produced by the harness. (`--summary` still works as a deprecated alias.) |
 | `--policy` | `.slint/policy.yaml` | Path to the policy file |
 | `--baseline` | `""` (disabled) | Path to a baseline summary for regression comparison; omit to skip |
 | `--output` | `slint-gate-summary.json` | Path to write the gate result JSON |
@@ -346,7 +346,7 @@ kube-slint supports three first-class measurement modes, set per-session or per-
 | Mode | Description |
 |---|---|
 | `InsideSnapshot` (default) | Snapshot-based collection at session start and end; delta is computed from the difference |
-| `InsideAnnotation` | Precise semantic-boundary collection; measurement aligns with annotated test boundaries |
+| `InsideAnnotation` | **Reserved, not yet implemented** — currently behaves identically to `InsideSnapshot` (only the recorded run-mode label differs); do not rely on it for annotation-boundary precision yet |
 | `OutsideSnapshot` | External scrape; metrics are collected from an external source rather than inside the session |
 
 ---
@@ -431,7 +431,7 @@ tracking `main`.
 - name: Evaluate slint gate
   run: |
     go run ./cmd/slint-gate \
-      --measurement-summary artifacts/sli-summary.json \
+      --summary artifacts/sli-summary.json \
       --policy .slint/policy.yaml \
       --github-step-summary
 

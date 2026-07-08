@@ -1,6 +1,6 @@
 # Builds the slint-gate CLI binary image.
 # Usage: docker run --rm -v $(pwd):/workspace ghcr.io/heainseo/slint-gate \
-#          --measurement-summary /workspace/artifacts/sli-summary.json \
+#          --summary /workspace/artifacts/sli-summary.json \
 #          --policy /workspace/.slint/policy.yaml \
 #          --output /workspace/slint-gate-summary.json
 #

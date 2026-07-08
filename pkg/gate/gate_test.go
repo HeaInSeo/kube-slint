@@ -121,6 +121,55 @@ func TestEvaluate_MeasurementCorrupt(t *testing.T) {
 	assert.Contains(t, result.Reasons, "MEASUREMENT_INPUT_CORRUPT")
 }
 
+// TestEvaluate_MeasurementReadIOError_LogsRealError is a regression test for
+// a finding from pre-release-adversarial-review (2026-07-08): a non-NotExist
+// os.ReadFile error was discarded entirely and mapped to the generic
+// measCorrupt state, indistinguishable from actually-malformed JSON.
+func TestEvaluate_MeasurementReadIOError_LogsRealError(t *testing.T) {
+	dir := t.TempDir()
+	policy := writePolicyFile(t, dir, defaultPolicy())
+	// A directory in place of the expected file reliably produces a
+	// non-NotExist os.ReadFile error (EISDIR) on all platforms this repo
+	// targets, without needing OS-specific permission manipulation.
+	measPath := filepath.Join(dir, "meas-is-a-dir")
+	require.NoError(t, os.Mkdir(measPath, 0o755))
+
+	stderr := captureStderr(t, func() {
+		result := gate.Evaluate(gate.Request{
+			MeasurementPath: measPath,
+			PolicyPath:      policy,
+		})
+		assert.Equal(t, "corrupt", result.MeasurementStatus)
+	})
+
+	assert.Contains(t, stderr, "could not read")
+	assert.Contains(t, stderr, measPath)
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+
+	fn()
+
+	_ = w.Close()
+	os.Stderr = old
+
+	var buf strings.Builder
+	tmp := make([]byte, 4096)
+	for {
+		n, _ := r.Read(tmp)
+		if n == 0 {
+			break
+		}
+		buf.Write(tmp[:n])
+	}
+	return buf.String()
+}
+
 func TestEvaluate_FirstRun_ThresholdPass(t *testing.T) {
 	dir := t.TempDir()
 	policy := writePolicyFile(t, dir, defaultPolicy())
@@ -522,6 +571,32 @@ func TestEvaluate_PolicyInvalidYAML(t *testing.T) {
 	assert.Equal(t, gate.GateNoGrade, result.GateResult)
 	assert.Equal(t, "invalid", result.PolicyStatus)
 	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
+// TestEvaluate_PolicyReadIOError_SurfacesRealErrorInWarnings is a regression
+// test for a finding from pre-release-adversarial-review (2026-07-08): a
+// non-NotExist os.ReadFile error (permission denied, EISDIR, etc.) was
+// discarded entirely and mapped to the generic policyInvalid state,
+// indistinguishable from an actual YAML syntax error.
+func TestEvaluate_PolicyReadIOError_SurfacesRealErrorInWarnings(t *testing.T) {
+	dir := t.TempDir()
+	// A directory in place of the expected file reliably produces a
+	// non-NotExist os.ReadFile error (EISDIR) on all platforms this repo
+	// targets, without needing OS-specific permission manipulation.
+	policyPath := filepath.Join(dir, "policy-is-a-dir")
+	require.NoError(t, os.Mkdir(policyPath, 0o755))
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"reconcile_total_delta": 3}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policyPath,
+	})
+
+	assert.Equal(t, "invalid", result.PolicyStatus)
+	require.NotEmpty(t, result.PolicyWarnings)
+	assert.Contains(t, result.PolicyWarnings[0], "could not read policy file")
 }
 
 func TestEvaluate_PolicyUnsupportedSchemaVersion(t *testing.T) {

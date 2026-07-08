@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
 )
 
 // dnsLabelRe matches a valid DNS-1123 label (the same shape Kubernetes
@@ -14,17 +16,11 @@ func isValidDNSLabel(s string) bool {
 	return len(s) > 0 && len(s) <= 63 && dnsLabelRe.MatchString(s)
 }
 
-// dangerousNamespaces are cluster-critical namespaces that must not be a
-// default measurement target.
-var dangerousNamespaces = map[string]bool{
-	"kube-system":     true,
-	"kube-public":     true,
-	"kube-node-lease": true,
-}
-
 // isDangerousNamespace reports whether ns is a cluster-critical namespace.
+// Delegates to kubeutil.IsDangerousNamespace so every kubectl-issuing path
+// in this module shares one definition instead of drifting independently.
 func isDangerousNamespace(ns string) bool {
-	return dangerousNamespaces[ns]
+	return kubeutil.IsDangerousNamespace(ns)
 }
 
 // ValidateMetricsURL builds the metrics scrape URL from a ServiceURLFormat

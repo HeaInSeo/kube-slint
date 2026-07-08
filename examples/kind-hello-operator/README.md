@@ -77,7 +77,7 @@ SLINT_SA_TOKEN=$SLINT_SA_TOKEN go test -tags kind -v -timeout 120s -run TestHell
 
 # 7. Evaluate policy gate (run from examples/kind-hello-operator/)
 go run ../../cmd/slint-gate \
-  --measurement-summary artifacts/sli-summary.json \
+  --summary artifacts/sli-summary.json \
   --policy .slint/policy.yaml \
   --exit-on FAIL_OR_NOGRADE
 

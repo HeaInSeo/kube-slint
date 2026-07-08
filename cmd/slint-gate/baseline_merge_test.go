@@ -125,3 +125,49 @@ func TestRunBaselineMerge_OutputDefaultsToBaseline(t *testing.T) {
 	require.NoError(t, readErr)
 	assert.Contains(t, string(data), "new_metric_delta")
 }
+
+func TestRunBaselineMerge_RefusesDifferentOutputOverwriteWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	policy := writeBaselinePolicy(t, dir)
+	baseline := writeDiffSummary(t, dir, "baseline.json", map[string]float64{"reconcile_total_delta": 5})
+	cur := writeDiffSummary(t, dir, "summary.json", map[string]float64{"reconcile_total_delta": 5})
+	out := filepath.Join(dir, "other-baseline.json")
+	require.NoError(t, os.WriteFile(out, []byte("existing content"), 0o644))
+
+	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", cur, "--policy", policy, "--output", out})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+
+	data, readErr := os.ReadFile(out)
+	require.NoError(t, readErr)
+	assert.Equal(t, "existing content", string(data), "existing file must not be touched without --force")
+}
+
+func TestRunBaselineMerge_ForceOverwritesDifferentOutput(t *testing.T) {
+	dir := t.TempDir()
+	policy := writeBaselinePolicy(t, dir)
+	baseline := writeDiffSummary(t, dir, "baseline.json", map[string]float64{"reconcile_total_delta": 5})
+	cur := writeDiffSummary(t, dir, "summary.json", map[string]float64{"reconcile_total_delta": 5, "new_metric_delta": 1})
+	out := filepath.Join(dir, "other-baseline.json")
+	require.NoError(t, os.WriteFile(out, []byte("existing content"), 0o644))
+
+	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", cur, "--policy", policy, "--output", out, "--force"})
+	require.NoError(t, err)
+
+	data, readErr := os.ReadFile(out)
+	require.NoError(t, readErr)
+	assert.Contains(t, string(data), "new_metric_delta")
+}
+
+func TestRunBaselineMerge_InPlaceMergeNeverNeedsForce(t *testing.T) {
+	// Regression guard: the default in-place merge (no --output) must keep
+	// working without --force, since overwriting the baseline it just read
+	// from is the whole point of merge.
+	dir := t.TempDir()
+	policy := writeBaselinePolicy(t, dir)
+	baseline := writeDiffSummary(t, dir, "baseline.json", map[string]float64{"reconcile_total_delta": 5})
+	cur := writeDiffSummary(t, dir, "summary.json", map[string]float64{"reconcile_total_delta": 5, "new_metric_delta": 1})
+
+	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", cur, "--policy", policy, "--output", baseline})
+	require.NoError(t, err)
+}

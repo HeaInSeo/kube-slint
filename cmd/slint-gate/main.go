@@ -86,7 +86,12 @@ func dispatchBaseline(args []string) {
 }
 
 func runGate() {
-	measurementPath := flag.String("measurement-summary", "artifacts/sli-summary.json", "Path to measurement summary JSON")
+	summaryPath := flag.String("summary", "", "Path to measurement summary JSON")
+	// Deprecated: every onboarding subcommand (inspect, recommend-policy,
+	// baseline diff/approve/merge, ci github-actions) uses --summary for
+	// this same artifact — this flag predates that convention. Kept as a
+	// working alias so existing invocations don't break.
+	measurementPath := flag.String("measurement-summary", "", "Deprecated: use --summary instead. Same meaning.")
 	policyPath := flag.String("policy", ".slint/policy.yaml", "Path to policy YAML")
 	baselinePath := flag.String("baseline", "", "Optional path to baseline summary JSON")
 	outputPath := flag.String("output", "slint-gate-summary.json", "Output path for gate summary JSON")
@@ -102,12 +107,17 @@ func runGate() {
 	flag.Parse()
 
 	exitOnSet, failOnSet := false, false
+	summarySet, measurementSet := false, false
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "exit-on":
 			exitOnSet = true
 		case "fail-on":
 			failOnSet = true
+		case "summary":
+			summarySet = true
+		case "measurement-summary":
+			measurementSet = true
 		}
 	})
 
@@ -122,8 +132,13 @@ func runGate() {
 		os.Exit(2)
 	}
 
+	resolvedSummary, summaryDeprecated := resolveSummaryPath(summarySet, *summaryPath, measurementSet, *measurementPath)
+	if summaryDeprecated {
+		fmt.Fprintln(os.Stderr, "slint-gate: --measurement-summary is deprecated; use --summary instead (still honored)")
+	}
+
 	result := gate.Evaluate(gate.Request{
-		MeasurementPath: *measurementPath,
+		MeasurementPath: resolvedSummary,
 		PolicyPath:      *policyPath,
 		BaselinePath:    strings.TrimSpace(*baselinePath),
 	})
@@ -159,6 +174,20 @@ func resolveExitOn(exitOnSet bool, exitOnVal string, failOnSet bool, failOnVal s
 		return failOnVal, true
 	}
 	return failOnVal, false
+}
+
+// resolveSummaryPath applies --summary/--measurement-summary precedence: an
+// explicitly-passed --summary always wins; otherwise an explicitly-passed
+// --measurement-summary is honored (and flagged as deprecated); otherwise
+// the default is "artifacts/sli-summary.json".
+func resolveSummaryPath(summarySet bool, summaryVal string, measurementSet bool, measurementVal string) (resolved string, deprecated bool) {
+	if summarySet {
+		return summaryVal, false
+	}
+	if measurementSet {
+		return measurementVal, true
+	}
+	return "artifacts/sli-summary.json", false
 }
 
 func isValidExitOn(exitOn string) bool {

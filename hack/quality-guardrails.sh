@@ -81,6 +81,15 @@ check_canonical_docs() {
     "implementation handoff includes ServiceURLFormat validator task"
 }
 
+check_public_api_doc_sync() {
+  echo "== public API doc-comment sync guardrails =="
+  # Found by pre-release-adversarial-review (2026-07-08): SessionConfig's
+  # StrictnessMode doc comment listed only 3 of the 4 modes propagation.go
+  # actually implements, hiding RequiredSLIs from the public API surface.
+  require_grep 'RequiredSLIs' pkg/slint/session.go \
+    "SessionConfig.StrictnessMode doc comment lists all implemented modes"
+}
+
 check_security_contract() {
   echo "== security guardrails =="
   require_file SECURITY.md
@@ -118,6 +127,18 @@ check_rbac_contract() {
     "unit test guards against default ClusterRoleBinding regression"
   require_grep 'Default generated RBAC must not use' docs/security-model.md \
     "RBAC model documents default cluster-wide RBAC rejection"
+
+  # Found by pre-release-adversarial-review (2026-07-08): Session.Cleanup()
+  # and SweepOrphansWithResult() issued `kubectl delete`/`kubectl get`
+  # against a caller-supplied namespace with no kube-system/kube-public/
+  # kube-node-lease rejection, even though docs/security-model.md documents
+  # that rejection as an unconditional default. Any file that shells out to
+  # kubectl delete against a session/config namespace must also reference
+  # the shared guard so this can't silently regress per-file.
+  require_grep 'kubeutil\.IsDangerousNamespace' pkg/slint/session.go \
+    "Session.Cleanup() enforces the kube-system namespace guard"
+  require_grep 'kubeutil\.IsDangerousNamespace' pkg/slint/sweep.go \
+    "SweepOrphansWithResult() enforces the kube-system namespace guard"
 }
 
 check_secret_redaction_contract() {
@@ -196,6 +217,7 @@ check_release_and_ux_contract() {
 
 check_source_of_truth
 check_canonical_docs
+check_public_api_doc_sync
 check_security_contract
 check_rbac_contract
 check_secret_redaction_contract

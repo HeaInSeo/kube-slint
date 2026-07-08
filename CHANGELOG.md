@@ -5,8 +5,64 @@
 
 ## [Unreleased]
 
+### Fixed
+
+Findings from a `pre-release-adversarial-review` workflow run (6 review
+dimensions, adversarial-verified): 8 raw findings, 8 confirmed real, all
+fixed (none deferred). See `.claude/workflows/pre-release-adversarial-review.js`
+and `hack/quality-guardrails.sh`'s "public API doc-comment sync" / "rbac
+guardrails" sections for the permanent regression checks added alongside
+these fixes.
+
+- **`baseline merge --output` had no overwrite guard**: unlike `init`/
+  `recommend-policy`/`baseline approve`, `baseline merge`'s `--output` had
+  no `--force` flag — an explicit `--output` pointing at a pre-existing,
+  unrelated file was silently clobbered. Added `--force`, guarding only
+  the case where `--output` differs from `--baseline` (in-place merge, the
+  default, is still allowed to overwrite the baseline it just read from —
+  that's the point of merge).
+- **`Session.Cleanup()`/`SweepOrphansWithResult()` didn't enforce the
+  kube-system namespace guard**: `docs/security-model.md` documents
+  kube-system/kube-public/kube-node-lease rejection as an unconditional
+  default, but that check only ever lived in `curlpod.Client.RunOnce`
+  (pre-scrape). A misconfigured `Namespace: kube-system` sailed straight
+  through to a real `kubectl get/delete pods`. The check
+  (`kubeutil.IsDangerousNamespace`, newly extracted to `pkg/kubeutil` so
+  `curlpod` and `pkg/slint` share one definition) is now enforced on both
+  paths, gated by the same `DangerouslyAllowKubeSystemNamespace` opt-in.
+- **`IsCertManagerCRDsInstalled`/`IsPrometheusOperatorCRDsInstalled`
+  silently converted any `kubectl` failure into `false`**: a connectivity/
+  permission error was indistinguishable from "CRDs genuinely not
+  installed." Both now log the real underlying error.
+- **`loadPolicy`/`loadMeasurement` discarded non-NotExist `os.ReadFile`
+  errors**: a permission or filesystem error was mapped to the same
+  generic invalid/corrupt state as an actual YAML/JSON syntax error,
+  misdirecting `diagnose.go`'s hints. The real error is now surfaced via
+  `PolicyWarnings` (policy) or stderr (measurement).
+- **README/README(Kor).md described `InsideAnnotation` as a working
+  "precise semantic-boundary" measurement mode**: it's explicitly
+  reserved/unimplemented in code (behaves identically to
+  `InsideSnapshot`). Both READMEs now say so.
+- **`SessionConfig.StrictnessMode`'s doc comment omitted `RequiredSLIs`**:
+  `propagation.go` implements a fourth, distinct mode not mentioned in the
+  public field's comment. Fixed.
+
 ### Changed
 
+- **`analyze-dataplane`'s `--fail-on` renamed to `--severity-threshold`**:
+  it collided in name (not meaning) with the gate command's deprecated
+  `--fail-on`/`--exit-on` pair — same flag name, unrelated value domain
+  (finding-severity vs. gate-result). `--fail-on` keeps working as a
+  deprecated alias on this subcommand.
+- **The main `slint-gate` gate invocation's `--measurement-summary`
+  renamed to `--summary`**: every onboarding subcommand (`inspect`,
+  `recommend-policy`, `baseline diff/approve/merge`, `ci github-actions`)
+  already used `--summary` for the identical artifact.
+  `--measurement-summary` keeps working as a deprecated alias.
+  `.github/actions/slint-gate`'s internal CLI invocation switched to
+  `--summary` to avoid the new deprecation warning on every run (the
+  action's own `measurement-summary:` input name is unchanged — that's a
+  separate, stable YAML contract).
 - Lowered `go.mod`'s `go` directive from an exact-patch pin (`1.25.5`) to
   `1.22`. Since Go 1.21 this directive is a strictly enforced minimum, so
   pinning the maintainer's exact installed toolchain was an unnecessarily

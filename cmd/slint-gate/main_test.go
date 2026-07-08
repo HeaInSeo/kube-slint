@@ -177,6 +177,13 @@ func TestIsValidExitOn(t *testing.T) {
 	assert.False(t, isValidExitOn("FAIL_OR_NO_GRADE"))
 }
 
+// Structurally identical to TestResolveSummaryPath and
+// TestResolveDataplaneSeverityThreshold by design: all three test the same
+// new-flag/deprecated-alias precedence pattern (D-016) applied to different
+// flag pairs. A shared generic table-driven helper would be a premature
+// abstraction over three call sites for marginal benefit.
+//
+//nolint:dupl
 func TestResolveExitOn(t *testing.T) {
 	cases := []struct {
 		name                 string
@@ -213,6 +220,58 @@ func TestResolveExitOn(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			resolved, deprecated := resolveExitOn(tc.exitOnSet, tc.exitOnVal, tc.failOnSet, tc.failOnVal)
+			assert.Equal(t, tc.wantResolved, resolved)
+			assert.Equal(t, tc.wantDeprecated, deprecated)
+		})
+	}
+}
+
+// TestResolveSummaryPath is a regression test for a finding from
+// pre-release-adversarial-review (2026-07-08): the main gate invocation
+// used --measurement-summary while every onboarding subcommand
+// (inspect/recommend-policy/baseline diff/approve/merge/ci github-actions)
+// used --summary for the identical artifact. --summary is now the
+// preferred name here too; --measurement-summary keeps working as a
+// deprecated alias. (Structurally similar to TestResolveExitOn — see the
+// dupl exemption there.)
+//
+//nolint:dupl
+func TestResolveSummaryPath(t *testing.T) {
+	cases := []struct {
+		name                       string
+		summarySet, measurementSet bool
+		summaryVal, measurementVal string
+		wantResolved               string
+		wantDeprecated             bool
+	}{
+		{
+			name:       "neither set defaults to artifacts/sli-summary.json, no deprecation warning",
+			summarySet: false, summaryVal: "",
+			measurementSet: false, measurementVal: "",
+			wantResolved: "artifacts/sli-summary.json", wantDeprecated: false,
+		},
+		{
+			name:       "only --measurement-summary set is honored with deprecation warning",
+			summarySet: false, summaryVal: "",
+			measurementSet: true, measurementVal: "custom/meas.json",
+			wantResolved: "custom/meas.json", wantDeprecated: true,
+		},
+		{
+			name:       "only --summary set is honored with no deprecation warning",
+			summarySet: true, summaryVal: "custom/summary.json",
+			measurementSet: false, measurementVal: "",
+			wantResolved: "custom/summary.json", wantDeprecated: false,
+		},
+		{
+			name:       "both set: --summary wins, no deprecation warning",
+			summarySet: true, summaryVal: "new.json",
+			measurementSet: true, measurementVal: "old.json",
+			wantResolved: "new.json", wantDeprecated: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolved, deprecated := resolveSummaryPath(tc.summarySet, tc.summaryVal, tc.measurementSet, tc.measurementVal)
 			assert.Equal(t, tc.wantResolved, resolved)
 			assert.Equal(t, tc.wantDeprecated, deprecated)
 		})

@@ -626,7 +626,11 @@ func loadPolicy(path string) (*Policy, string, []string) {
 		if os.IsNotExist(err) {
 			return nil, policyMissing, nil
 		}
-		return nil, policyInvalid, nil
+		// A non-NotExist error (permission denied, EISDIR, etc.) is an OS/IO
+		// failure, not a YAML content problem — surface the real error via
+		// the same warnings channel diagnose.go's POLICY_INVALID hints read,
+		// instead of leaving the caller to guess it's a syntax issue.
+		return nil, policyInvalid, []string{fmt.Sprintf("could not read policy file %s: %v", path, err)}
 	}
 
 	var warnings []string
@@ -727,6 +731,12 @@ func loadMeasurement(path string) (*summary.Summary, string) {
 		if os.IsNotExist(err) {
 			return nil, measMissing
 		}
+		// Same reasoning as loadPolicy: an OS/IO failure here is not the
+		// same thing as "corrupt content," and diagnose.go's hints for
+		// MEASUREMENT_INPUT_CORRUPT only make sense for the latter. There's
+		// no warnings-list return path here (unlike loadPolicy), so surface
+		// the real error directly.
+		fmt.Fprintf(os.Stderr, "slint-gate: could not read %s: %v\n", path, err)
 		return nil, measCorrupt
 	}
 	var s summary.Summary

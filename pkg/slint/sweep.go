@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
 )
 
 const (
@@ -130,6 +132,11 @@ func (s *Session) SweepOrphansWithResult(ctx context.Context, opts OrphanSweepOp
 		finalizeSweepResult(&res)
 		return res, nil
 	}
+	if kubeutil.IsDangerousNamespace(ns) && !s.impl.DangerouslyAllowKubeSystemNamespace {
+		appendDangerousNamespaceGuard(&res, ns)
+		finalizeSweepResult(&res)
+		return res, nil
+	}
 
 	res.Request.Namespace = ns
 	res.Request.CurrentRunID = runID
@@ -190,6 +197,14 @@ func appendSkipGuard(res *SweepResult) {
 	res.Summary.Skipped++
 	res.Summary.SkippedByReason["missing_guard"]++
 	warnMsg := "skip - missing namespace or run-id for safety guard"
+	res.Warnings = append(res.Warnings, warnMsg)
+	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: %s\n", warnMsg)
+}
+
+func appendDangerousNamespaceGuard(res *SweepResult, ns string) {
+	res.Summary.Skipped++
+	res.Summary.SkippedByReason["dangerous_namespace"]++
+	warnMsg := fmt.Sprintf("skip - namespace %q is cluster-critical and rejected by default; set DangerouslyAllowKubeSystemNamespace to override", ns)
 	res.Warnings = append(res.Warnings, warnMsg)
 	fmt.Fprintf(os.Stderr, "kube-slint [orphan-sweep]: %s\n", warnMsg)
 }

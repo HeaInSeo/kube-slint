@@ -50,6 +50,57 @@ func TestShouldFailOnDataplane(t *testing.T) {
 	}
 }
 
+// TestResolveDataplaneSeverityThreshold is a regression test for a finding
+// from pre-release-adversarial-review (2026-07-08): this subcommand's
+// --fail-on collided in name (not meaning) with the gate command's
+// deprecated --fail-on/--exit-on pair. --severity-threshold is the new
+// preferred name; --fail-on keeps working as a deprecated alias.
+// (Structurally similar to TestResolveExitOn in main_test.go — see the
+// dupl exemption there.)
+//
+//nolint:dupl
+func TestResolveDataplaneSeverityThreshold(t *testing.T) {
+	cases := []struct {
+		name                    string
+		thresholdSet, failOnSet bool
+		thresholdVal, failOnVal string
+		wantResolved            string
+		wantDeprecated          bool
+	}{
+		{
+			name:         "neither set defaults to error, no deprecation warning",
+			thresholdSet: false, thresholdVal: "",
+			failOnSet: false, failOnVal: "",
+			wantResolved: "error", wantDeprecated: false,
+		},
+		{
+			name:         "only --fail-on set is honored with deprecation warning",
+			thresholdSet: false, thresholdVal: "",
+			failOnSet: true, failOnVal: "warning",
+			wantResolved: "warning", wantDeprecated: true,
+		},
+		{
+			name:         "only --severity-threshold set is honored with no deprecation warning",
+			thresholdSet: true, thresholdVal: "none",
+			failOnSet: false, failOnVal: "",
+			wantResolved: "none", wantDeprecated: false,
+		},
+		{
+			name:         "both set: --severity-threshold wins, no deprecation warning",
+			thresholdSet: true, thresholdVal: "error",
+			failOnSet: true, failOnVal: "warning",
+			wantResolved: "error", wantDeprecated: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolved, deprecated := resolveDataplaneSeverityThreshold(tc.thresholdSet, tc.thresholdVal, tc.failOnSet, tc.failOnVal)
+			assert.Equal(t, tc.wantResolved, resolved)
+			assert.Equal(t, tc.wantDeprecated, deprecated)
+		})
+	}
+}
+
 func TestAnalyzeDataplane_EndToEnd_JSONAndSARIFWritten(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "examples", "kind-hello-operator", "manifests")
 	dir := t.TempDir()
