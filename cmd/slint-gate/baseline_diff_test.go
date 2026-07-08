@@ -91,7 +91,7 @@ func TestRunBaselineDiff_Improved_LabeledImproves(t *testing.T) {
 		err = runBaselineDiff([]string{"--baseline", baseline, "--summary", cur, "--policy", policy})
 	})
 	require.NoError(t, err)
-	assert.Contains(t, out, "improves on the known-good baseline")
+	assert.Contains(t, out, "baseline merge --mode review-existing")
 }
 
 func TestRunBaselineDiff_MissingFromSummary(t *testing.T) {

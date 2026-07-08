@@ -356,7 +356,7 @@ UX goal:
 Show whether the baseline is stale before touching it.
 ```
 
-### 7. Baseline Safe Merge — implemented (Sprint 4, `append-new-only` only)
+### 7. Baseline Safe Merge — implemented (Sprint 4, `append-new-only` only; `review-existing`/`force-replace` added 2026-07-08)
 
 ```sh
 slint-gate baseline merge \
@@ -374,19 +374,28 @@ Actual behavior:
   equivalent for this command;
 - `--baseline` must already exist (`baseline approve` first if it doesn't);
   `--output` defaults to `--baseline` itself (in-place update);
-- **`append-new-only` never touches an existing SLI's value, in either
-  direction** — this is the literal meaning of "append-*new*-only." Every
-  existing-SLI value difference (worse or better) is listed under "Rejected
-  changes" and the baseline keeps its original value; SLIs in the baseline
-  but absent from the current summary are left in place, never deleted; only
-  genuinely new SLI IDs are appended;
-- **only `append-new-only` is implemented so far** — `--mode` rejects any
-  other value with a clear "not yet supported" error. The doc's other two
-  modes (`review-existing`, and `force-replace` in particular — flagged in
-  the doc itself as a dangerous, hide-from-quickstart option, matching this
-  project's `Dangerously*` precedent) are deferred until actually needed;
-- `Result: MERGED` (only new SLIs appended), `MERGED_WITH_REJECTIONS` (some
-  existing-SLI changes were rejected), or `NO_CHANGE`.
+- **`append-new-only` (default) never touches an existing SLI's value, in
+  either direction** — this is the literal meaning of "append-*new*-only."
+  Every existing-SLI value difference (worse or better) is listed under
+  "Rejected changes" and the baseline keeps its original value; SLIs in the
+  baseline but absent from the current summary are left in place, never
+  deleted; only genuinely new SLI IDs are appended;
+- **`review-existing`** (added 2026-07-08, D-023) updates an existing SLI's
+  value only when it's a confirmed improvement in the direction implied by
+  `policy.yaml`'s threshold operator for that metric (reusing
+  `gate.LowerIsBetter`/`gate.HigherIsBetter`, same as `baseline diff`'s
+  improve/weaken wording). A change with no recognized direction, or a
+  regression, is still rejected and left unchanged — this mode never
+  guesses;
+- **`force-replace`** (added 2026-07-08, D-023) unconditionally overwrites
+  every existing SLI whose value changed, regardless of direction. This is
+  a deliberate rebaselining escape hatch, not a default-safe mode — Sprint
+  4's original doc flagged it as the more dangerous of the two deferred
+  modes, and that judgment still holds; it's just no longer *unimplemented*,
+  it's opt-in via `--mode force-replace`;
+- `Result: MERGED` (something changed — appended and/or, for
+  `review-existing`/`force-replace`, updated), `MERGED_WITH_REJECTIONS`
+  (some existing-SLI changes were rejected), or `NO_CHANGE`.
 
 UX goal:
 
@@ -636,11 +645,11 @@ Resolved:
   with `--allow-warn`; `FAIL`/`NO_GRADE` always rejected, with no flag
   (including `--force`) able to override — `--force` only controls
   overwriting an existing `--output` file. See "Approve Baseline" above.
-- **`baseline merge` mode scope**: only `append-new-only` is implemented.
-  `review-existing` and `force-replace` are deferred until actually needed —
-  `force-replace` in particular stays out until there's a concrete request
-  for it, consistent with keeping dangerous options out of the default
-  surface. See "Baseline Safe Merge" above.
+- **`baseline merge` mode scope**: all three modes (`append-new-only`,
+  `review-existing`, `force-replace`) are implemented as of 2026-07-08
+  (D-023). `append-new-only` remains the default — `force-replace` is
+  opt-in only, consistent with keeping the more dangerous option out of the
+  default surface. See "Baseline Safe Merge" above.
 
 - **Profile selection location**: CLI input only for now (`--profile` on
   `init`). The generated `policy.yaml` records the profile as a comment, not

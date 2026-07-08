@@ -167,14 +167,14 @@ func printChangeGuidance(id string, baseVal, curVal float64, direction string) {
 			fmt.Println("    Reason: this weakens the known-good baseline.")
 			return
 		}
-		fmt.Println("    Recommendation: safe to review — this improves on the known-good baseline.")
+		fmt.Println("    Recommendation: an improvement — 'baseline merge --mode review-existing' will apply it.")
 	case "higher":
 		if curVal < baseVal {
 			fmt.Println("    Recommendation: do not merge automatically.")
 			fmt.Println("    Reason: this weakens the known-good baseline.")
 			return
 		}
-		fmt.Println("    Recommendation: safe to review — this improves on the known-good baseline.")
+		fmt.Println("    Recommendation: an improvement — 'baseline merge --mode review-existing' will apply it.")
 	default:
 		fmt.Printf("    Recommendation: review before merging (improve/weaken direction for %q is unknown — no policy threshold for it, or its operator doesn't imply a direction).\n", id)
 	}
