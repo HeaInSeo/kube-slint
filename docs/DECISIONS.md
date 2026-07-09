@@ -122,11 +122,11 @@ This file records architecture/product-direction decisions that define the proje
 - Status: Accepted, Completed
 - Decision:
   - `hack/slint_gate.py` (Python + pyyaml)는 삭제되었다. 운영 gate 경로는 `cmd/slint-gate` Go 바이너리만 사용한다.
-  - gate 평가 로직은 `internal/gate` 패키지로 캡슐화하며, CLI는 `cmd/slint-gate/main.go`에서만 flag 파싱 및 출력을 담당한다.
+  - gate 평가 로직은 `internal/gate` 패키지로 캡슐화하며, CLI는 `cmd/slint-gate/main.go`에서만 flag 파싱 및 출력을 담당한다. **(2026-07-09 갱신: `internal/gate`는 이후 post-RC 하드닝 R6에서 `pkg/gate`로 이동했고 `internal/gate`는 더 이상 존재하지 않음 — 이 결정 자체(Go 단일 스택, 로직/CLI 분리)는 여전히 유효하지만 패키지 경로는 `pkg/gate`로 읽을 것. `docs/architecture.md`/`.golangci.yml`은 이미 "formerly internal/gate"로 갱신되어 있었으나 이 항목만 누락됐던 것을 세 번째 `pre-release-adversarial-review`에서 발견.)**
   - `hack/prepare-baseline-update.sh`도 `go run ./cmd/slint-gate` + `jq` 기반으로 재작성되었다.
 - Rationale:
   - Go 단일 언어 스택으로 통합하여 Python 런타임/pyyaml 의존을 완전 제거한다.
-  - `internal/gate` 단위 테스트로 게이트 로직의 회귀를 방어한다.
+  - `pkg/gate`(구 `internal/gate`) 단위 테스트로 게이트 로직의 회귀를 방어한다.
   - `--github-step-summary` 플래그로 Actions step summary 렌더링을 Go 바이너리 내부로 흡수한다.
 
 ## D-013: pkg/slint owns the consumer-facing session API

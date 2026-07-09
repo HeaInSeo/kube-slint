@@ -10,25 +10,11 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-// Config defines the inputs to an SLO measurement session.
-// type Config struct {
-// 	Enabled bool	// false skips instrumentation hooks entirely
-// 	Namespace          string
-// 	MetricsServiceName string
-// 	TestCase           string
-// 	Suite              string
-// 	RunID              string
-// 	ServiceAccountName string
-// 	Token              string
-// 	ArtifactsDir string
-// 	Tags         map[string]string
-// 	// Lets instrumentation code select this.
-// 	Method engine.Method
-//     Fetcher fetch.MetricsFetcher
-// }
-
 // Attach registers BeforeEach/AfterEach hooks that call provider to fetch
-// the current test's config and manage the measurement session.
+// the current test's config (see SessionConfig in session.go for its full,
+// authoritative field list) and manage the measurement session. Calling
+// Attach() is itself the opt-in; disable it without code changes via
+// SLINT_ENABLED=0/false (see isEnabledByEnv below).
 func Attach(provider func() SessionConfig) (*Session, error) {
 	session := &Session{} // placeholder; impl is set in BeforeEach
 
