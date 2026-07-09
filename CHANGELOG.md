@@ -28,6 +28,18 @@ real, all fixed (none deferred):
 
 Permanent guardrails added for the repeatable patterns: `.semgrep/rules/kube-slint-no-raw-json-splice-in-podspec`, and two new `hack/quality-guardrails.sh` checks (`check_cli_dispatch_error_printing`, `check_flag_deprecation_docs`).
 
+A third `pre-release-adversarial-review` run found 9 more findings (2 were
+duplicate reports of the same bug — 8 unique), all confirmed real, all
+fixed (none deferred):
+
+- **Reliability (high)**: `pkg/slo/fetch/curlpod`'s `WaitDone` treated pod phase `Succeeded` and `Failed` identically, so `CurlPod.Run` always returned the pod's logs regardless of outcome. Since the in-pod script uses `curl --fail-with-body`, a non-2xx response (RBAC 403, wrong port, etc.) set phase `Failed` while still writing the response body to stdout — and the promtext parser silently skips lines it can't parse as metrics, so a JSON error body parsed to an empty-but-successful `map[]`/`nil`. The engine only sets `CollectionStatus=Failed` on a Go error from `Fetch()`, which this path never produced, so a genuinely failed scrape reported `CollectionStatus=Complete` with the affected SLIs quietly skipped — indistinguishable from an operator legitimately exposing zero metrics. Contradicted `docs/architecture.md`'s documented reliability contract. `WaitDone` now returns a new `ErrPodFailed` sentinel for phase `Failed`; `CurlPod.Run` still best-effort fetches logs for diagnostics but returns them embedded (redacted) in the error instead of as a successful sample. See D-027.
+- `slint-gate ci github-actions` generated the deprecated `measurement-summary:` action input in its printed snippet instead of the preferred `summary:`, even though every other onboarding command and `action.yml` itself had already migrated — the one command whose entire job is handing a new user a working, best-practice snippet handed them the deprecated key.
+- Two label-selector-based `kubectl delete` cleanup paths used singular `pod`, and one name-based delete used plural `pods` — standardized (name-based = singular, selector-based = plural, matching this codebase's existing `kubectl get` convention).
+- Five more copies of the `captureStdout`/`captureStderr` pipe-buffer deadlock (see the previous round's D-026): `pkg/gate/gate_test.go`'s `captureStderr`, `cmd/slint-gate/diagnose_test.go`'s `capturePrintDiagnostics`, and three inline capture blocks in `init_test.go`. `captureStderr` got its own fix; the three `cmd/slint-gate` sites were consolidated onto the already-fixed `captureStdout`. See D-028.
+- `docs/DECISIONS.md`'s D-012 still described gate logic as living in `internal/gate`, renamed to `pkg/gate` in the R6 post-RC hardening move; `pkg/slint/attach.go`'s commented-out pseudo-code `Config` type no longer matched real `SessionConfig` (wrong type name, a phantom field, missing most real fields) — removed in favor of a doc comment pointing at the real definition.
+
+Permanent guardrails added: `check_kubectl_delete_pod_resource_naming` and `check_test_capture_helper_consolidation` in `hack/quality-guardrails.sh`, plus an extension to `check_flag_deprecation_docs` covering the `ci github-actions` generator.
+
 ### Changed
 
 - `pkg/gate/gate.go` (866 lines) split into `types.go`, `policy.go`, `measurement.go`, `threshold.go`, `regression.go`, `reliability.go`, and a slimmed-down orchestration-only `gate.go`. No behavior change.

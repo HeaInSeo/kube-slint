@@ -61,6 +61,29 @@ D-026 for full rationale.
   shared `captureStdout` test helper on output larger than the OS pipe
   buffer (D-026, independently reproduced via a standalone repro before
   fixing). See `CHANGELOG.md`'s `[Unreleased]` entry for the full list.
+* [x] Third `pre-release-adversarial-review` run (2026-07-09): first attempt
+  again hit the session rate limit across all 7 agents (a non-result, same
+  as the second round's first attempt); retry completed cleanly with 9
+  findings (2 duplicate reports of the same bug — 8 unique), all confirmed,
+  all fixed. The significant one: `pkg/slo/fetch/curlpod`'s `WaitDone`
+  treated pod phase `Succeeded`/`Failed` identically, so a scrape that
+  failed with a non-2xx response (RBAC 403, wrong port, etc.) still had its
+  raw error body parsed as an empty-but-successful metrics sample —
+  `CollectionStatus` reported `Complete` instead of `Failed`, directly
+  contradicting `docs/architecture.md`'s documented reliability contract.
+  This is the project's core value proposition (a guardrail whose entire
+  point is that broken measurements never silently look clean), so it was
+  fixed with real logic (a new `ErrPodFailed` sentinel), not deferred.
+  See D-027. Also fixed: `ci github-actions` generating the deprecated
+  `measurement-summary:` key in its printed snippet; `kubectl delete
+  pod`/`pods` spelling inconsistency across 3 files (standardized:
+  name-based=singular, selector-based=plural); 5 more copies of the
+  `captureStdout` pipe-buffer deadlock (D-028, 3 consolidated onto the
+  existing fixed helper rather than each getting an independent fix); and
+  two stale-docs findings (D-012's `internal/gate` reference, `attach.go`'s
+  drifted `Config` pseudo-code comment, removed rather than re-synced since
+  a hand-copied duplicate will just drift again). See `CHANGELOG.md`'s
+  `[Unreleased]` entry for the full list.
 
 ### v1.5.3 Release (2026-07-08)
 
