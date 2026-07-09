@@ -171,6 +171,22 @@ check_curlpod_security_contract() {
     "curlpod validates ServiceAccountName before use (PodSpec-injection guard)"
 }
 
+check_kubectl_delete_pod_resource_naming() {
+  echo "== kubectl delete pod/pods naming guardrails =="
+  # Convention: a delete targeting one named pod uses singular "pod"; a
+  # delete targeting a label selector (potentially multiple pods) uses
+  # plural "pods". Found by the third pre-release-adversarial-review pass
+  # (2026-07-09): two selector-based deletes used singular "pod" and one
+  # name-based delete used plural "pods" - an unexplained divergence
+  # between the closest-analogous cleanup paths in the same packages.
+  require_grep '"kubectl", "delete", "pods",' pkg/slo/fetch/curlpod/client.go \
+    "curlpod CleanupByLabel (selector-based) uses plural 'pods'"
+  require_grep 'kubectl.*delete.*pods.*-l.*labelSelector' pkg/slint/session.go \
+    "session.go's label-selector delete uses plural 'pods'"
+  require_grep 'kubectl.*delete.*pod.*name.*-n' pkg/slint/sweep.go \
+    "sweep.go's name-based delete uses singular 'pod'"
+}
+
 check_cli_dispatch_error_printing() {
   echo "== CLI dispatch error printing guardrails =="
   local file="cmd/slint-gate/main.go"
@@ -268,6 +284,7 @@ check_security_contract
 check_rbac_contract
 check_secret_redaction_contract
 check_curlpod_security_contract
+check_kubectl_delete_pod_resource_naming
 check_cli_dispatch_error_printing
 check_gate_contract
 check_test_strategy

@@ -323,7 +323,7 @@ func (c *Client) CleanupByLabel(ctx context.Context, ns string) error {
 	}
 
 	cmd := exec.Command(
-		"kubectl", "delete", "pod",
+		"kubectl", "delete", "pods",
 		"-n", ns,
 		"-l", c.LabelSelector,
 		"--ignore-not-found=true",

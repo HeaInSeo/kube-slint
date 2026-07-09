@@ -373,7 +373,7 @@ func shouldRunCleanup(mode string, enabled, hasFailed bool) bool {
 func runCleanupActions(ctx context.Context, ns, runID string) {
 	labelSelector := fmt.Sprintf("app.kubernetes.io/managed-by=kube-slint,slint-run-id=%s", SanitizeKubernetesLabelValue(runID))
 
-	cmd := execCommandContext(ctx, "kubectl", "delete", "pod", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
+	cmd := execCommandContext(ctx, "kubectl", "delete", "pods", "-n", ns, "-l", labelSelector, "--ignore-not-found=true")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "kube-slint [cleanup]: failed for run-id %s: %v (output: %s)\n", runID, err, string(out))
