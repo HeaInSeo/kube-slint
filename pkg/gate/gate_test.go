@@ -1,7 +1,9 @@
 package gate_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -146,6 +148,13 @@ func TestEvaluate_MeasurementReadIOError_LogsRealError(t *testing.T) {
 	assert.Contains(t, stderr, measPath)
 }
 
+// captureStderr redirects os.Stderr to a pipe and returns everything fn()
+// wrote to it. The read end is drained concurrently in a goroutine started
+// before fn() runs (not after) — see cmd/slint-gate/inspect_test.go's
+// captureStdout, which has the identical shape and an explanatory comment:
+// os.Pipe()'s write end has a bounded kernel buffer (commonly 64KiB on
+// Linux, not a portable guarantee), so draining only after fn() returns
+// risks a deadlock if fn() ever writes more than that in one call.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	old := os.Stderr
@@ -153,20 +162,19 @@ func captureStderr(t *testing.T, fn func()) string {
 	require.NoError(t, err)
 	os.Stderr = w
 
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+
 	fn()
 
 	_ = w.Close()
 	os.Stderr = old
+	<-done
 
-	var buf strings.Builder
-	tmp := make([]byte, 4096)
-	for {
-		n, _ := r.Read(tmp)
-		if n == 0 {
-			break
-		}
-		buf.Write(tmp[:n])
-	}
 	return buf.String()
 }
 

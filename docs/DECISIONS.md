@@ -499,3 +499,15 @@ This file records architecture/product-direction decisions that define the proje
 - Rationale:
   - This is the project's core value proposition (a shift-left SLI *guardrail* whose entire point is that a broken measurement must never silently look like a clean one), so it was fixed directly rather than deferred or merely pattern-guarded — there's no grep/semgrep pattern that generalizes "does this specific failure path get correctly classified," it needed real logic.
   - Redacting the embedded pod output (rather than passing it through raw) matters because this error can end up in `Reliability.BlockedReason`, a field persisted into `sli-summary.json` — the same artifact class `evidence.RedactString` already protects elsewhere (`pkg/kubeutil/runner.go`'s command-error path).
+
+## D-028: five more copies of the captureStdout pipe-buffer deadlock, consolidated
+
+- Date: 2026-07-09
+- Status: Accepted
+- Decision:
+  - The third `pre-release-adversarial-review` pass found the same defect class as D-026 (`cmd/slint-gate/inspect_test.go`'s `captureStdout`, fixed 2026-07-08) duplicated five more times: `pkg/gate/gate_test.go`'s `captureStderr`, `cmd/slint-gate/diagnose_test.go`'s `capturePrintDiagnostics`, and three inline `os.Pipe()` capture blocks in `cmd/slint-gate/init_test.go` (`TestRunInit_WithServiceOverride`, `TestRunInit_DefaultPlaceholders`, and a `capture` closure in `TestPrintDiscoveryResult_DiscoverErrorIsDistinctFromNoCandidates`). All five drained their pipe only after the captured function returned, the same latent deadlock-on-output-larger-than-the-OS-pipe-buffer risk.
+  - `pkg/gate/gate_test.go`'s `captureStderr` is in a different package from the already-fixed `captureStdout`, so it got its own independent fix using the identical concurrent-drain-goroutine pattern.
+  - The three `cmd/slint-gate` sites are in the *same* package (`main`) as the already-fixed `captureStdout` — rather than fixing each site independently (which would just be a sixth/seventh/eighth copy of the same fix), they were consolidated to call `captureStdout` directly. `diagnose_test.go`'s `capturePrintDiagnostics` became a one-line wrapper (`captureStdout(t, func() { printDiagnostics(result) })`) instead of duplicating pipe-capture logic; the two `init_test.go` inline blocks were replaced with direct `captureStdout` calls.
+  - Added `check_test_capture_helper_consolidation` to `hack/quality-guardrails.sh`: fails if `os.Pipe()` appears in any `cmd/slint-gate`/`pkg/gate` test file other than the two canonical fixed helpers, so a future ad-hoc capture helper can't reintroduce this pattern a sixth time.
+- Rationale:
+  - Consolidating onto the existing fixed helper (rather than re-fixing each site independently) is strictly better here: one implementation to maintain, and it matches this project's general anti-duplication stance (see D-022's `ResultValues`/`CompareOp` consolidation) — three near-identical bug fixes in one PR is a stronger signal to standardize than to keep patching copies.

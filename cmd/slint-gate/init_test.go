@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,62 +41,33 @@ func TestRunInit_WithServiceOverride(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "policy.yaml")
 
-	// Capture stdout via pipe
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runInit([]string{
-		"--output", out,
-		"--service", "my-operator-metrics-service",
-		"--namespace", "my-ns",
+	var err error
+	stdout := captureStdout(t, func() {
+		err = runInit([]string{
+			"--output", out,
+			"--service", "my-operator-metrics-service",
+			"--namespace", "my-ns",
+		})
 	})
 
-	_ = w.Close()
-	os.Stdout = old
-
-	var buf strings.Builder
-	tmp := make([]byte, 4096)
-	for {
-		n, _ := r.Read(tmp)
-		if n == 0 {
-			break
-		}
-		buf.Write(tmp[:n])
-	}
-
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "my-operator-metrics-service")
-	assert.Contains(t, buf.String(), "my-ns")
+	assert.Contains(t, stdout, "my-operator-metrics-service")
+	assert.Contains(t, stdout, "my-ns")
 }
 
 func TestRunInit_DefaultPlaceholders(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "policy.yaml")
 
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runInit([]string{"--output", out})
-
-	_ = w.Close()
-	os.Stdout = old
-
-	var buf strings.Builder
-	tmp := make([]byte, 4096)
-	for {
-		n, _ := r.Read(tmp)
-		if n == 0 {
-			break
-		}
-		buf.Write(tmp[:n])
-	}
+	var err error
+	stdout := captureStdout(t, func() {
+		err = runInit([]string{"--output", out})
+	})
 
 	require.NoError(t, err)
 	// 네임스페이스/서비스 미지정 시 placeholder가 출력되어야 함
-	assert.Contains(t, buf.String(), "<YOUR_NAMESPACE>")
-	assert.Contains(t, buf.String(), "<YOUR_METRICS_SERVICE_NAME>")
+	assert.Contains(t, stdout, "<YOUR_NAMESPACE>")
+	assert.Contains(t, stdout, "<YOUR_METRICS_SERVICE_NAME>")
 }
 
 func TestResolveServiceName_Override(t *testing.T) {
@@ -297,32 +267,13 @@ func TestDescribeKubectlError_NonExitErrorSurfacesGoError(t *testing.T) {
 }
 
 func TestPrintDiscoveryResult_DiscoverErrorIsDistinctFromNoCandidates(t *testing.T) {
-	capture := func(fn func()) string {
-		old := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-		fn()
-		_ = w.Close()
-		os.Stdout = old
-		var buf strings.Builder
-		tmp := make([]byte, 4096)
-		for {
-			n, _ := r.Read(tmp)
-			if n == 0 {
-				break
-			}
-			buf.Write(tmp[:n])
-		}
-		return buf.String()
-	}
-
-	errOutput := capture(func() {
+	errOutput := captureStdout(t, func() {
 		printDiscoveryResult("my-ns", nil, errors.New("kubectl get svc: connection refused"))
 	})
 	assert.Contains(t, errOutput, "could not auto-detect")
 	assert.Contains(t, errOutput, "connection refused")
 
-	noCandidatesOutput := capture(func() {
+	noCandidatesOutput := captureStdout(t, func() {
 		printDiscoveryResult("my-ns", nil, nil)
 	})
 	assert.Contains(t, noCandidatesOutput, "no metrics services auto-detected")

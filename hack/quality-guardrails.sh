@@ -234,6 +234,25 @@ check_test_strategy() {
     "E2E acceptance rejects invalid-input PASS"
 }
 
+check_test_capture_helper_consolidation() {
+  echo "== test capture helper consolidation guardrails =="
+  # os.Pipe()-based output capture must go through the canonical, already-
+  # fixed helpers (cmd/slint-gate/inspect_test.go's captureStdout,
+  # pkg/gate/gate_test.go's captureStderr) rather than reinventing a
+  # synchronous-drain-after-fn() version, which deadlocks on output larger
+  # than the OS pipe buffer. Found 5 duplicate instances of the buggy
+  # pattern by the third pre-release-adversarial-review pass (2026-07-09);
+  # all were consolidated onto these two canonical helpers.
+  local unexpected
+  unexpected=$(grep -rl 'os\.Pipe()' --include='*_test.go' cmd/slint-gate pkg/gate 2>/dev/null \
+    | grep -v -E '^(cmd/slint-gate/inspect_test\.go|pkg/gate/gate_test\.go)$' || true)
+  if [[ -z "$unexpected" ]]; then
+    pass "no new os.Pipe()-based capture helpers outside the two canonical ones"
+  else
+    fail "new os.Pipe() usage outside the canonical capture helpers (reuse captureStdout/captureStderr instead of reinventing): $unexpected"
+  fi
+}
+
 check_flag_deprecation_docs() {
   echo "== flag deprecation docs guardrails =="
   # --summary is the current/preferred flag; --measurement-summary is the
@@ -288,6 +307,7 @@ check_kubectl_delete_pod_resource_naming
 check_cli_dispatch_error_printing
 check_gate_contract
 check_test_strategy
+check_test_capture_helper_consolidation
 check_flag_deprecation_docs
 check_identity_wording
 check_release_and_ux_contract
