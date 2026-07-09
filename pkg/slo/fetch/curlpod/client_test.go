@@ -3,9 +3,11 @@ package curlpod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
@@ -366,5 +368,58 @@ func TestNew_TLSInsecureSkipVerifyDefaultsFalse(t *testing.T) {
 	}
 	if c.DangerouslySkipTLSVerify {
 		t.Fatal("expected DangerouslySkipTLSVerify to default to false")
+	}
+}
+
+// phaseRunner returns a scripted phase for "kubectl get pod ... jsonpath=
+// {.status.phase}" and nil/empty for anything else (e.g. delete cleanup).
+type phaseRunner struct {
+	phase    string
+	phaseErr error
+}
+
+func (r *phaseRunner) Run(_ context.Context, _ slo.Logger, cmd *exec.Cmd) (string, error) {
+	for _, a := range cmd.Args {
+		if a == "jsonpath={.status.phase}" {
+			return r.phase, r.phaseErr
+		}
+	}
+	return "", nil
+}
+
+func TestWaitDone_Succeeded_ReturnsNil(t *testing.T) {
+	c := New(nil, &phaseRunner{phase: "Succeeded"})
+	if err := c.WaitDone(context.Background(), "ns", "pod-1", time.Millisecond); err != nil {
+		t.Fatalf("expected nil error for phase=Succeeded, got: %v", err)
+	}
+}
+
+// TestWaitDone_Failed_ReturnsErrPodFailed reproduces the finding from the
+// third pre-release-adversarial-review pass (2026-07-09): WaitDone used to
+// treat phase=Succeeded and phase=Failed identically (both just "done"),
+// so a genuinely failed scrape was silently treated as a successful one
+// downstream. WaitDone must now distinguish them.
+func TestWaitDone_Failed_ReturnsErrPodFailed(t *testing.T) {
+	c := New(nil, &phaseRunner{phase: "Failed"})
+	err := c.WaitDone(context.Background(), "ns", "pod-1", time.Millisecond)
+	if err == nil {
+		t.Fatal("expected an error for phase=Failed, got nil")
+	}
+	if !errors.Is(err, ErrPodFailed) {
+		t.Fatalf("expected errors.Is(err, ErrPodFailed) to be true, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "ns/pod-1") {
+		t.Fatalf("expected the error to identify the pod, got: %v", err)
+	}
+}
+
+func TestWaitDone_KubectlError_PropagatesWithoutErrPodFailed(t *testing.T) {
+	c := New(nil, &phaseRunner{phaseErr: context.DeadlineExceeded})
+	err := c.WaitDone(context.Background(), "ns", "pod-1", time.Millisecond)
+	if err == nil {
+		t.Fatal("expected an error when the phase check itself fails, got nil")
+	}
+	if errors.Is(err, ErrPodFailed) {
+		t.Fatal("a kubectl/context error must not be reported as ErrPodFailed")
 	}
 }

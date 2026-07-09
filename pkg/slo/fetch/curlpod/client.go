@@ -3,6 +3,7 @@ package curlpod
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -11,6 +12,17 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/kubeutil"
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
 )
+
+// ErrPodFailed indicates the curl pod reached phase "Failed" — the scrape
+// itself did not complete successfully (e.g. curl's --fail-with-body exited
+// non-zero on a non-2xx response, or the container was OOM-killed), as
+// opposed to a kubectl/context error. Callers must treat this as a scrape
+// failure, not attempt to parse the pod's logs as if they were a
+// successful measurement — "Succeeded" and "Failed" used to be
+// indistinguishable to WaitDone's caller, which let a failed scrape's raw
+// (often non-Prometheus) log output flow into the metrics parser and
+// silently report as an empty-but-successful sample.
+var ErrPodFailed = errors.New("curl pod reached phase Failed")
 
 // PodLabelSelector 는 curl 파드에 사용되는 레이블임.
 const PodLabelSelector = "app=curl-metrics"
@@ -217,6 +229,10 @@ type podOverrideSeccompProfile struct {
 }
 
 // WaitDone 은 curl 파드가 종료 단계(Succeeded/Failed)에 도달할 때까지 기다림.
+// Returns ErrPodFailed (wrapped with the pod's identity) if the pod reaches
+// phase "Failed" — this is a terminal state, not a transient kubectl error,
+// so the caller must not proceed to treat the pod's logs as a successful
+// measurement.
 func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Duration) error {
 	c.Logger = slo.NewLogger(c.Logger)
 	if c.Runner == nil {
@@ -230,7 +246,7 @@ func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Dur
 	defer ticker.Stop()
 
 	// 즉시 첫 번째 확인
-	if done, err := c.isTerminal(ctx, ns, podName); err != nil {
+	if done, err := c.checkTerminalPhase(ctx, ns, podName); err != nil {
 		return err
 	} else if done {
 		return nil
@@ -241,7 +257,7 @@ func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Dur
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			done, err := c.isTerminal(ctx, ns, podName)
+			done, err := c.checkTerminalPhase(ctx, ns, podName)
 			if err != nil {
 				return err
 			}
@@ -249,6 +265,25 @@ func (c *Client) WaitDone(ctx context.Context, ns, podName string, poll time.Dur
 				return nil
 			}
 		}
+	}
+}
+
+// checkTerminalPhase reports whether the pod has reached a terminal phase.
+// done=true, err=nil means phase=Succeeded. done=true, err=ErrPodFailed
+// means phase=Failed — still "terminal" in the sense that polling should
+// stop, but the caller must treat it as a failure, not success.
+func (c *Client) checkTerminalPhase(ctx context.Context, ns, podName string) (done bool, err error) {
+	phase, err := c.podPhase(ctx, ns, podName)
+	if err != nil {
+		return false, err
+	}
+	switch phase {
+	case "Succeeded":
+		return true, nil
+	case "Failed":
+		return true, fmt.Errorf("%w: %s/%s", ErrPodFailed, ns, podName)
+	default:
+		return false, nil
 	}
 }
 
@@ -320,7 +355,9 @@ func parseSelectorToLabels(selector string) map[string]string {
 	return m
 }
 
-func (c *Client) isTerminal(ctx context.Context, ns, podName string) (bool, error) {
+// podPhase returns the pod's current .status.phase (e.g. "Running",
+// "Succeeded", "Failed").
+func (c *Client) podPhase(ctx context.Context, ns, podName string) (string, error) {
 	cmd := exec.Command(
 		"kubectl", "get", "pod", podName,
 		"-n", ns,
@@ -328,8 +365,7 @@ func (c *Client) isTerminal(ctx context.Context, ns, podName string) (bool, erro
 	)
 	out, err := c.Runner.Run(ctx, c.Logger, cmd)
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	phase := strings.TrimSpace(out)
-	return phase == "Succeeded" || phase == "Failed", nil
+	return strings.TrimSpace(out), nil
 }
