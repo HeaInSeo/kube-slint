@@ -180,7 +180,7 @@ Run the gate separately after any E2E suite that writes `artifacts/sli-summary.j
 # .github/workflows/e2e.yml
 - uses: ./.github/actions/slint-gate
   with:
-    measurement-summary: artifacts/sli-summary.json
+    summary: artifacts/sli-summary.json
     policy: examples/kind-hello-operator/.slint/policy.yaml
     exit-on: FAIL_OR_NOGRADE
 ```

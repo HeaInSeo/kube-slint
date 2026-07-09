@@ -18,7 +18,7 @@ func TestRunCIGithubActions_WithBaseline(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "baseline: docs/baselines/my-service-sli-summary.json")
-	assert.Contains(t, stdout, "measurement-summary: artifacts/sli-summary.json")
+	assert.Contains(t, stdout, "summary: artifacts/sli-summary.json")
 	assert.Contains(t, stdout, "policy: .slint/policy.yaml")
 	assert.Contains(t, stdout, "exit-on: FAIL_OR_NOGRADE")
 }

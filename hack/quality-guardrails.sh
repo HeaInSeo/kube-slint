@@ -232,6 +232,13 @@ check_flag_deprecation_docs() {
     "README.md correctly names --measurement-summary as the deprecated alias"
   require_grep '`--measurement-summary`는 하위호환용 deprecated alias' "README(Kor).md" \
     "README(Kor).md correctly names --measurement-summary as the deprecated alias"
+  # `ci github-actions` generates a ready-to-paste Actions step - it must
+  # emit the preferred `summary:` action input, not the deprecated
+  # `measurement-summary:` alias. Found by the third pre-release-adversarial-
+  # review pass (2026-07-09): every other onboarding surface had already
+  # migrated to --summary, but this one generator was missed.
+  reject_grep 'measurement-summary: %s' cmd/slint-gate/ci_github_actions.go \
+    "ci github-actions generates the preferred summary: action input, not measurement-summary:"
 }
 
 check_identity_wording() {

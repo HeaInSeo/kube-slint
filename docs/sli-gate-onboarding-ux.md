@@ -305,9 +305,9 @@ for generated snippets):
 
 ```yaml
 - name: Run kube-slint shift-left SLI gate
-  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.5.0
+  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.5.3
   with:
-    measurement-summary: artifacts/sli-summary.json
+    summary: artifacts/sli-summary.json
     policy: .slint/policy.yaml
     baseline: docs/baselines/my-service-sli-summary.json
     exit-on: FAIL_OR_NOGRADE

@@ -40,7 +40,7 @@ func runCIGithubActions(args []string) error {
 	fmt.Fprintf(&b, "- name: Run kube-slint shift-left SLI gate\n")
 	fmt.Fprintf(&b, "  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@%s\n", *actionRef)
 	fmt.Fprintf(&b, "  with:\n")
-	fmt.Fprintf(&b, "    measurement-summary: %s\n", *summaryPath)
+	fmt.Fprintf(&b, "    summary: %s\n", *summaryPath)
 	fmt.Fprintf(&b, "    policy: %s\n", *policyPath)
 	if baseline := strings.TrimSpace(*baselinePath); baseline != "" {
 		fmt.Fprintf(&b, "    baseline: %s\n", baseline)

@@ -262,9 +262,9 @@ promote_to_fail:
 - name: slint-gate
   uses: HeaInSeo/kube-slint/.github/actions/slint-gate@main
   with:
-    measurement-summary: artifacts/sli-summary.json
-    policy:              .slint/policy.yaml
-    exit-on:             FAIL_OR_NOGRADE
+    summary:              artifacts/sli-summary.json
+    policy:               .slint/policy.yaml
+    exit-on:              FAIL_OR_NOGRADE
 ```
 
 ### CLI 직접 실행
