@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-09
+
 ### Added
 
 - `slint-gate wizard`: a real interactive, stdin-prompted onboarding flow (init → recommend-policy → baseline approve → ci github-actions), previously deferred in Sprint 6 pending a TTY/CI-safety answer. Refuses to run unless stdin is a real terminal (`golang.org/x/term.IsTerminal`), so CI/piped invocations never hang on a prompt. Shares state detection with `quickstart` (`cmd/slint-gate/onboarding_state.go`) and calls each subcommand's own function directly rather than reimplementing it. See D-024.

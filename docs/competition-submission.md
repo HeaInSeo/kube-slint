@@ -6,7 +6,7 @@
 
 kube-slint는 쿠버네티스 오퍼레이터 E2E 테스트 세션에 내장하는 **shift-left 운영 SLI 가드레일 라이브러리**입니다. 오퍼레이터를 수정하지 않고 외부 curl pod 또는 port-forward로 `/metrics` 엔드포인트를 스크랩하여 reconcile rate, workqueue depth, REST client error 등의 SLI를 측정하고, 선언적 `policy.yaml`로 CI 게이트 판정을 내립니다. 기능 정확성을 검증하는 E2E 테스트와 독립적으로 동작하며, 계측 실패가 테스트를 중단시키지 않는 safety-first 원칙을 준수합니다.
 
-**최신 릴리즈**: v1.5.3 (태그 전 필수화된 `pre-release-adversarial-review` 워크플로우 도입 및 첫 실행에서 발견한 8개 실버그 수정, `go.mod` 최소 Go 버전을 `1.25.5` 정확한 patch 고정에서 `1.22`로 인하해 소비자 호환성 개선. 이전 v1.5.0의 SLI Gate Onboarding UX 로드맵 Sprint 1-6·dataplane-service 정적 분석기·커스텀 Semgrep 가드레일, v1.5.1의 GitHub Action 아티팩트 보존 수정, v1.5.2의 ownerRef 메트릭 한계 문서화 및 이미지 pinning 정책 결정 포함)
+**최신 릴리즈**: v1.6.0 (`pkg/gate/gate.go` 7개 파일 분리, `baseline merge --mode review-existing/force-replace`, 진짜 interactive 온보딩 `slint-gate wizard`, F4 quoted label parser 수정에 더해, 태그 전 필수 `pre-release-adversarial-review` 워크플로우 2·3회차 실행에서 발견한 실버그 16건 전부 수정 — 그중 하나는 curl pod PodSpec/JSON injection 취약점, 또 하나는 스크랩 실패가 성공으로 오인되던 신뢰성 버그. 이전 v1.5.3의 adversarial review 프로세스 도입, v1.5.0의 SLI Gate Onboarding UX 로드맵 Sprint 1-6·dataplane-service 정적 분석기·커스텀 Semgrep 가드레일, v1.5.1의 GitHub Action 아티팩트 보존 수정, v1.5.2의 ownerRef 메트릭 한계 문서화 및 이미지 pinning 정책 결정 포함)
 
 **태그 이후(unreleased) 진행 중인 실사용 하드닝**: `pkg/gate/gate.go`(866줄) 7개 파일로 분리, Prometheus label 값에 공백이 포함된 경우 파싱이 깨지던 버그 수정, `baseline merge`의 `review-existing`/`force-replace` 모드 구현, 진짜 interactive 온보딩 명령 `slint-gate wizard` 추가(실제 TTY 아니면 거부). 두 번째 `pre-release-adversarial-review` 실행에서 발견한 PodSpec/JSON injection 취약점(curl pod `--overrides` 페이로드) 등 8건도 확정·수정 완료.
 

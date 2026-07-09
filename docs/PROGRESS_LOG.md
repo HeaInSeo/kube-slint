@@ -5,18 +5,18 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Unreleased — Internal-Usage Backlog Batch
+## Current Status: v1.6.0 Tagged (Real-Usage Hardening Batch + 2 Adversarial Review Rounds)
 
 **Branch:** `main`
-**Last updated:** 2026-07-08
+**Last updated:** 2026-07-09 (v1.6.0 tag + release)
 
-### Unreleased: Real-Usage Hardening Batch (2026-07-08)
+### v1.6.0 Release (2026-07-09)
 
 Following v1.5.3, closed 4 of the 5 items on the internal-usage backlog
 (`docs/project-status.yaml`'s `current_focus_deferred`) — MCP/IDE
 integration intentionally left out, still a separate paused track. See
-`CHANGELOG.md`'s `[Unreleased]` entry and `docs/DECISIONS.md` D-022 through
-D-026 for full rationale.
+`CHANGELOG.md`'s `[1.6.0]` entry and `docs/DECISIONS.md` D-022 through
+D-028 for full rationale.
 
 * [x] `pkg/gate/gate.go` (866 lines, a known tech-debt item) split into 7
   per-concern files (`types.go`, `policy.go`, `measurement.go`,
@@ -60,7 +60,7 @@ D-026 for full rationale.
   input alias matching the CLI rename; and a real deadlock risk in the
   shared `captureStdout` test helper on output larger than the OS pipe
   buffer (D-026, independently reproduced via a standalone repro before
-  fixing). See `CHANGELOG.md`'s `[Unreleased]` entry for the full list.
+  fixing). See `CHANGELOG.md`'s `[1.6.0]` entry for the full list.
 * [x] Third `pre-release-adversarial-review` run (2026-07-09): first attempt
   again hit the session rate limit across all 7 agents (a non-result, same
   as the second round's first attempt); retry completed cleanly with 9
@@ -83,7 +83,7 @@ D-026 for full rationale.
   two stale-docs findings (D-012's `internal/gate` reference, `attach.go`'s
   drifted `Config` pseudo-code comment, removed rather than re-synced since
   a hand-copied duplicate will just drift again). See `CHANGELOG.md`'s
-  `[Unreleased]` entry for the full list.
+  `[1.6.0]` entry for the full list.
 
 ### v1.5.3 Release (2026-07-08)
 
