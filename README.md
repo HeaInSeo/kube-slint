@@ -407,11 +407,13 @@ kube-slint supports three first-class measurement modes, set per-session or per-
 
 ## Gate Model
 
-Both gate model components are complete.
+The gate model components are complete.
 
 **Threshold checking** (DONE): Each metric result in `sli-summary.json` is evaluated against the threshold rules in `policy.yaml`. A threshold miss sets `gate_result` to `FAIL` if `threshold_miss` is in `promote_to_fail`; otherwise it sets `gate_result` to `WARN`.
 
 **Regression detection** (DONE): When `--baseline` is provided, each metric result is compared to the stored baseline value. If the change exceeds `tolerance_percent`, the result is flagged as a regression. A detected regression sets `gate_result` to `FAIL` if `regression_detected` is in `promote_to_fail`; otherwise it sets `gate_result` to `WARN`. A regression from a zero baseline to a non-zero current value is always treated as a detected regression.
+
+**Coverage governance** (DONE): When `coverage.required: true`, every measured scalar SLI must be covered by a threshold rule or listed under `coverage.informational`. A coverage gap sets `gate_result` to `FAIL` when `coverage_gap` is in `promote_to_fail`; generated policies include it by default. Set `coverage.required: false` to disable this check.
 
 ---
 

@@ -19,7 +19,7 @@ current_focus:
   - "Custom Semgrep guardrails implemented and blocking in CI, shipped in v1.5.0: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"
 current_focus_deferred:
   - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused - the one item intentionally excluded from the v1.6.0 backlog batch; all other formerly-deferred items shipped in v1.6.0, see current_focus above)"
-next_milestone: "Source/window UX Sprint U1-U5 due 2026-07-19; code submission due ~2026-08-15"
+next_milestone: "Post-source/window UX hardening review; code submission due ~2026-08-15"
 active_hardening_sprint: "real-usage-sli-governance"
 capabilities:
   identity_aligned: "done"

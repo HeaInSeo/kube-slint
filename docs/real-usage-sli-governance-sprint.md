@@ -90,7 +90,8 @@ Acceptance criteria:
 
 - Do not implement histogram quantiles, burn-rate/window_ratio semantics, or
   concrete PromQL range fetchers in the initial window engine foundation.
-- Do not make policy coverage warnings fail CI by default.
+- Do not make coverage diagnostics fail CI from `inspect`; D-034 later makes
+  gate coverage gaps strict by default in generated/default promotion behavior.
 - Do not rename or remove `UnsafePromKey` in a breaking way.
 - Do not turn kube-slint into a generic correctness test framework.
 
@@ -122,13 +123,12 @@ Acceptance criteria:
 
 ## Open Risks
 
-- Adding coverage diagnostics without changing gate semantics may still leave
-  some teams ignoring the warning.
+- `inspect` coverage diagnostics remain advisory; the gate path is now strict
+  by default for coverage gaps after D-034.
 - Prometheus-specific names remain in the public API for compatibility.
 - A public JSON/expvar adapter package could become an API commitment before
   enough consumer usage exists.
-- SessionConfig-level wiring for window fetchers is not implemented yet, so the
-  first runtime window path is engine-level.
+- SessionConfig-level wiring for window fetchers is now implemented.
 - Histogram quantiles and burn-rate semantics still require dedicated design.
 
 ## Sprint D: SessionConfig Window Wiring

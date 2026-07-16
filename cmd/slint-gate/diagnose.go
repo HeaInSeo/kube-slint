@@ -44,7 +44,7 @@ var diagMessages = map[string]diagEntry{
 		hints: []string{
 			"Check for YAML syntax errors: cat .slint/policy.yaml",
 			"Check that schema_version is present and exactly \"slint.policy.v1\" (missing or any other value is treated as invalid):\n    schema_version: slint.policy.v1",
-			"Check for unsupported values in fail_on. Supported values: threshold_miss, regression_detected",
+			"Check for unsupported values in promote_to_fail/fail_on. Supported values: threshold_miss, regression_detected, coverage_gap",
 			"Check that reliability.min_level is partial or complete.",
 			"Check for an unsupported operator (e.g. !=) in an operator field.",
 			"Supported operators: <=, >=, <, >, ==",

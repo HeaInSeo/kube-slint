@@ -114,7 +114,7 @@ Acceptance criteria:
 
 - No new engine compute modes.
 - No histogram quantile implementation.
-- No new CI failure defaults.
+- No new CI failure defaults outside the accepted D-034 coverage-gap default.
 - No breaking API rename.
 
 ## Open Risks
