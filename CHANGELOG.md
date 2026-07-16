@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-16
+
 ### Added
 
 - `slint-gate inspect --policy` now prints concrete next actions for
@@ -41,15 +43,14 @@
   `window_max`, `window_avg`, `window_p95`, and `window_p99`.
 - Session-level window wiring via `SessionConfig.WindowFetcher`, a concrete
   Prometheus range source (`pkg/slo/fetch/promrange`), `window_ratio`, and
-  opt-in policy coverage governance (`coverage.required`,
+  strict policy coverage governance (`coverage.required`,
   `coverage.informational`, and `promote_to_fail: ["coverage_gap"]`).
 
 ### Documented
 
 - Accepted the Source And Window UX Sprint (D-033), covering inspect
   next-action wording, source selection docs, a promrange window example,
-  coverage policy recommendation flow, and source-neutral terminology. No
-  runtime behavior changed in this planning update.
+  coverage policy recommendation flow, and source-neutral terminology.
 - Accepted the real-usage SLI governance hardening sprint (D-029), with Sprint
   A focused on measured-but-not-gated SLI diagnostics and source-neutral UX,
   and Sprint B focused on non-Prometheus adapter ergonomics plus window/range
@@ -417,7 +418,9 @@ the full before/after analysis behind each item below.
 
 - `hack/slint_gate.py`: Python gate 프로토타입 삭제
 
-[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/HeaInSeo/kube-slint/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/HeaInSeo/kube-slint/releases/tag/v1.6.0
 [1.2.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/HeaInSeo/kube-slint/compare/v1.0.1...v1.1.0
 [0.1.0]: https://github.com/HeaInSeo/kube-slint/releases/tag/v0.1.0

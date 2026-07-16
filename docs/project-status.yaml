@@ -1,7 +1,8 @@
-current_stage: "source/window UX sprint complete"
+current_stage: "v1.7.0 release prepared"
 roadmap_percent: 98
 roadmap_status: "post_rc"
 current_focus:
+  - "v1.7.0 prepared: source-neutral/window/coverage hardening release. Adds jsonendpoint, WindowFetcher/session wiring, promrange, scalar window modes, window_ratio, strict coverage governance defaults, source/window UX docs, and strict-default consistency fixes. Not shipped yet: histogram bucket quantiles and specialized burn-rate semantics beyond generic window_ratio."
   - "2026-07-16: D-033/D-034 Source And Window UX Sprint complete. U1 shipped stronger inspect coverage-gap next-action wording, U2 added a source-selection guide, U3 added a promrange window_p95/window_ratio end-to-end example, U4 updated recommend-policy/init/default promotion behavior to make coverage gaps fail by default while allowing coverage.required: false opt-out, and U5 aligned point/snapshot/range/window source terminology in user docs."
   - "2026-07-16: D-029 through D-032 real-usage SLI governance hardening sprint in progress. Sprint A shipped advisory slint-gate inspect policy coverage diagnostics and source-neutral README wording. Sprint B shipped pkg/slo/fetch/jsonendpoint as a source-neutral HTTP JSON/expvar SnapshotFetcher. Sprint C added fetch.WindowFetcher, ExecuteRequest.WindowFetcher, SessionConfig.WindowFetcher, scalar window compute modes window_min/window_max/window_avg/window_p95/window_p99/window_ratio, and pkg/slo/fetch/promrange for Prometheus query_range. D-034 now makes gate policy coverage governance strict by default in generated/default promotion behavior, with coverage.required: false as the explicit opt-out. Not shipped yet: histogram quantiles, specialized burn-rate semantics beyond generic window_ratio, and higher-level onboarding for window policies."
   - "v1.6.0 tagged: internal-usage backlog batch closing 4 of 5 deferred items (MCP/IDE integration intentionally excluded, still deferred). pkg/gate/gate.go (866 lines) split into 7 per-concern files. Deduplicated 3 copies of Summary-to-value-map flattening and 2 copies each of operator-comparison/direction-inference logic into summary.Summary.ResultValues()/gate.CompareOp/gate.LowerIsBetter/gate.HigherIsBetter (D-022) - no standalone pkg/policy package created, since gate.Policy et al have zero external consumers. F4 fixed: promtext parser no longer breaks on label values containing spaces. baseline merge review-existing/force-replace modes implemented (D-023), append-new-only remains default. slint-gate wizard added: real interactive onboarding, hard-refuses non-TTY stdin via golang.org/x/term.IsTerminal (D-024)."
@@ -19,7 +20,7 @@ current_focus:
   - "Custom Semgrep guardrails implemented and blocking in CI, shipped in v1.5.0: 6 rules from security-model.md's previously-unimplemented Static Guardrail Plan, real codebase verified compliant"
 current_focus_deferred:
   - "MCP read-only exposure of analyze-dataplane / IDE integration (separate track, paused - the one item intentionally excluded from the v1.6.0 backlog batch; all other formerly-deferred items shipped in v1.6.0, see current_focus above)"
-next_milestone: "Post-source/window UX hardening review; code submission due ~2026-08-15"
+next_milestone: "Post-v1.7.0 release validation; code submission due ~2026-08-15"
 active_hardening_sprint: "real-usage-sli-governance"
 capabilities:
   identity_aligned: "done"

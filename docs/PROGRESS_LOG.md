@@ -5,12 +5,36 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Source And Window UX Sprint Planned
+## Current Status: v1.7.0 Release Prepared
 
 **Branch:** `main`
-**Last updated:** 2026-07-16 (D-033 UX sprint planning)
+**Last updated:** 2026-07-16 (v1.7.0 release preparation)
 
-### Source And Window UX Sprint (Planned 2026-07-16)
+### v1.7.0 Release (2026-07-16)
+
+Closed the real-usage source/window/coverage hardening batch and UX follow-up:
+
+* [x] Added source-neutral JSON/expvar fetching through
+  `pkg/slo/fetch/jsonendpoint`.
+* [x] Added the window SLI engine path, `SessionConfig.WindowFetcher`,
+  `pkg/slo/fetch/promrange`, scalar window modes, and `window_ratio`.
+* [x] Added strict coverage governance defaults:
+  `coverage.required: true`, `coverage.informational`, and default
+  `coverage_gap` promotion.
+* [x] Added source-selection and end-to-end window SLI docs.
+* [x] Fixed strict-default consistency issues found during review:
+  `slint-gate init` now gates `workqueue_retries_total_delta`, and `inspect`
+  treats `coverage.informational` entries as covered.
+
+Behavior changed:
+
+```text
+Yes. v1.7.0 adds new source/window capabilities and changes generated/default
+coverage governance to fail unclassified measured SLIs unless
+coverage.required is explicitly false.
+```
+
+### Source And Window UX Sprint (Completed 2026-07-16)
 
 **Source of truth:**
 
@@ -61,8 +85,8 @@ usage feedback:
   HTTP JSON/expvar `SnapshotFetcher` that flattens numeric JSON leaves into
   dot-separated input keys and caches the start sample through `PreFetch`.
 * [x] Sprint B design slice: added `docs/window-sli-design.md` and D-030.
-  Window/range SLIs remain design-first; no runtime window engine behavior has
-  shipped.
+  Window/range SLIs were design-first at that point; Sprint C and follow-up
+  D-G later shipped the runtime path.
 * [x] Sprint C window engine foundation: added real `fetch.WindowFetcher`,
   `ExecuteRequest.WindowFetcher`, and scalar compute modes
   `window_min`/`window_max`/`window_avg`/`window_p95`/`window_p99`. Existing

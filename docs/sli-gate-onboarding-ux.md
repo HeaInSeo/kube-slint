@@ -338,7 +338,7 @@ for generated snippets):
 
 ```yaml
 - name: Run kube-slint shift-left SLI gate
-  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.6.0
+  uses: HeaInSeo/kube-slint/.github/actions/slint-gate@v1.7.0
   with:
     summary: artifacts/sli-summary.json
     policy: .slint/policy.yaml
