@@ -21,7 +21,7 @@ Update this file at the **start and end** of every stage/task.
 Planned follow-up UX work after the source-neutral/window/coverage runtime
 features:
 
-* [ ] U1: strengthen `slint-gate inspect` coverage-gap next-action wording.
+* [x] U1: strengthened `slint-gate inspect` coverage-gap next-action wording.
 * [ ] U2: add a source-selection guide for curlpod, portforward,
   jsonendpoint, and promrange.
 * [ ] U3: add an end-to-end `promrange` window SLI example with `window_p95`

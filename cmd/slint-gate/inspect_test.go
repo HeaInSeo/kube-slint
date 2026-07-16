@@ -186,7 +186,10 @@ regression:
 	assert.Contains(t, out, "Policy coverage:")
 	assert.Contains(t, out, "Measured but not covered by policy:")
 	assert.Contains(t, out, "reconcile_slow_delta")
-	assert.Contains(t, out, "advisory: add a threshold/regression rule or mark informational")
+	assert.Contains(t, out, "advisory: choose one next action")
+	assert.Contains(t, out, "add a threshold rule if this SLI should gate CI")
+	assert.Contains(t, out, "add to coverage.informational if it is context-only")
+	assert.Contains(t, out, "remove or ignore the signal if it was measured accidentally")
 	assert.Contains(t, out, "Policy-covered but missing from summary: (none)")
 }
 

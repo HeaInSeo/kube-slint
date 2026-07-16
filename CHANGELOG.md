@@ -7,6 +7,9 @@
 
 ### Added
 
+- `slint-gate inspect --policy` now prints concrete next actions for
+  measured-but-not-policy-covered SLIs: add a threshold, mark informational, or
+  remove/ignore accidental signals.
 - `slint-gate inspect --policy`: best-effort advisory policy coverage
   diagnostics. The command now reports measured SLIs that are not covered by
   threshold/regression policy and policy-covered SLIs missing from the current

@@ -147,7 +147,10 @@ func printPolicyCoverage(policyPath string, s summary.Summary) {
 	} else {
 		fmt.Println("  Measured but not covered by policy:")
 		for _, id := range uncovered {
-			fmt.Printf("    %-32s advisory: add a threshold/regression rule or mark informational\n", id)
+			fmt.Printf("    %-32s advisory: choose one next action\n", id)
+			fmt.Println("      - add a threshold rule if this SLI should gate CI")
+			fmt.Println("      - add to coverage.informational if it is context-only")
+			fmt.Println("      - remove or ignore the signal if it was measured accidentally")
 		}
 	}
 

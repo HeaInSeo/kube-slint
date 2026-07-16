@@ -1,7 +1,7 @@
 # Source And Window UX Sprint
 
 Date: 2026-07-16
-Status: Planned
+Status: Sprint U1 complete; U2-U5 pending
 Decision source: `docs/DECISIONS.md` D-033
 
 ## Confirmed Facts
@@ -23,17 +23,17 @@ SLIs.
 
 Planned work:
 
-- For each uncovered measured SLI, recommend one of:
+- [x] For each uncovered measured SLI, recommend one of:
   - add a threshold rule;
   - add it to `coverage.informational`;
   - remove/ignore the signal if it is accidental.
-- Keep the recommendation advisory. Do not change gate behavior.
+- [x] Keep the recommendation advisory. Do not change gate behavior.
 
 Acceptance criteria:
 
-- `slint-gate inspect --policy` output includes concrete next-action wording
+- [x] `slint-gate inspect --policy` output includes concrete next-action wording
   for coverage gaps.
-- Existing gate semantics remain unchanged.
+- [x] Existing gate semantics remain unchanged.
 
 ## Sprint U2: Source Selection Guide
 
