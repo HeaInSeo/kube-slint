@@ -1,7 +1,7 @@
 # Source And Window UX Sprint
 
 Date: 2026-07-16
-Status: Sprint U1 complete; U2-U5 pending
+Status: Sprint U2 complete; U3-U5 pending
 Decision source: `docs/DECISIONS.md` D-033
 
 ## Confirmed Facts
@@ -43,14 +43,14 @@ Goal: help users choose the correct source adapter before writing code.
 
 Planned work:
 
-- Add a docs/README table mapping common scenarios to source types:
+- [x] Add a docs/README table mapping common scenarios to source types:
   default curlpod, portforward, jsonendpoint, and promrange.
-- Use user-facing terms alongside Go names:
+- [x] Use user-facing terms alongside Go names:
   "point source", "snapshot source", "range/window source".
 
 Acceptance criteria:
 
-- A new user can identify the likely fetcher for `/metrics`, local
+- [x] A new user can identify the likely fetcher for `/metrics`, local
   port-forward, expvar/status JSON, and Prometheus range query use cases.
 
 ## Sprint U3: Window SLI End-To-End Example

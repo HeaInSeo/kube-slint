@@ -185,6 +185,15 @@ sess := slint.NewSession(slint.SessionConfig{
 })
 ```
 
+**Source selection guide**
+
+| Situation | Source type | Go package |
+|---|---|---|
+| Kubernetes Service exposes `/metrics` and CI can create a temporary pod | snapshot source | default `pkg/slint` curlpod path |
+| Prefer local access through `kubectl port-forward` | snapshot source | `pkg/slo/fetch/portforward` |
+| Go expvar or custom status JSON endpoint | snapshot source | `pkg/slo/fetch/jsonendpoint` |
+| Prometheus range query for window p95/ratio checks | range/window source | `pkg/slo/fetch/promrange` |
+
 ---
 
 ### 2. Embed Harness in E2E Tests
@@ -546,4 +555,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

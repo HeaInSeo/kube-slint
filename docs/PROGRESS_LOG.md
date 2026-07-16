@@ -22,7 +22,7 @@ Planned follow-up UX work after the source-neutral/window/coverage runtime
 features:
 
 * [x] U1: strengthened `slint-gate inspect` coverage-gap next-action wording.
-* [ ] U2: add a source-selection guide for curlpod, portforward,
+* [x] U2: added a source-selection guide for curlpod, portforward,
   jsonendpoint, and promrange.
 * [ ] U3: add an end-to-end `promrange` window SLI example with `window_p95`
   and `window_ratio`.

@@ -186,6 +186,15 @@ sess := slint.NewSession(slint.SessionConfig{
 })
 ```
 
+**소스 선택 가이드**
+
+| 상황 | 소스 유형 | Go 패키지 |
+|---|---|---|
+| Kubernetes Service가 `/metrics`를 노출하고 CI에서 임시 pod 생성 가능 | snapshot source | 기본 `pkg/slint` curlpod 경로 |
+| `kubectl port-forward`를 통한 로컬 접근 선호 | snapshot source | `pkg/slo/fetch/portforward` |
+| Go expvar 또는 custom status JSON endpoint | snapshot source | `pkg/slo/fetch/jsonendpoint` |
+| window p95/ratio 검사용 Prometheus range query | range/window source | `pkg/slo/fetch/promrange` |
+
 ---
 
 ### 2. E2E 테스트에 하네스 임베드
