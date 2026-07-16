@@ -25,7 +25,10 @@ func TestRunInit_GeneratesPolicyFile(t *testing.T) {
 	assert.Contains(t, body, "schema_version")
 	assert.Contains(t, body, "reconcile_total_delta")
 	assert.Contains(t, body, "workqueue_depth_end")
+	assert.Contains(t, body, "workqueue_retries_total_delta")
 	assert.Contains(t, body, "rest_client_429_delta")
+	assert.Contains(t, body, `  - "coverage_gap"`)
+	assert.Contains(t, body, `  required: true`)
 }
 
 func TestRunInit_CreatesSlintDir(t *testing.T) {

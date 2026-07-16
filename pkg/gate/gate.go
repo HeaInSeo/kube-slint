@@ -212,7 +212,7 @@ func computeGateResult(failed, hasWarn, hasNoGrade bool, baselineStatus string, 
 func gateMessage(result string) string {
 	switch result {
 	case GateFail:
-		return "Policy violation detected (threshold/regression)."
+		return "Policy violation detected (threshold/regression/coverage)."
 	case GateWarn:
 		return "Policy evaluated with non-blocking warnings."
 	case GateNoGrade:

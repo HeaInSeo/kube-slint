@@ -654,7 +654,7 @@ This file records architecture/product-direction decisions that define the proje
 ## D-033: UX follow-up sprint focuses on choices and next actions, not new engine semantics
 
 - Date: 2026-07-16
-- Status: Accepted (planned; implementation not yet shipped)
+- Status: Accepted (implemented)
 - Decision:
   - A follow-up UX sprint is accepted after D-029 through D-032. Its goal is
     to make the newly added source-neutral/window/coverage features easier to

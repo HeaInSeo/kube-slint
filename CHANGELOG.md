@@ -24,6 +24,9 @@
   API names.
 - Removed stale coverage-governance wording from diagnostics and status docs
   after D-034 made coverage gaps strict by default.
+- Fixed the strict coverage defaults so `slint-gate init` gates the noisy
+  `workqueue_retries_total_delta` SLI instead of leaving it as a coverage gap,
+  and `inspect` now treats `coverage.informational` entries as covered.
 - `slint-gate inspect --policy`: best-effort advisory policy coverage
   diagnostics. The command now reports measured SLIs that are not covered by
   threshold/regression policy and policy-covered SLIs missing from the current

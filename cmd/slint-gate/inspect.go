@@ -193,15 +193,21 @@ func loadInspectPolicyCoverage(path string) (inspectPolicyCoverage, error) {
 	if strings.TrimSpace(policy.SchemaVersion) != "slint.policy.v1" {
 		return inspectPolicyCoverage{}, fmt.Errorf("%s has unsupported schema_version %q", path, policy.SchemaVersion)
 	}
-	metrics := make(map[string]bool, len(policy.Thresholds))
+	metrics := make(map[string]bool, len(policy.Thresholds)+len(policy.Coverage.Informational))
 	for _, rule := range policy.Thresholds {
 		metric := strings.TrimSpace(rule.Metric)
 		if metric != "" {
 			metrics[metric] = true
 		}
 	}
+	for _, id := range policy.Coverage.Informational {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			metrics[id] = true
+		}
+	}
 	if len(metrics) == 0 {
-		return inspectPolicyCoverage{}, fmt.Errorf("%s has no threshold metrics", path)
+		return inspectPolicyCoverage{}, fmt.Errorf("%s has no threshold or coverage.informational metrics", path)
 	}
 	return inspectPolicyCoverage{metrics: metrics, regressionEnabled: policy.Regression.Enabled}, nil
 }

@@ -97,6 +97,12 @@ thresholds:
     operator: "<="
     value: 0
 
+  # Workqueue retries should stay at zero.
+  - name: "workqueue_retries_total_delta_max"
+    metric: "workqueue_retries_total_delta"
+    operator: "=="
+    value: 0
+
   # API server must not throttle the operator (429 rate-limit).
   - name: "rest_client_429_delta_max"
     metric: "rest_client_429_delta"

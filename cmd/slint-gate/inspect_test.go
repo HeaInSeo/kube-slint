@@ -193,6 +193,36 @@ regression:
 	assert.Contains(t, out, "Policy-covered but missing from summary: (none)")
 }
 
+func TestRunInspect_PolicyCoverageTreatsInformationalAsCovered(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{
+		"reconcile_total_delta",
+		"reconcile_success_delta",
+	}, "Complete")
+	policyPath := writeInspectPolicy(t, dir, `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+coverage:
+  required: true
+  informational:
+    - reconcile_success_delta
+regression:
+  enabled: false
+`)
+
+	var err error
+	out := captureStdout(t, func() {
+		err = runInspect([]string{"--summary", summaryPath, "--policy", policyPath})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, out, "Measured but not covered by policy: (none)")
+	assert.Contains(t, out, "Policy-covered but missing from summary: (none)")
+	assert.NotContains(t, out, "reconcile_success_delta            advisory")
+}
+
 func TestRunInspect_PolicyCoverageReportsPolicyMetricMissingFromSummary(t *testing.T) {
 	dir := t.TempDir()
 	summaryPath := writeInspectSummary(t, dir, []string{"reconcile_total_delta"}, "Complete")

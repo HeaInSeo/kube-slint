@@ -1,7 +1,7 @@
 # Real-Usage SLI Governance Hardening Sprint
 
 Date: 2026-07-16
-Status: Sprint D-G implementation complete; review pending
+Status: Complete
 Decision source: `docs/DECISIONS.md` D-029
 
 ## Confirmed Facts

@@ -13,8 +13,9 @@ The default engine path is still a **2-point model**: it calls
 `MetricsFetcher.Fetch()` twice (at `StartedAt` and `FinishedAt`) and evaluates
 the delta or snapshot between those two scalar maps.
 
-This document draws the boundary between what the current engine can support and what requires
-a future engine extension.
+This document draws the boundary between the default two-point engine path,
+the implemented range/window path, and remaining future extensions such as
+histogram quantiles or specialized burn-rate semantics.
 
 ## Tier 1 — Works with the current 2-point engine
 
