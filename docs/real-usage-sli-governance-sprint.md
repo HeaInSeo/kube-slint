@@ -1,7 +1,7 @@
 # Real-Usage SLI Governance Hardening Sprint
 
 Date: 2026-07-16
-Status: Sprint B in progress
+Status: Sprint C in progress
 Decision source: `docs/DECISIONS.md` D-029
 
 ## Confirmed Facts
@@ -88,10 +88,37 @@ Acceptance criteria:
 
 ## Non-Goals
 
-- Do not implement a full window/range engine in Sprint A.
+- Do not implement histogram quantiles, burn-rate/window_ratio semantics, or
+  concrete PromQL range fetchers in the initial window engine foundation.
 - Do not make policy coverage warnings fail CI by default.
 - Do not rename or remove `UnsafePromKey` in a breaking way.
 - Do not turn kube-slint into a generic correctness test framework.
+
+## Sprint C: Window Engine Foundation
+
+Schedule: 2026-07-16 to 2026-07-19
+
+Goal: implement the smallest useful runtime window path after the D-030 design
+boundary, without changing the existing two-point behavior.
+
+Planned work:
+
+- [x] Promote `fetch.WindowFetcher` from commented future interface to real
+  optional interface.
+- [x] Add `ExecuteRequest.WindowFetcher` without changing `MetricsFetcher` or
+  `SessionConfig`.
+- [x] Add scalar window compute modes: `window_min`, `window_max`,
+  `window_avg`, `window_p95`, and `window_p99`.
+- [x] Preserve existing two-point behavior for `delta`/`start`/`end` specs.
+- [x] Treat missing/failing window collection as summary-level skip/partial or
+  failed collection, not a correctness-test failure.
+
+Acceptance criteria:
+
+- [x] Existing engine tests pass unchanged.
+- [x] New tests cover window average, p95, missing window fetcher, and window
+  fetch failure reliability state.
+- [x] Gate and summary schemas remain unchanged for scalar window results.
 
 ## Open Risks
 
@@ -100,5 +127,6 @@ Acceptance criteria:
 - Prometheus-specific names remain in the public API for compatibility.
 - A public JSON/expvar adapter package could become an API commitment before
   enough consumer usage exists.
-- Window/range support may require summary schema changes, not just fetcher
-  additions.
+- SessionConfig-level wiring for window fetchers is not implemented yet, so the
+  first runtime window path is engine-level.
+- Histogram quantiles and burn-rate semantics still require dedicated design.

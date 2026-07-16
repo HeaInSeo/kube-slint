@@ -34,12 +34,19 @@ usage feedback:
 * [x] Sprint B design slice: added `docs/window-sli-design.md` and D-030.
   Window/range SLIs remain design-first; no runtime window engine behavior has
   shipped.
+* [x] Sprint C window engine foundation: added real `fetch.WindowFetcher`,
+  `ExecuteRequest.WindowFetcher`, and scalar compute modes
+  `window_min`/`window_max`/`window_avg`/`window_p95`/`window_p99`. Existing
+  two-point specs keep the old path. Window fetcher absence/failure is
+  represented as skipped/partial or failed collection in the summary, not a
+  correctness-test failure.
 
 Behavior changed:
 
 ```text
-Yes. `slint-gate inspect` gained advisory policy coverage diagnostics, and
-pkg/slo/fetch/jsonendpoint was added as a source-neutral JSON/expvar adapter.
+Yes. `slint-gate inspect` gained advisory policy coverage diagnostics,
+pkg/slo/fetch/jsonendpoint was added as a source-neutral JSON/expvar adapter,
+and the engine gained an optional scalar window aggregation path.
 ```
 
 ### v1.6.0 Release (2026-07-09)

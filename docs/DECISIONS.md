@@ -584,3 +584,35 @@ This file records architecture/product-direction decisions that define the proje
   - Latency percentiles, burn-rate, and soak analysis do not satisfy that rule.
     Keeping them behind a separate design avoids overloading the two-point
     path with misleading semantics.
+
+## D-031: Window SLI engine foundation supports scalar window aggregation
+
+- Date: 2026-07-16
+- Status: Accepted (initial implementation)
+- Decision:
+  - `fetch.WindowFetcher` is now a real optional interface:
+    `FetchRange(ctx, start, end) ([]fetch.Sample, error)`.
+  - `engine.ExecuteRequest` accepts an optional `WindowFetcher`. The existing
+    two-point `MetricsFetcher` path remains unchanged for `delta`/`start`/`end`
+    specs, and specs with no window compute mode do not require a window
+    fetcher.
+  - The first implemented window compute modes are scalar aggregations over
+    numeric sample values: `window_min`, `window_max`, `window_avg`,
+    `window_p95`, and `window_p99`.
+  - Window fetcher absence or failure does not become a correctness-test
+    failure. Missing window support skips the affected SLI and makes evaluation
+    partial; a window fetch error records failed collection while still
+    returning a summary.
+  - This does not implement histogram quantile semantics, burn-rate/ratio
+    semantics, PromQL range query fetchers, or SessionConfig-level window
+    wiring.
+- Rationale:
+  - D-029 identified latency/window SLIs as a real consumer gap, and D-030
+    deliberately deferred runtime semantics until the boundary was explicit.
+    The scalar aggregation subset is the smallest useful engine extension that
+    follows that boundary.
+  - Keeping `WindowFetcher` separate from `MetricsFetcher` avoids pretending
+    that p95/p99 can be computed from two point samples.
+  - Summary and gate schemas do not need to change for this initial subset:
+    a window SLI still emits one scalar `SLIResult.Value`, so existing
+    threshold and regression evaluation can operate unchanged.

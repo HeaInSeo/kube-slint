@@ -23,10 +23,12 @@ These source types return one `fetch.Sample` per call and fit directly into the 
 Adding a new Tier 1 source requires only implementing `MetricsFetcher` (or optionally `SnapshotFetcher`);
 the engine, spec, and gate layers need no changes.
 
-## Tier 2 — Requires engine extension
+## Tier 2 — Uses the window engine path
 
 These source types need N samples over a time window, not two discrete scalars.
-They **cannot** be added by implementing `MetricsFetcher` alone.
+They **cannot** be added by implementing `MetricsFetcher` alone. The initial
+window engine path supports scalar aggregations (`window_min`, `window_max`,
+`window_avg`, `window_p95`, `window_p99`) through `fetch.WindowFetcher`.
 
 | Source type | Blocker | Description |
 |---|---|---|
@@ -37,15 +39,10 @@ They **cannot** be added by implementing `MetricsFetcher` alone.
 
 ### What extension is needed
 
-A `WindowFetcher` interface (stub defined in `pkg/slo/fetch/fetcher.go`) would return `[]Sample`
-for a `(start, end time.Time)` range. The engine would need:
-
-1. A new `ComputeMode` (e.g. `ComputeP95`, `ComputeSoak`) that accepts `[]Sample` instead of two maps.
-2. `evalSLI` to branch on whether the spec's compute mode is 2-point or window-based.
-3. Engine request to carry an optional `WindowFetcher` alongside the existing `MetricsFetcher`.
-
-This is a **breaking change to the engine API** and must be designed before any implementation
-to avoid fragmenting the existing clean 2-point path.
+`WindowFetcher` returns `[]Sample` for a `(start, end time.Time)` range. The
+engine request carries an optional `WindowFetcher` alongside the existing
+`MetricsFetcher`. This is additive for engine callers, but SessionConfig-level
+window wiring and concrete range fetchers remain future work.
 
 ## Design rule
 

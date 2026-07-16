@@ -16,6 +16,9 @@
   `SnapshotFetcher` for endpoints that expose numeric JSON leaves. Keys are
   flattened with dot separators (for example, `memstats.Alloc`) and can be
   referenced from `SLISpec.Inputs` like any other fetch sample key.
+- Initial scalar window SLI engine foundation: `fetch.WindowFetcher`,
+  `ExecuteRequest.WindowFetcher`, and compute modes `window_min`,
+  `window_max`, `window_avg`, `window_p95`, and `window_p99`.
 
 ### Documented
 
@@ -26,7 +29,8 @@
   as the source-neutral input boundary and Prometheus helpers as conveniences,
   not engine requirements.
 - Added `docs/window-sli-design.md` and D-030 to keep latency/window/range SLI
-  support design-first. No runtime window engine behavior shipped.
+  support design-first. D-031 records the initial scalar window aggregation
+  implementation and its explicit non-goals.
 
 ## [1.6.0] - 2026-07-09
 

@@ -39,6 +39,17 @@ const (
 	ComputeStart ComputeMode = "start"
 	// ComputeEnd 는 종료 값을 사용함.
 	ComputeEnd ComputeMode = "end"
+
+	// ComputeWindowMin uses the minimum input value observed across a window.
+	ComputeWindowMin ComputeMode = "window_min"
+	// ComputeWindowMax uses the maximum input value observed across a window.
+	ComputeWindowMax ComputeMode = "window_max"
+	// ComputeWindowAvg uses the arithmetic mean of input values observed across a window.
+	ComputeWindowAvg ComputeMode = "window_avg"
+	// ComputeWindowP95 uses the nearest-rank p95 over input values observed across a window.
+	ComputeWindowP95 ComputeMode = "window_p95"
+	// ComputeWindowP99 uses the nearest-rank p99 over input values observed across a window.
+	ComputeWindowP99 ComputeMode = "window_p99"
 )
 
 // CounterResetPolicy defines how ComputeDelta handles delta < 0 (suspected counter reset).

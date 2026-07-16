@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -135,6 +136,110 @@ type mockStaticFetcher struct {
 
 func (m *mockStaticFetcher) Fetch(_ context.Context, at time.Time) (fetch.Sample, error) {
 	return fetch.Sample{At: at, Values: m.values}, nil
+}
+
+type mockWindowFetcher struct {
+	samples []fetch.Sample
+	err     error
+}
+
+func (m *mockWindowFetcher) FetchRange(_ context.Context, start, end time.Time) ([]fetch.Sample, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.samples, nil
+}
+
+func TestEngine_WindowAvgAndP95(t *testing.T) {
+	writer := &mockWriter{}
+	eng := New(nil, writer, nil)
+	req := ExecuteRequest{
+		Config: RunConfig{
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs: []spec.SLISpec{
+			{
+				ID:      "latency_avg",
+				Kind:    "latency",
+				Inputs:  []spec.MetricRef{{Key: "request_ms"}},
+				Compute: spec.ComputeSpec{Mode: spec.ComputeWindowAvg},
+			},
+			{
+				ID:      "latency_p95",
+				Kind:    "latency",
+				Inputs:  []spec.MetricRef{{Key: "request_ms"}},
+				Compute: spec.ComputeSpec{Mode: spec.ComputeWindowP95},
+			},
+		},
+		WindowFetcher: &mockWindowFetcher{samples: []fetch.Sample{
+			{At: time.Unix(1001, 0), Values: map[string]float64{"request_ms": 10}},
+			{At: time.Unix(1002, 0), Values: map[string]float64{"request_ms": 20}},
+			{At: time.Unix(1003, 0), Values: map[string]float64{"request_ms": 30}},
+			{At: time.Unix(1004, 0), Values: map[string]float64{"request_ms": 40}},
+		}},
+		Reliability: &summary.Reliability{},
+	}
+
+	sum, err := eng.Execute(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Equal(t, "Complete", sum.Reliability.CollectionStatus)
+	assert.Len(t, sum.Results, 2)
+	assert.Equal(t, "latency_avg", sum.Results[0].ID)
+	assert.NotNil(t, sum.Results[0].Value)
+	assert.Equal(t, 25.0, *sum.Results[0].Value)
+	assert.Equal(t, "latency_p95", sum.Results[1].ID)
+	assert.NotNil(t, sum.Results[1].Value)
+	assert.Equal(t, 40.0, *sum.Results[1].Value)
+}
+
+func TestEngine_WindowFetcherMissingSkipsWindowSLI(t *testing.T) {
+	writer := &mockWriter{}
+	eng := New(nil, writer, nil)
+	req := ExecuteRequest{
+		Config: RunConfig{
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs: []spec.SLISpec{{
+			ID:      "latency_avg",
+			Inputs:  []spec.MetricRef{{Key: "request_ms"}},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeWindowAvg},
+		}},
+		Reliability: &summary.Reliability{},
+	}
+
+	sum, err := eng.Execute(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Equal(t, "Partial", sum.Reliability.EvaluationStatus)
+	assert.Equal(t, summary.StatusSkip, sum.Results[0].Status)
+	assert.Equal(t, "window fetcher required", sum.Results[0].Reason)
+}
+
+func TestEngine_WindowFetcherErrorMarksCollectionFailed(t *testing.T) {
+	writer := &mockWriter{}
+	eng := New(nil, writer, nil)
+	req := ExecuteRequest{
+		Config: RunConfig{
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs: []spec.SLISpec{{
+			ID:      "latency_avg",
+			Inputs:  []spec.MetricRef{{Key: "request_ms"}},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeWindowAvg},
+		}},
+		WindowFetcher: &mockWindowFetcher{err: fmt.Errorf("boom")},
+		Reliability:   &summary.Reliability{},
+	}
+
+	sum, err := eng.Execute(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Equal(t, "Failed", sum.Reliability.CollectionStatus)
+	assert.Equal(t, "Partial", sum.Reliability.EvaluationStatus)
+	assert.Contains(t, sum.Reliability.BlockedReason, "fetch(window) failed")
+	assert.Equal(t, summary.StatusSkip, sum.Results[0].Status)
+	assert.Contains(t, sum.Results[0].Reason, "fetch(window) failed")
 }
 
 // BenchmarkEngine_Execute 는 SLI 평가 파이프라인 전체(2회 fetch + evalSLI)를 벤치마킹함.
