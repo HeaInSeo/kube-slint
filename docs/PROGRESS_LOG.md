@@ -40,13 +40,20 @@ usage feedback:
   two-point specs keep the old path. Window fetcher absence/failure is
   represented as skipped/partial or failed collection in the summary, not a
   correctness-test failure.
+* [x] Follow-up Sprint D-G batch: wired `SessionConfig.WindowFetcher`, added
+  `pkg/slo/fetch/promrange` as a concrete Prometheus `query_range`
+  `WindowFetcher`, added `window_ratio`, and added opt-in
+  `policy.coverage` governance with `coverage.informational` and
+  `promote_to_fail: ["coverage_gap"]`.
 
 Behavior changed:
 
 ```text
 Yes. `slint-gate inspect` gained advisory policy coverage diagnostics,
 pkg/slo/fetch/jsonendpoint was added as a source-neutral JSON/expvar adapter,
-and the engine gained an optional scalar window aggregation path.
+the engine gained an optional scalar window aggregation path, SessionConfig can
+carry a WindowFetcher, promrange provides a concrete range source, and gate
+policy coverage governance is available as opt-in behavior.
 ```
 
 ### v1.6.0 Release (2026-07-09)

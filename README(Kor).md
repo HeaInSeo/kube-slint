@@ -173,6 +173,19 @@ sess := slint.NewSession(slint.SessionConfig{
 })
 ```
 
+range/window 소스는 `SessionConfig.WindowFetcher`로 전달한다. 예를 들어
+Prometheus `query_range`는 다음처럼 사용할 수 있다.
+
+```go
+import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/promrange"
+
+windowFetcher := promrange.New("http://prometheus:9090", `rate(http_requests_total[5m])`, 30*time.Second)
+sess := slint.NewSession(slint.SessionConfig{
+    Specs:         windowSpecs, // 예: ComputeWindowP95 또는 ComputeWindowRatio
+    WindowFetcher: windowFetcher,
+})
+```
+
 ---
 
 ### 2. E2E 테스트에 하네스 임베드
@@ -313,9 +326,15 @@ regression:
 reliability:
   required: false
   min_level: "partial"
+coverage:
+  required: false
+  informational:
+    - "reconcile_success_delta"
 promote_to_fail:
   - "threshold_miss"
   - "regression_detected"
+  # 선택: 측정됐지만 gate되지 않는 SLI를 CI 실패로 승격
+  # - "coverage_gap"
 ```
 
 **게이트 결과값**

@@ -172,6 +172,19 @@ sess := slint.NewSession(slint.SessionConfig{
 })
 ```
 
+For range/window sources, pass a `fetch.WindowFetcher` through
+`SessionConfig.WindowFetcher`. For example, Prometheus `query_range`:
+
+```go
+import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/promrange"
+
+windowFetcher := promrange.New("http://prometheus:9090", `rate(http_requests_total[5m])`, 30*time.Second)
+sess := slint.NewSession(slint.SessionConfig{
+    Specs:         windowSpecs, // e.g. ComputeWindowP95 or ComputeWindowRatio
+    WindowFetcher: windowFetcher,
+})
+```
+
 ---
 
 ### 2. Embed Harness in E2E Tests
@@ -293,9 +306,15 @@ regression:
 reliability:
   required: false
   min_level: "partial"
+coverage:
+  required: false
+  informational:
+    - "reconcile_success_delta"
 promote_to_fail:
   - "threshold_miss"
   - "regression_detected"
+  # Optional: fail CI on measured-but-not-gated SLIs.
+  # - "coverage_gap"
 ```
 
 **Gate result values**
@@ -527,5 +546,4 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 

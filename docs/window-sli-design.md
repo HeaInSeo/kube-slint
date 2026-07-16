@@ -11,7 +11,8 @@ Decision source: `docs/DECISIONS.md` D-029, D-030, D-031
 - `fetch.WindowFetcher` is implemented as an optional source interface in
   `pkg/slo/fetch/fetcher.go`.
 - The engine supports scalar window aggregation modes:
-  `window_min`, `window_max`, `window_avg`, `window_p95`, and `window_p99`.
+  `window_min`, `window_max`, `window_avg`, `window_p95`, `window_p99`, and
+  `window_ratio`.
 - `docs/verification-sources.md` still treats range/window sources as a
   separate source class. They must use `WindowFetcher`, not a two-point
   `MetricsFetcher` workaround.
@@ -48,11 +49,16 @@ Implemented compute modes are explicit and narrow:
 - `window_avg`
 - `window_p95`
 - `window_p99`
+- `window_ratio`
 
 Each mode consumes numeric values for `SLISpec.Inputs` across the returned
 window samples. Missing or empty windows map to `StatusSkip`; gate evaluation
 then treats the missing scalar conservatively through the existing summary
 contract.
+
+`window_ratio` consumes at least two inputs and computes
+`sum(input[0]) / sum(input[1])` across the window. A missing input or zero
+denominator is skipped rather than producing a misleading scalar.
 
 ## Summary And Gate Compatibility
 
@@ -83,5 +89,5 @@ computation. Threshold and regression checks should continue to operate over
   default at the gate policy layer, beyond the current skipped result.
 - Whether startup latency belongs in `WindowFetcher` or should be modeled as a
   small event-pair fetcher that emits a scalar directly.
-- Whether to add `window_ratio`/burn-rate compute modes once a concrete source
-  shape exists.
+- Whether to add more specialized burn-rate semantics beyond the implemented
+  generic `window_ratio`.

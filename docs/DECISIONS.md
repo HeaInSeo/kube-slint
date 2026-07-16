@@ -616,3 +616,37 @@ This file records architecture/product-direction decisions that define the proje
   - Summary and gate schemas do not need to change for this initial subset:
     a window SLI still emits one scalar `SLIResult.Value`, so existing
     threshold and regression evaluation can operate unchanged.
+
+## D-032: Session-level window wiring, Prometheus range source, ratio mode, and policy coverage governance
+
+- Date: 2026-07-16
+- Status: Accepted (implemented)
+- Decision:
+  - `pkg/slint.SessionConfig` now accepts an optional `WindowFetcher`, and
+    `Session.End()` passes it through to the engine. Window-only specs do not
+    create the default curlpod point fetcher.
+  - `pkg/slo/fetch/promrange` is accepted as a concrete `WindowFetcher` for
+    Prometheus `/api/v1/query_range`. It parses matrix results into
+    `[]fetch.Sample` and derives sample keys from Prometheus metric labels.
+  - `window_ratio` is accepted as the first ratio/burn-rate-style scalar
+    window mode. It computes `sum(input[0]) / sum(input[1])` over the returned
+    window samples and skips on missing inputs or zero denominator.
+  - `policy.coverage` is added to `slint.policy.v1` as an opt-in governance
+    check:
+    - `coverage.required: true` reports measured SLIs that have no threshold
+      rule and are not listed as informational.
+    - `coverage.informational: [...]` explicitly marks measured SLIs that are
+      intentionally not gated.
+    - `promote_to_fail: ["coverage_gap"]` can promote a coverage gap from WARN
+      to FAIL. Without that promotion, coverage gaps are WARN.
+- Rationale:
+  - D-031 made window evaluation possible at the engine boundary. Session-level
+    wiring is required for normal consumers to use it without bypassing
+    `pkg/slint`.
+  - PromQL range queries are a concrete source for latency/range values, but
+    they still enter through the source-neutral `WindowFetcher` boundary rather
+    than becoming a special engine dependency.
+  - `window_ratio` covers a useful class of error-rate/burn-rate checks while
+    keeping the first ratio semantics explicit and scalar.
+  - Coverage governance closes the remaining "measured but not gated" gap
+    without making advisory diagnostics fail CI by default.

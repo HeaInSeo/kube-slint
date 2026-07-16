@@ -41,10 +41,11 @@ func Evaluate(req Request) *Summary {
 	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
 	relWarn, relNoGrade := runReliability(out, policy, measurement)
 	rsFailed, rsWarn, rsNoGrade := runResultStatus(out, measurement)
+	covFailed, covWarn := runCoverage(out, policy, measurement, promote)
 
-	anyFailed := tFailed || rFailed || rsFailed
+	anyFailed := tFailed || rFailed || rsFailed || covFailed
 	anyNoGrade := tNoGrade || rNoGrade || rsNoGrade || relNoGrade
-	hasWarn := rWarn || relWarn || tWarn || rsWarn
+	hasWarn := rWarn || relWarn || tWarn || rsWarn || covWarn
 
 	out.EvaluationStatus = computeEvalStatus(out.Checks, anyNoGrade)
 	out.GateResult = computeGateResult(anyFailed, hasWarn, anyNoGrade, out.BaselineStatus, policy.Regression.Enabled)

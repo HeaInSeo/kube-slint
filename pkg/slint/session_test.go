@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,6 +84,45 @@ func (m *mockFetcher) Fetch(ctx context.Context, at time.Time) (fetch.Sample, er
 		At:     at,
 		Values: map[string]float64{"foo": 1.0},
 	}, nil
+}
+
+type mockWindowFetcher struct {
+	called bool
+}
+
+func (m *mockWindowFetcher) FetchRange(_ context.Context, start, end time.Time) ([]fetch.Sample, error) {
+	m.called = true
+	return []fetch.Sample{
+		{At: start, Values: map[string]float64{"request_ms": 10}},
+		{At: end, Values: map[string]float64{"request_ms": 30}},
+	}, nil
+}
+
+func TestSession_End_PassesWindowFetcher(t *testing.T) {
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	wf := &mockWindowFetcher{}
+	cfg := SessionConfig{
+		Namespace: "ns",
+		TestCase:  "window",
+		Now: func() time.Time {
+			return now
+		},
+		Specs: []spec.SLISpec{{
+			ID:      "request_ms_avg",
+			Inputs:  []spec.MetricRef{{Key: "request_ms"}},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeWindowAvg},
+		}},
+		WindowFetcher: wf,
+	}
+
+	sess := NewSession(cfg)
+	sess.Start()
+	sum, err := sess.End(context.Background())
+	require.NoError(t, err)
+	require.True(t, wf.called)
+	require.Len(t, sum.Results, 1)
+	require.NotNil(t, sum.Results[0].Value)
+	assert.Equal(t, 20.0, *sum.Results[0].Value)
 }
 
 // stoppableMockFetcher implements Stop() so tests can observe whether

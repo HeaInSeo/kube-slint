@@ -1,7 +1,7 @@
 # Real-Usage SLI Governance Hardening Sprint
 
 Date: 2026-07-16
-Status: Sprint C in progress
+Status: Sprint D-G implementation complete; review pending
 Decision source: `docs/DECISIONS.md` D-029
 
 ## Confirmed Facts
@@ -130,3 +130,41 @@ Acceptance criteria:
 - SessionConfig-level wiring for window fetchers is not implemented yet, so the
   first runtime window path is engine-level.
 - Histogram quantiles and burn-rate semantics still require dedicated design.
+
+## Sprint D: SessionConfig Window Wiring
+
+Status: Complete
+
+- [x] Added `SessionConfig.WindowFetcher`.
+- [x] `Session.End()` passes the window fetcher into the engine.
+- [x] Window-only specs avoid constructing the default curlpod point fetcher.
+
+## Sprint E: Concrete WindowFetcher Source
+
+Status: Complete
+
+- [x] Added `pkg/slo/fetch/promrange` for Prometheus `/api/v1/query_range`.
+- [x] Matrix results are converted into `[]fetch.Sample`.
+- [x] Series keys are derived from Prometheus metric labels.
+
+## Sprint F: Advanced Window Semantics
+
+Status: Partial complete
+
+- [x] Added `window_ratio` as `sum(input[0]) / sum(input[1])`.
+- [x] Missing input or zero denominator produces a skipped SLI, not a
+  misleading scalar.
+- [ ] Histogram bucket quantiles remain unimplemented.
+- [ ] Specialized burn-rate semantics beyond generic `window_ratio` remain
+  unimplemented.
+
+## Sprint G: Coverage Governance
+
+Status: Complete
+
+- [x] Added opt-in `policy.coverage.required`.
+- [x] Added `policy.coverage.informational` to distinguish intentional
+  informational SLIs from accidental coverage gaps.
+- [x] Added `coverage_gap` as an optional `promote_to_fail` category.
+- [x] Default behavior remains backward-compatible: coverage governance is off
+  unless explicitly enabled.

@@ -15,6 +15,7 @@ var knownPolicyKeys = map[string]bool{
 	"thresholds":      true,
 	"regression":      true,
 	"reliability":     true,
+	"coverage":        true,
 	"fail_on":         true,
 	"promote_to_fail": true,
 }
@@ -117,7 +118,7 @@ func collectUnknownPolicyKeys(doc *yaml.Node) []string {
 		key := root.Content[i].Value
 		if !knownPolicyKeys[key] {
 			warnings = append(warnings,
-				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, fail_on (deprecated), promote_to_fail",
+				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, coverage, fail_on (deprecated), promote_to_fail",
 					key, root.Content[i].Line))
 		}
 	}
@@ -151,6 +152,7 @@ func makePromotionSet(policy *Policy) map[string]bool {
 var allowedPromotionValues = map[string]bool{
 	"threshold_miss":      true,
 	"regression_detected": true,
+	"coverage_gap":        true,
 }
 
 func normalizePromotionValue(v string) string {

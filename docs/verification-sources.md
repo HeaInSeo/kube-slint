@@ -28,11 +28,12 @@ the engine, spec, and gate layers need no changes.
 These source types need N samples over a time window, not two discrete scalars.
 They **cannot** be added by implementing `MetricsFetcher` alone. The initial
 window engine path supports scalar aggregations (`window_min`, `window_max`,
-`window_avg`, `window_p95`, `window_p99`) through `fetch.WindowFetcher`.
+`window_avg`, `window_p95`, `window_p99`, `window_ratio`) through
+`fetch.WindowFetcher`.
 
 | Source type | Blocker | Description |
 |---|---|---|
-| `promql_query` | Range result ([]Sample) | PromQL `range_query` returns a matrix, not a scalar |
+| `promql_query` | Range result ([]Sample) | Implemented by `pkg/slo/fetch/promrange` for Prometheus `query_range` matrix results |
 | `soak_analysis_run` | Multi-point aggregation | Requires p50/p95/p99 over the full window |
 | `burn_rate` | Sliding window ratio | Error budget burn over a look-back period |
 | `p95_over_window` | Histogram aggregation | Needs raw bucket series, not two snapshots |
@@ -41,8 +42,8 @@ window engine path supports scalar aggregations (`window_min`, `window_max`,
 
 `WindowFetcher` returns `[]Sample` for a `(start, end time.Time)` range. The
 engine request carries an optional `WindowFetcher` alongside the existing
-`MetricsFetcher`. This is additive for engine callers, but SessionConfig-level
-window wiring and concrete range fetchers remain future work.
+`MetricsFetcher`. `pkg/slint.SessionConfig` also accepts an optional
+`WindowFetcher` for consumer-facing sessions.
 
 ## Design rule
 

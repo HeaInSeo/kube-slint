@@ -64,6 +64,7 @@ Top-level fields:
 - `thresholds`;
 - `regression`;
 - `reliability`;
+- `coverage`;
 - `promote_to_fail` (preferred) / `fail_on` (deprecated alias — both are
   honored as a union; see `docs/sli-gate-onboarding-ux.md`'s naming section).
 
@@ -92,6 +93,20 @@ Policy invalid cases:
 - non-finite value;
 - negative regression tolerance;
 - unknown `promote_to_fail`/`fail_on` value.
+
+Coverage governance is opt-in:
+
+```yaml
+coverage:
+  required: true
+  informational:
+    - reconcile_success_delta
+```
+
+When enabled, measured summary results with a scalar value must either be
+covered by a threshold rule or listed under `coverage.informational`.
+Uncovered measured SLIs produce `coverage` checks. They are WARN by default and
+become FAIL only when `coverage_gap` is listed in `promote_to_fail`.
 
 ## Gate Result Semantics
 

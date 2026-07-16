@@ -19,6 +19,10 @@
 - Initial scalar window SLI engine foundation: `fetch.WindowFetcher`,
   `ExecuteRequest.WindowFetcher`, and compute modes `window_min`,
   `window_max`, `window_avg`, `window_p95`, and `window_p99`.
+- Session-level window wiring via `SessionConfig.WindowFetcher`, a concrete
+  Prometheus range source (`pkg/slo/fetch/promrange`), `window_ratio`, and
+  opt-in policy coverage governance (`coverage.required`,
+  `coverage.informational`, and `promote_to_fail: ["coverage_gap"]`).
 
 ### Documented
 
@@ -31,6 +35,8 @@
 - Added `docs/window-sli-design.md` and D-030 to keep latency/window/range SLI
   support design-first. D-031 records the initial scalar window aggregation
   implementation and its explicit non-goals.
+- D-032 records Session-level window wiring, Prometheus range fetching,
+  `window_ratio`, and opt-in policy coverage governance.
 
 ## [1.6.0] - 2026-07-09
 

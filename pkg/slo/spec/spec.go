@@ -50,6 +50,8 @@ const (
 	ComputeWindowP95 ComputeMode = "window_p95"
 	// ComputeWindowP99 uses the nearest-rank p99 over input values observed across a window.
 	ComputeWindowP99 ComputeMode = "window_p99"
+	// ComputeWindowRatio uses sum(input[0]) / sum(input[1]) over a window.
+	ComputeWindowRatio ComputeMode = "window_ratio"
 )
 
 // CounterResetPolicy defines how ComputeDelta handles delta < 0 (suspected counter reset).

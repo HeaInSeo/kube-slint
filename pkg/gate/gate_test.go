@@ -26,6 +26,7 @@ type policyFixture struct {
 	Thresholds    []map[string]any `yaml:"thresholds"`
 	Regression    map[string]any   `yaml:"regression"`
 	Reliability   map[string]any   `yaml:"reliability"`
+	Coverage      map[string]any   `yaml:"coverage,omitempty"`
 	FailOn        []string         `yaml:"fail_on"`
 	PromoteToFail []string         `yaml:"promote_to_fail,omitempty"`
 }
@@ -1292,5 +1293,80 @@ func TestEvaluate_ResultStatus_PassNoEffect(t *testing.T) {
 	assert.Equal(t, gate.GatePass, result.GateResult)
 	for _, c := range result.Checks {
 		assert.NotEqual(t, "result_status", c.Category, "pass status must not produce a result_status check")
+	}
+}
+
+func TestEvaluate_CoverageRequiredWarnsOnUncoveredMeasuredSLI(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "covered", "metric": "covered_delta", "operator": ">=", "value": 1},
+		},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		Coverage:      map[string]any{"required": true},
+		PromoteToFail: []string{"threshold_miss"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"covered_delta":   2,
+		"uncovered_delta": 1,
+	}, "Complete"))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateWarn, result.GateResult)
+	assert.Contains(t, result.Reasons, "COVERAGE_GAP")
+	var coverage gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "coverage" {
+			coverage = c
+		}
+	}
+	assert.Equal(t, "warn", coverage.Status)
+	assert.Equal(t, "uncovered_delta", coverage.Metric)
+}
+
+func TestEvaluate_CoverageGapCanPromoteToFail(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:    []map[string]any{},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		Coverage:      map[string]any{"required": true},
+		PromoteToFail: []string{"coverage_gap"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"uncovered_delta": 1,
+	}, "Complete"))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+}
+
+func TestEvaluate_CoverageInformationalSuppressesGap(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		Coverage: map[string]any{
+			"required":      true,
+			"informational": []string{"activity_delta"},
+		},
+		PromoteToFail: []string{"coverage_gap"},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"activity_delta": 1,
+	}, "Complete"))
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GatePass, result.GateResult)
+	for _, c := range result.Checks {
+		assert.NotEqual(t, "coverage", c.Category)
 	}
 }

@@ -64,6 +64,7 @@ type Policy struct {
 	Thresholds    []ThresholdRule `yaml:"thresholds"`
 	Regression    RegressionCfg   `yaml:"regression"`
 	Reliability   ReliabilityCfg  `yaml:"reliability"`
+	Coverage      CoverageCfg     `yaml:"coverage"`
 
 	// FailOn is deprecated: use PromoteToFail instead. Both are honored
 	// (union of the two) during the deprecation window; using FailOn
@@ -96,6 +97,12 @@ type RegressionCfg struct {
 type ReliabilityCfg struct {
 	Required bool   `yaml:"required"`
 	MinLevel string `yaml:"min_level"`
+}
+
+// CoverageCfg controls policy coverage governance for measured SLIs.
+type CoverageCfg struct {
+	Required      bool     `yaml:"required"`
+	Informational []string `yaml:"informational"`
 }
 
 // Check is a single policy check result.

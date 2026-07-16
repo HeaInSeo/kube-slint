@@ -242,6 +242,64 @@ func TestEngine_WindowFetcherErrorMarksCollectionFailed(t *testing.T) {
 	assert.Contains(t, sum.Results[0].Reason, "fetch(window) failed")
 }
 
+func TestEngine_WindowRatio(t *testing.T) {
+	writer := &mockWriter{}
+	eng := New(nil, writer, nil)
+	req := ExecuteRequest{
+		Config: RunConfig{
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs: []spec.SLISpec{{
+			ID: "error_ratio",
+			Inputs: []spec.MetricRef{
+				{Key: "errors"},
+				{Key: "requests"},
+			},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeWindowRatio},
+		}},
+		WindowFetcher: &mockWindowFetcher{samples: []fetch.Sample{
+			{At: time.Unix(1001, 0), Values: map[string]float64{"errors": 1, "requests": 10}},
+			{At: time.Unix(1002, 0), Values: map[string]float64{"errors": 2, "requests": 20}},
+		}},
+		Reliability: &summary.Reliability{},
+	}
+
+	sum, err := eng.Execute(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Len(t, sum.Results, 1)
+	assert.NotNil(t, sum.Results[0].Value)
+	assert.Equal(t, 0.1, *sum.Results[0].Value)
+}
+
+func TestEngine_WindowRatioZeroDenominatorSkips(t *testing.T) {
+	writer := &mockWriter{}
+	eng := New(nil, writer, nil)
+	req := ExecuteRequest{
+		Config: RunConfig{
+			StartedAt:  time.Unix(1000, 0),
+			FinishedAt: time.Unix(1060, 0),
+		},
+		Specs: []spec.SLISpec{{
+			ID: "error_ratio",
+			Inputs: []spec.MetricRef{
+				{Key: "errors"},
+				{Key: "requests"},
+			},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeWindowRatio},
+		}},
+		WindowFetcher: &mockWindowFetcher{samples: []fetch.Sample{
+			{At: time.Unix(1001, 0), Values: map[string]float64{"errors": 1, "requests": 0}},
+		}},
+		Reliability: &summary.Reliability{},
+	}
+
+	sum, err := eng.Execute(context.Background(), req)
+	assert.NoError(t, err)
+	assert.Equal(t, summary.StatusSkip, sum.Results[0].Status)
+	assert.Equal(t, "window_ratio denominator is zero", sum.Results[0].Reason)
+}
+
 // BenchmarkEngine_Execute 는 SLI 평가 파이프라인 전체(2회 fetch + evalSLI)를 벤치마킹함.
 func BenchmarkEngine_Execute(b *testing.B) {
 	values := map[string]float64{

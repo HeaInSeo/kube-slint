@@ -401,6 +401,14 @@ func evalWindowSLI(s spec.SLISpec, samples []fetch.Sample) summary.SLIResult {
 		value = percentile(values, 0.95)
 	case spec.ComputeWindowP99:
 		value = percentile(values, 0.99)
+	case spec.ComputeWindowRatio:
+		ratio, ok, reason := windowRatio(s.Inputs, samples)
+		if !ok {
+			res.Status = summary.StatusSkip
+			res.Reason = reason
+			return res
+		}
+		value = ratio
 	default:
 		res.Status = summary.StatusSkip
 		res.Reason = "unknown window compute mode"
@@ -476,9 +484,34 @@ func percentile(values []float64, quantile float64) float64 {
 	return sorted[rank-1]
 }
 
+func windowRatio(inputs []spec.MetricRef, samples []fetch.Sample) (float64, bool, string) {
+	if len(inputs) < 2 {
+		return 0, false, "window_ratio requires numerator and denominator inputs"
+	}
+	var numerator, denominator float64
+	seenNum, seenDen := false, false
+	for _, sample := range samples {
+		if v, ok := sample.Values[inputs[0].Key]; ok {
+			numerator += v
+			seenNum = true
+		}
+		if v, ok := sample.Values[inputs[1].Key]; ok {
+			denominator += v
+			seenDen = true
+		}
+	}
+	if !seenNum || !seenDen {
+		return 0, false, "missing input metrics"
+	}
+	if denominator == 0 {
+		return 0, false, "window_ratio denominator is zero"
+	}
+	return numerator / denominator, true, ""
+}
+
 func isWindowMode(mode spec.ComputeMode) bool {
 	switch mode {
-	case spec.ComputeWindowMin, spec.ComputeWindowMax, spec.ComputeWindowAvg, spec.ComputeWindowP95, spec.ComputeWindowP99:
+	case spec.ComputeWindowMin, spec.ComputeWindowMax, spec.ComputeWindowAvg, spec.ComputeWindowP95, spec.ComputeWindowP99, spec.ComputeWindowRatio:
 		return true
 	default:
 		return false
@@ -531,6 +564,8 @@ type ExecuteRequestStandard struct {
 	Specs       []spec.SLISpec
 	OutPath     string
 	Reliability *summary.Reliability
+	// WindowFetcher is optional and only used by window compute modes.
+	WindowFetcher fetch.WindowFetcher
 }
 
 // ExecuteStandard 는 표준 기본값을 적용하고 엔진에 위임함.
@@ -544,9 +579,10 @@ func ExecuteStandard(ctx context.Context, eng *Engine, req ExecuteRequestStandar
 		Trigger:  string(mode.Trigger),
 	}
 	return eng.Execute(ctx, ExecuteRequest{
-		Config:      req.Config,
-		Specs:       req.Specs,
-		OutPath:     req.OutPath,
-		Reliability: req.Reliability,
+		Config:        req.Config,
+		Specs:         req.Specs,
+		OutPath:       req.OutPath,
+		Reliability:   req.Reliability,
+		WindowFetcher: req.WindowFetcher,
 	})
 }
