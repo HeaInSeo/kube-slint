@@ -1,7 +1,7 @@
 # Source And Window UX Sprint
 
 Date: 2026-07-16
-Status: Sprint U3 complete; U4-U5 pending
+Status: Sprint U4 complete; U5 pending
 Decision source: `docs/DECISIONS.md` D-033
 
 ## Confirmed Facts
@@ -80,15 +80,15 @@ Goal: reduce manual policy editing for coverage governance.
 
 Planned work:
 
-- Teach policy/profile examples how to mark known informational SLIs.
-- Consider whether `recommend-policy` should emit a commented
+- [x] Teach policy/profile examples how to mark known informational SLIs.
+- [x] Consider whether `recommend-policy` should emit a commented
   `coverage.informational` block for informational profile candidates.
-- Keep generated hard-fail behavior conservative.
+- [x] Keep generated hard-fail behavior conservative.
 
 Acceptance criteria:
 
-- Users have a clear path from coverage warning to policy edit.
-- `coverage_gap` is not promoted to FAIL by default.
+- [x] Users have a clear path from coverage warning to policy edit.
+- [x] `coverage_gap` is not promoted to FAIL by default.
 
 ## Sprint U5: Terminology Pass
 

@@ -56,10 +56,16 @@ reliability:
   required: false
   min_level: "partial"
 
+coverage:
+  # Set true when you want measured-but-unclassified SLIs to show as coverage WARN.
+  required: false
+{{ .CoverageBlock }}
 promote_to_fail:
   - "threshold_miss"
   # Uncomment after baseline is established:
   # - "regression_detected"
+  # Uncomment only when coverage gaps should fail CI:
+  # - "coverage_gap"
 `
 
 type recommendedThreshold struct {
@@ -72,6 +78,7 @@ type recommendedThreshold struct {
 type recommendPolicyTemplateData struct {
 	GeneratedAt, Profile, Strictness string
 	ActiveBlock, CommentedBlock      string
+	CoverageBlock                    string
 }
 
 func runRecommendPolicy(args []string) error {
@@ -126,6 +133,7 @@ func runRecommendPolicy(args []string) error {
 		Strictness:     strictnessName,
 		ActiveBlock:    renderActiveThresholds(active),
 		CommentedBlock: renderCommentedCandidates(commented),
+		CoverageBlock:  renderCoverageInformational(candidates),
 	}
 
 	tmpl, err := template.New("recommend-policy").Parse(recommendPolicyTemplate)
@@ -252,6 +260,25 @@ func renderCommentedCandidates(items []commentedEntry) string {
 	for _, e := range items {
 		fmt.Fprintf(&b, "# - %s (%s)\n", e.candidate.ID, e.note)
 		fmt.Fprintf(&b, "#   %s\n#\n", e.candidate.Reason)
+	}
+	return b.String()
+}
+
+func renderCoverageInformational(candidates []profileCandidate) string {
+	var ids []string
+	for _, c := range candidates {
+		if c.Tier == tierInformational {
+			ids = append(ids, c.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return "  informational: []\n"
+	}
+	var b strings.Builder
+	b.WriteString("  # Profile informational SLIs are context signals, not default gates.\n")
+	b.WriteString("  informational:\n")
+	for _, id := range ids {
+		fmt.Fprintf(&b, "    - %q\n", id)
 	}
 	return b.String()
 }

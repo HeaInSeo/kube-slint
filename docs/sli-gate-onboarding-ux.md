@@ -194,6 +194,9 @@ Actual behavior:
 - defaults to `promote_to_fail: ["threshold_miss"]` with
   `# - "regression_detected"` commented out, and `regression.enabled: false`
   — matches `init`'s existing template so both commands feel consistent;
+- emits `coverage.required: false` plus profile informational SLIs under
+  `coverage.informational`, so users have a direct edit path from an inspect
+  coverage warning without making coverage gaps fail CI by default;
 - **Sprint 6**: when an active rule's own default operator/value is already
   violated by the currently measured value (e.g. default `<= 0` but the
   measured value is `3`), an extra `# ⚠ measured value (...) does not
@@ -235,10 +238,21 @@ reliability:
   required: false
   min_level: "partial"
 
+coverage:
+  # Set true when you want measured-but-unclassified SLIs to show as coverage WARN.
+  required: false
+  # Profile informational SLIs are context signals, not default gates.
+  informational:
+    - "reconcile_success_delta"
+    - "workqueue_adds_total_delta"
+    - "rest_client_requests_total_delta"
+
 promote_to_fail:
   - "threshold_miss"
   # Uncomment after baseline is established:
   # - "regression_detected"
+  # Uncomment only when coverage gaps should fail CI:
+  # - "coverage_gap"
 ```
 
 UX goal:

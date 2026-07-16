@@ -14,6 +14,9 @@
   portforward, jsonendpoint, and promrange.
 - Added `docs/window-sli-example.md` with a complete `promrange`,
   `window_p95`, `window_ratio`, and policy example.
+- `slint-gate recommend-policy` now emits a conservative `coverage` block with
+  profile informational SLIs prefilled under `coverage.informational`; coverage
+  checks remain disabled and `coverage_gap` remains commented out by default.
 - `slint-gate inspect --policy`: best-effort advisory policy coverage
   diagnostics. The command now reports measured SLIs that are not covered by
   threshold/regression policy and policy-covered SLIs missing from the current

@@ -26,15 +26,17 @@ features:
   jsonendpoint, and promrange.
 * [x] U3: added an end-to-end `promrange` window SLI example with `window_p95`
   and `window_ratio`.
-* [ ] U4: improve coverage governance policy recommendation/examples,
+* [x] U4: improved coverage governance policy recommendation/examples,
   especially `coverage.informational`.
 * [ ] U5: terminology pass for point/snapshot/range-window source wording.
 
 Behavior changed:
 
 ```text
-No runtime/library behavior changed. U1 changed inspect wording only, and U2-U3
-added user-facing documentation.
+Yes, CLI-generated policy text changed. `recommend-policy` now emits a
+conservative `coverage` block with informational profile candidates listed, but
+coverage checks remain disabled and `coverage_gap` is not promoted to FAIL by
+default. Runtime/library behavior did not change.
 ```
 
 ### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)
