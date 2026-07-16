@@ -1,0 +1,6 @@
+name: kube-slint-codeql
+
+paths-ignore:
+  # Consumer onboarding fixtures are separate nested modules that exercise
+  # downstream integration shape, not the product module's analyzable surface.
+  - test/consumer-onboarding/**

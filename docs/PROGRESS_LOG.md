@@ -10,6 +10,19 @@ Update this file at the **start and end** of every stage/task.
 **Branch:** `main`
 **Last updated:** 2026-07-16 (v1.7.0 release preparation)
 
+### CodeQL CI Setup Fix (2026-07-16)
+
+GitHub CodeQL default setup reported that Go files were found but not processed.
+Added an explicit CodeQL advanced setup workflow for Go with manual build mode
+and `go build ./...`, plus a CodeQL config that excludes nested
+consumer-onboarding fixture modules from the root product-module scan.
+
+Behavior changed:
+
+```text
+Yes, CI/code-scanning behavior changed. Runtime/library behavior did not change.
+```
+
 ### v1.7.0 Release (2026-07-16)
 
 Closed the real-usage source/window/coverage hardening batch and UX follow-up:

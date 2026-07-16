@@ -48,6 +48,10 @@ Recommended `tmux` layout:
   - Maintain README wording, operating docs, progress/status consistency, and workflow-facing terminology.
   - Ensure docs do not imply that correctness tests and guardrail evaluation are the same path.
   - Maintain `hack/quality-guardrails.sh` and `.github/workflows/quality-guardrails.yml` when accepted security, identity, RBAC, or gate contracts need CI-backed drift detection.
+  - Maintain `.github/workflows/codeql.yml` and `.github/codeql/codeql-config.yml`
+    when GitHub code scanning setup changes. CodeQL should analyze the root
+    product module with an explicit Go build and keep nested consumer fixture
+    modules out of the product-module scan.
 
 ## 5. When To Avoid Product Changes
 
