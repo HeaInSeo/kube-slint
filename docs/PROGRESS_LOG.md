@@ -14,8 +14,9 @@ Update this file at the **start and end** of every stage/task.
 
 GitHub CodeQL default setup reported that Go files were found but not processed.
 Added an explicit CodeQL advanced setup workflow for Go with manual build mode
-and `go build ./...`, plus a CodeQL config that excludes nested
-consumer-onboarding fixture modules from the root product-module scan.
+and `go build ./...`, plus GitHub Actions workflow analysis in the same
+advanced setup. The CodeQL config excludes nested consumer-onboarding fixture
+modules from the root product-module scan.
 
 Behavior changed:
 

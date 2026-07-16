@@ -21,15 +21,24 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze Go
+    name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: actions
+            build-mode: none
 
     steps:
       - name: Clone the code
         uses: actions/checkout@v6
 
       - name: Setup Go
+        if: matrix.language == 'go'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -37,11 +46,12 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: go
-          build-mode: manual
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build Go packages
+        if: matrix.language == 'go'
         run: go build ./...
 
       - name: Perform CodeQL Analysis
