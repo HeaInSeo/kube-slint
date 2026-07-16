@@ -650,3 +650,32 @@ This file records architecture/product-direction decisions that define the proje
     keeping the first ratio semantics explicit and scalar.
   - Coverage governance closes the remaining "measured but not gated" gap
     without making advisory diagnostics fail CI by default.
+
+## D-033: UX follow-up sprint focuses on choices and next actions, not new engine semantics
+
+- Date: 2026-07-16
+- Status: Accepted (planned; implementation not yet shipped)
+- Decision:
+  - A follow-up UX sprint is accepted after D-029 through D-032. Its goal is
+    to make the newly added source-neutral/window/coverage features easier to
+    discover and act on from CLI/docs, without adding new engine semantics.
+  - Sprint U1: strengthen `slint-gate inspect` coverage-gap recommendations
+    so each uncovered measured SLI points to concrete next actions: add a
+    threshold, mark informational, or exclude/remove the signal.
+  - Sprint U2: add a source-selection guide that maps common situations to
+    fetchers: default curlpod, portforward, jsonendpoint, and promrange.
+  - Sprint U3: add an end-to-end window SLI example using `promrange` with
+    `window_p95` and `window_ratio`.
+  - Sprint U4: improve policy generation/profile examples for coverage
+    governance, especially `coverage.informational` suggestions.
+  - Sprint U5: align user-facing terminology around "point source",
+    "snapshot source", and "range/window source" while preserving the public
+    Go interface names.
+  - The sprint schedule and acceptance criteria live in
+    `docs/source-window-ux-sprint.md`.
+- Rationale:
+  - The core capability now exists, but the remaining UX risk is choice
+    overload: users must know which source adapter to use, how to write window
+    specs, and what to do with uncovered measured SLIs.
+  - The next highest-leverage work is therefore CLI/docs guidance and policy
+    recommendation flow, not additional runtime behavior.

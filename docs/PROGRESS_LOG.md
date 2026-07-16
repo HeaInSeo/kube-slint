@@ -5,10 +5,36 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: Real-Usage SLI Governance Hardening Sprint Started
+## Current Status: Source And Window UX Sprint Planned
 
 **Branch:** `main`
-**Last updated:** 2026-07-16 (D-029 sprint planning)
+**Last updated:** 2026-07-16 (D-033 UX sprint planning)
+
+### Source And Window UX Sprint (Planned 2026-07-16)
+
+**Source of truth:**
+
+* `docs/DECISIONS.md` D-033
+* `docs/source-window-ux-sprint.md`
+* `docs/project-status.yaml`
+
+Planned follow-up UX work after the source-neutral/window/coverage runtime
+features:
+
+* [ ] U1: strengthen `slint-gate inspect` coverage-gap next-action wording.
+* [ ] U2: add a source-selection guide for curlpod, portforward,
+  jsonendpoint, and promrange.
+* [ ] U3: add an end-to-end `promrange` window SLI example with `window_p95`
+  and `window_ratio`.
+* [ ] U4: improve coverage governance policy recommendation/examples,
+  especially `coverage.informational`.
+* [ ] U5: terminology pass for point/snapshot/range-window source wording.
+
+Behavior changed:
+
+```text
+No. This entry records the accepted UX sprint schedule and scope only.
+```
 
 ### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)
 

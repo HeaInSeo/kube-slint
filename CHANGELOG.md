@@ -26,6 +26,10 @@
 
 ### Documented
 
+- Accepted the Source And Window UX Sprint (D-033), covering inspect
+  next-action wording, source selection docs, a promrange window example,
+  coverage policy recommendation flow, and source-neutral terminology. No
+  runtime behavior changed in this planning update.
 - Accepted the real-usage SLI governance hardening sprint (D-029), with Sprint
   A focused on measured-but-not-gated SLI diagnostics and source-neutral UX,
   and Sprint B focused on non-Prometheus adapter ergonomics plus window/range
