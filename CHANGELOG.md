@@ -12,6 +12,8 @@
   remove/ignore accidental signals.
 - README/README(Kor) now include a source-selection guide for default curlpod,
   portforward, jsonendpoint, and promrange.
+- Added `docs/window-sli-example.md` with a complete `promrange`,
+  `window_p95`, `window_ratio`, and policy example.
 - `slint-gate inspect --policy`: best-effort advisory policy coverage
   diagnostics. The command now reports measured SLIs that are not covered by
   threshold/regression policy and policy-covered SLIs missing from the current

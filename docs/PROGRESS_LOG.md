@@ -24,7 +24,7 @@ features:
 * [x] U1: strengthened `slint-gate inspect` coverage-gap next-action wording.
 * [x] U2: added a source-selection guide for curlpod, portforward,
   jsonendpoint, and promrange.
-* [ ] U3: add an end-to-end `promrange` window SLI example with `window_p95`
+* [x] U3: added an end-to-end `promrange` window SLI example with `window_p95`
   and `window_ratio`.
 * [ ] U4: improve coverage governance policy recommendation/examples,
   especially `coverage.informational`.
@@ -33,7 +33,8 @@ features:
 Behavior changed:
 
 ```text
-No. This entry records the accepted UX sprint schedule and scope only.
+No runtime/library behavior changed. U1 changed inspect wording only, and U2-U3
+added user-facing documentation.
 ```
 
 ### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)

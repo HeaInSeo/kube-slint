@@ -1,7 +1,7 @@
 # Source And Window UX Sprint
 
 Date: 2026-07-16
-Status: Sprint U2 complete; U3-U5 pending
+Status: Sprint U3 complete; U4-U5 pending
 Decision source: `docs/DECISIONS.md` D-033
 
 ## Confirmed Facts
@@ -61,15 +61,15 @@ Goal: show the complete path for range/window SLIs.
 
 Planned work:
 
-- Add a small example or docs section using `promrange.New(...)`.
-- Include one `window_p95` example and one `window_ratio` example.
-- Include matching policy threshold examples.
+- [x] Add a small example or docs section using `promrange.New(...)`.
+- [x] Include one `window_p95` example and one `window_ratio` example.
+- [x] Include matching policy threshold examples.
 
 Acceptance criteria:
 
-- The example shows `SessionConfig.WindowFetcher`, `SLISpec`, and policy YAML
+- [x] The example shows `SessionConfig.WindowFetcher`, `SLISpec`, and policy YAML
   together.
-- The example does not imply histogram quantiles or specialized burn-rate
+- [x] The example does not imply histogram quantiles or specialized burn-rate
   semantics are implemented.
 
 ## Sprint U4: Coverage Policy Recommendation Flow
