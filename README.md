@@ -160,6 +160,18 @@ For non-Prometheus sources, implement `fetch.MetricsFetcher` or
 `spec.UnsafePromKey` are conveniences for Prometheus text exposition, not a
 requirement of the SLI engine.
 
+For HTTP JSON or Go expvar endpoints, use the built-in JSON endpoint fetcher:
+
+```go
+import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/jsonendpoint"
+
+fetcher := jsonendpoint.New("http://127.0.0.1:8080/debug/vars")
+sess := slint.NewSession(slint.SessionConfig{
+    Specs:   mySpecs, // Inputs use flattened JSON keys, e.g. "memstats.Alloc"
+    Fetcher: fetcher,
+})
+```
+
 ---
 
 ### 2. Embed Harness in E2E Tests
@@ -515,6 +527,5 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 
 

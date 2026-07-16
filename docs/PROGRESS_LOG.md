@@ -28,16 +28,18 @@ usage feedback:
 * [x] Sprint A source-neutral wording slice: README now describes
   `MetricsFetcher`/`SnapshotFetcher` as the source-neutral input boundary and
   Prometheus helpers as conveniences, not engine requirements.
-* [ ] Sprint A remaining verification/review (2026-07-16 to 2026-07-19):
-  run broader tests and review docs/CLI wording for remaining Prometheus-only
-  assumptions.
-* [ ] Sprint B (2026-07-20 to 2026-07-26): non-Prometheus HTTP JSON/expvar
-  adapter ergonomics and a design-first window/range SLI extension plan.
+* [x] Sprint B adapter slice: added `pkg/slo/fetch/jsonendpoint`, a small
+  HTTP JSON/expvar `SnapshotFetcher` that flattens numeric JSON leaves into
+  dot-separated input keys and caches the start sample through `PreFetch`.
+* [x] Sprint B design slice: added `docs/window-sli-design.md` and D-030.
+  Window/range SLIs remain design-first; no runtime window engine behavior has
+  shipped.
 
 Behavior changed:
 
 ```text
-Yes. `slint-gate inspect` gained advisory policy coverage diagnostics.
+Yes. `slint-gate inspect` gained advisory policy coverage diagnostics, and
+pkg/slo/fetch/jsonendpoint was added as a source-neutral JSON/expvar adapter.
 ```
 
 ### v1.6.0 Release (2026-07-09)

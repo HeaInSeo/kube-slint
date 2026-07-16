@@ -1,7 +1,7 @@
 # Real-Usage SLI Governance Hardening Sprint
 
 Date: 2026-07-16
-Status: Sprint A in progress
+Status: Sprint B in progress
 Decision source: `docs/DECISIONS.md` D-029
 
 ## Confirmed Facts
@@ -69,19 +69,21 @@ window/range semantics design-first.
 
 Planned work:
 
-- Add or document a small HTTP JSON/expvar source adapter path.
-- Factor common source-adapter boilerplate only if it reduces real duplication:
+- [x] Add a small HTTP JSON/expvar source adapter path
+  (`pkg/slo/fetch/jsonendpoint`).
+- [x] Factor common source-adapter boilerplate only where it reduces real duplication:
   HTTP GET, JSON flattening, and optional start-snapshot caching.
-- Decide whether the adapter starts as an example or a public package. Prefer
-  an example if the API stability risk is unclear.
-- Draft the window/range SLI design for `WindowFetcher`, compute modes, and
+- [x] Decide whether the adapter starts as an example or a public package:
+  `pkg/slo/fetch/jsonendpoint` is accepted as a small public adapter because it
+  only depends on the existing stable `fetch.SnapshotFetcher` contract.
+- [x] Draft the window/range SLI design for `WindowFetcher`, compute modes, and
   summary/gate compatibility.
 
 Acceptance criteria:
 
-- A non-Prometheus source path is documented or demonstrated without requiring
+- [x] A non-Prometheus source path is documented or demonstrated without requiring
   custom scratch code for every consumer.
-- Window/range SLI support has an accepted design boundary before any runtime
+- [x] Window/range SLI support has an accepted design boundary before any runtime
   implementation begins.
 
 ## Non-Goals

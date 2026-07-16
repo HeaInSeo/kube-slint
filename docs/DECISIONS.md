@@ -555,3 +555,32 @@ This file records architecture/product-direction decisions that define the proje
     boundary and the unimplemented `WindowFetcher` direction. Treating
     latency/window SLIs as a design-first track avoids fragmenting the clean
     two-point path with ad hoc semantics.
+
+## D-030: Non-Prometheus JSON endpoints are Tier 1 sources; window SLIs remain design-first
+
+- Date: 2026-07-16
+- Status: Accepted (Sprint B in progress)
+- Decision:
+  - `pkg/slo/fetch/jsonendpoint` is accepted as a small Tier 1 source adapter
+    for HTTP JSON/expvar-style endpoints. It implements
+    `fetch.SnapshotFetcher`, flattens numeric JSON leaves into dot-separated
+    input keys, ignores non-numeric leaves, and reuses the existing two-point
+    engine without changing `SLISpec`, summary, or gate semantics.
+  - JSON/expvar support is deliberately limited to scalar numeric leaves. It
+    does not attempt to interpret histograms, distributions, timestamps, or
+    event streams.
+  - Window/range/latency semantics remain a design-first track in
+    `docs/window-sli-design.md`; no runtime window engine behavior ships as
+    part of this decision.
+- Rationale:
+  - D-029 identified that kube-slint's product identity is source-neutral even
+    though its examples and default fetchers made Prometheus text scraping feel
+    like the only intended path. A small JSON endpoint fetcher proves the
+    source-neutral boundary without inventing a new engine model.
+  - expvar and simple status JSON endpoints naturally produce keyed numeric
+    scalars, so they satisfy `docs/verification-sources.md`'s Tier 1 rule:
+    their result can be expressed as `map[string]float64` at a single point in
+    time.
+  - Latency percentiles, burn-rate, and soak analysis do not satisfy that rule.
+    Keeping them behind a separate design avoids overloading the two-point
+    path with misleading semantics.

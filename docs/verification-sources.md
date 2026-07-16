@@ -14,6 +14,8 @@ These source types return one `fetch.Sample` per call and fit directly into the 
 | Source type | Interface | Notes |
 |---|---|---|
 | `point_scrape` | `MetricsFetcher` | HTTP GET /metrics at a point in time |
+| `http_json` | `SnapshotFetcher` | HTTP JSON endpoint; numeric leaves flatten to dot-separated input keys |
+| `expvar_json` | `SnapshotFetcher` | Go expvar `/debug/vars`; same JSON flattening path as `http_json` |
 | `portforward` | `MetricsFetcher` | kubectl port-forward + HTTP scrape |
 | `curlpod` | `SnapshotFetcher` | in-cluster curl Pod; PreFetch caches start snapshot |
 | `baseline_compare` | _(file-side)_ | Load a prior `sli-summary.json` as baseline for regression |

@@ -12,6 +12,10 @@
   threshold/regression policy and policy-covered SLIs missing from the current
   summary. This is informational only; it does not change gate results or CI
   failure behavior.
+- `pkg/slo/fetch/jsonendpoint`: a source-neutral HTTP JSON/expvar
+  `SnapshotFetcher` for endpoints that expose numeric JSON leaves. Keys are
+  flattened with dot separators (for example, `memstats.Alloc`) and can be
+  referenced from `SLISpec.Inputs` like any other fetch sample key.
 
 ### Documented
 
@@ -21,6 +25,8 @@
   SLI design. README wording now presents `MetricsFetcher`/`SnapshotFetcher`
   as the source-neutral input boundary and Prometheus helpers as conveniences,
   not engine requirements.
+- Added `docs/window-sli-design.md` and D-030 to keep latency/window/range SLI
+  support design-first. No runtime window engine behavior shipped.
 
 ## [1.6.0] - 2026-07-09
 

@@ -160,6 +160,19 @@ Prometheus가 아닌 소스는 `fetch.MetricsFetcher` 또는
 Prometheus helper는 Prometheus text exposition을 위한 편의 기능이지 SLI
 엔진의 필수 조건이 아니다.
 
+HTTP JSON 또는 Go expvar 엔드포인트는 기본 제공 JSON endpoint fetcher를
+사용할 수 있다.
+
+```go
+import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/jsonendpoint"
+
+fetcher := jsonendpoint.New("http://127.0.0.1:8080/debug/vars")
+sess := slint.NewSession(slint.SessionConfig{
+    Specs:   mySpecs, // 입력은 "memstats.Alloc" 같은 flattened JSON key 사용
+    Fetcher: fetcher,
+})
+```
+
 ---
 
 ### 2. E2E 테스트에 하네스 임베드
