@@ -20,6 +20,17 @@ How does a new project go from "I have an E2E test and /metrics" to
 internal kube-slint concept first?
 ```
 
+Source terminology for onboarding:
+
+- point source: one keyed numeric sample per fetch (`fetch.MetricsFetcher`).
+- snapshot source: a point source that can pre-capture the start sample at
+  `Session.Start()` (`fetch.SnapshotFetcher`).
+- range/window source: many samples over the test window
+  (`fetch.WindowFetcher`).
+
+The Go API names remain explicit, but user docs should use these source terms
+when explaining which adapter to choose.
+
 ## Current UX Rating
 
 Estimated current score for new-project SLI/gate onboarding:

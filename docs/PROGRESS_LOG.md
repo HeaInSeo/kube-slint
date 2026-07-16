@@ -28,15 +28,16 @@ features:
   and `window_ratio`.
 * [x] U4: improved coverage governance policy recommendation/examples,
   especially `coverage.informational`.
-* [ ] U5: terminology pass for point/snapshot/range-window source wording.
+* [x] U5: terminology pass for point/snapshot/range/window source wording.
 
 Behavior changed:
 
 ```text
-Yes, CLI-generated policy text changed. `recommend-policy` now emits a
+Yes, CLI-generated policy text changed in U4. `recommend-policy` now emits a
 conservative `coverage` block with informational profile candidates listed, but
 coverage checks remain disabled and `coverage_gap` is not promoted to FAIL by
-default. Runtime/library behavior did not change.
+default. U5 changed documentation terminology only. Runtime/library behavior did
+not change.
 ```
 
 ### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)

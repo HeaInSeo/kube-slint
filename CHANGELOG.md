@@ -17,6 +17,9 @@
 - `slint-gate recommend-policy` now emits a conservative `coverage` block with
   profile informational SLIs prefilled under `coverage.informational`; coverage
   checks remain disabled and `coverage_gap` remains commented out by default.
+- README, onboarding, and verification-source docs now use consistent
+  point/snapshot/range/window source terminology while preserving the public Go
+  API names.
 - `slint-gate inspect --policy`: best-effort advisory policy coverage
   diagnostics. The command now reports measured SLIs that are not covered by
   threshold/regression policy and policy-covered SLIs missing from the current

@@ -11,7 +11,7 @@
 
 **kube-slint does not replace your tests. It measures what happens during them.**
 
-Attach kube-slint to your existing Kubernetes operator E2E session. Its default fetcher reads `/metrics` before and after your workload, but the measurement boundary is the source-neutral `MetricsFetcher` interface: any source that can produce keyed numeric samples can feed the same SLI computation and policy gate. kube-slint computes operational SLI deltas (reconcile rate, workqueue depth, REST errors) and evaluates them against a declarative policy — without modifying your operator code.
+Attach kube-slint to your existing Kubernetes operator E2E session. Its default fetcher reads `/metrics` before and after your workload, but the measurement boundary is source-neutral: point sources (`MetricsFetcher`), snapshot sources (`SnapshotFetcher`), and range/window sources (`WindowFetcher`) can feed the same SLI computation and policy gate when they produce keyed numeric samples. kube-slint computes operational SLI deltas (reconcile rate, workqueue depth, REST errors) and evaluates them against a declarative policy — without modifying your operator code.
 
 **Try it now** (requires kind ≥ v0.22, Docker, and Go 1.22+):
 
@@ -154,9 +154,17 @@ mySpecs := []spec.SLISpec{
 
 Pass `mySpecs` as the `Specs` field in `SessionConfig`.
 
-For non-Prometheus sources, implement `fetch.MetricsFetcher` or
-`fetch.SnapshotFetcher` and return the same input keys used by your
-`SLISpec.Inputs`. Prometheus helpers such as `spec.PromMetric` and
+Use the source model that matches the data shape:
+
+- point source: implement `fetch.MetricsFetcher` when each fetch returns one
+  keyed numeric sample.
+- snapshot source: implement `fetch.SnapshotFetcher` when the source should
+  cache the start sample at `Session.Start()` before the workload runs.
+- range/window source: implement `fetch.WindowFetcher` when the SLI needs many
+  samples across the test window.
+
+For non-Prometheus point or snapshot sources, return the same input keys used
+by your `SLISpec.Inputs`. Prometheus helpers such as `spec.PromMetric` and
 `spec.UnsafePromKey` are conveniences for Prometheus text exposition, not a
 requirement of the SLI engine.
 
@@ -189,6 +197,7 @@ sess := slint.NewSession(slint.SessionConfig{
 
 | Situation | Source type | Go package |
 |---|---|---|
+| Custom direct scrape or in-process numeric sample | point source | implement `fetch.MetricsFetcher` |
 | Kubernetes Service exposes `/metrics` and CI can create a temporary pod | snapshot source | default `pkg/slint` curlpod path |
 | Prefer local access through `kubectl port-forward` | snapshot source | `pkg/slo/fetch/portforward` |
 | Go expvar or custom status JSON endpoint | snapshot source | `pkg/slo/fetch/jsonendpoint` |

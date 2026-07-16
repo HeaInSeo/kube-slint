@@ -1,7 +1,7 @@
 # Source And Window UX Sprint
 
 Date: 2026-07-16
-Status: Sprint U4 complete; U5 pending
+Status: Complete
 Decision source: `docs/DECISIONS.md` D-033
 
 ## Confirmed Facts
@@ -98,16 +98,16 @@ Goal: make source-neutral terminology consistent.
 
 Planned work:
 
-- Use "point source", "snapshot source", and "range/window source" in user
+- [x] Use "point source", "snapshot source", and "range/window source" in user
   docs where helpful.
-- Preserve public Go API names: `MetricsFetcher`, `SnapshotFetcher`,
+- [x] Preserve public Go API names: `MetricsFetcher`, `SnapshotFetcher`,
   `WindowFetcher`.
-- Avoid implying kube-slint is Prometheus-only.
+- [x] Avoid implying kube-slint is Prometheus-only.
 
 Acceptance criteria:
 
-- README and onboarding docs use consistent source terminology.
-- Existing product identity guardrails still pass.
+- [x] README and onboarding docs use consistent source terminology.
+- [x] Existing product identity guardrails still pass.
 
 ## Non-Goals
 

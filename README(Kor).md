@@ -11,7 +11,7 @@ English documentation is available in [README.md](README.md).
 
 **kube-slint는 테스트를 대체하지 않는다. 테스트 중에 일어나는 일을 측정한다.**
 
-기존 Kubernetes 오퍼레이터 E2E 세션에 kube-slint를 붙인다. 기본 fetcher는 워크로드 전후의 `/metrics`를 읽지만, 계측 경계는 source-neutral `MetricsFetcher` 인터페이스다. 키가 있는 숫자 샘플을 만들 수 있는 소스라면 같은 SLI 계산과 정책 게이트에 넣을 수 있다. kube-slint는 운영 SLI 델타(reconcile 비율, 워크큐 깊이, REST 오류)를 계산하고, 선언적 정책과 대조해 평가한다 — 오퍼레이터 코드를 수정할 필요는 없다.
+기존 Kubernetes 오퍼레이터 E2E 세션에 kube-slint를 붙인다. 기본 fetcher는 워크로드 전후의 `/metrics`를 읽지만, 계측 경계는 source-neutral하다. point source(`MetricsFetcher`), snapshot source(`SnapshotFetcher`), range/window source(`WindowFetcher`)는 키가 있는 숫자 샘플을 만들 수 있으면 같은 SLI 계산과 정책 게이트에 넣을 수 있다. kube-slint는 운영 SLI 델타(reconcile 비율, 워크큐 깊이, REST 오류)를 계산하고, 선언적 정책과 대조해 평가한다 — 오퍼레이터 코드를 수정할 필요는 없다.
 
 **지금 바로 체험** (kind ≥ v0.22, Docker, Go 1.22+ 필요):
 
@@ -154,11 +154,19 @@ mySpecs := []spec.SLISpec{
 
 `mySpecs`를 `SessionConfig`의 `Specs` 필드에 전달한다.
 
-Prometheus가 아닌 소스는 `fetch.MetricsFetcher` 또는
-`fetch.SnapshotFetcher`를 구현하고, `SLISpec.Inputs`에서 사용하는 같은
-입력 키를 반환하면 된다. `spec.PromMetric`, `spec.UnsafePromKey` 같은
-Prometheus helper는 Prometheus text exposition을 위한 편의 기능이지 SLI
-엔진의 필수 조건이 아니다.
+데이터 형태에 맞는 소스 모델을 고른다.
+
+- point source: 각 fetch가 키가 있는 숫자 샘플 하나를 반환하면
+  `fetch.MetricsFetcher`를 구현한다.
+- snapshot source: 워크로드 실행 전 `Session.Start()` 시점에 시작 샘플을
+  캐시해야 하면 `fetch.SnapshotFetcher`를 구현한다.
+- range/window source: 테스트 window 전체의 여러 샘플이 필요하면
+  `fetch.WindowFetcher`를 구현한다.
+
+Prometheus가 아닌 point/snapshot 소스는 `SLISpec.Inputs`에서 사용하는
+같은 입력 키를 반환하면 된다. `spec.PromMetric`, `spec.UnsafePromKey`
+같은 Prometheus helper는 Prometheus text exposition을 위한 편의 기능이지
+SLI 엔진의 필수 조건이 아니다.
 
 HTTP JSON 또는 Go expvar 엔드포인트는 기본 제공 JSON endpoint fetcher를
 사용할 수 있다.
@@ -190,6 +198,7 @@ sess := slint.NewSession(slint.SessionConfig{
 
 | 상황 | 소스 유형 | Go 패키지 |
 |---|---|---|
+| custom direct scrape 또는 in-process 숫자 샘플 | point source | `fetch.MetricsFetcher` 구현 |
 | Kubernetes Service가 `/metrics`를 노출하고 CI에서 임시 pod 생성 가능 | snapshot source | 기본 `pkg/slint` curlpod 경로 |
 | `kubectl port-forward`를 통한 로컬 접근 선호 | snapshot source | `pkg/slo/fetch/portforward` |
 | Go expvar 또는 custom status JSON endpoint | snapshot source | `pkg/slo/fetch/jsonendpoint` |
