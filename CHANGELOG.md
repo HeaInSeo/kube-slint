@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- `slint-gate inspect --policy`: best-effort advisory policy coverage
+  diagnostics. The command now reports measured SLIs that are not covered by
+  threshold/regression policy and policy-covered SLIs missing from the current
+  summary. This is informational only; it does not change gate results or CI
+  failure behavior.
+
+### Documented
+
+- Accepted the real-usage SLI governance hardening sprint (D-029), with Sprint
+  A focused on measured-but-not-gated SLI diagnostics and source-neutral UX,
+  and Sprint B focused on non-Prometheus adapter ergonomics plus window/range
+  SLI design. README wording now presents `MetricsFetcher`/`SnapshotFetcher`
+  as the source-neutral input boundary and Prometheus helpers as conveniences,
+  not engine requirements.
+
 ## [1.6.0] - 2026-07-09
 
 ### Added

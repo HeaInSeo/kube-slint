@@ -1,0 +1,102 @@
+# Real-Usage SLI Governance Hardening Sprint
+
+Date: 2026-07-16
+Status: Sprint A in progress
+Decision source: `docs/DECISIONS.md` D-029
+
+## Confirmed Facts
+
+- `docs/DECISIONS.md` D-001 defines kube-slint as a shift-left operational
+  SLI guardrail, not a Prometheus-specific tool.
+- `docs/DECISIONS.md` D-002 and D-008 separate measurement, policy
+  evaluation, and CI failure.
+- `docs/verification-sources.md` defines the current engine as a two-point
+  model and records window/range sources as requiring a future engine
+  extension.
+- `pkg/slo/fetch.MetricsFetcher` and `SnapshotFetcher` are source-neutral
+  interfaces, but current README/examples strongly bias the first-time user
+  toward Prometheus text keys and `/metrics` scraping.
+
+## Problem Statement
+
+Real consumer usage found four product gaps:
+
+1. An SLI can be defined and computed, then never asserted or covered by a
+   gate policy. kube-slint currently does not report this as a governance
+   problem.
+2. Latency/window SLIs such as startup latency, gRPC request latency, p95/p99,
+   and burn-rate checks do not fit the current two-point engine.
+3. `UnsafePromKey` and Prometheus-key examples make the API feel more
+   Prometheus-specific than the accepted product identity allows.
+4. Non-Prometheus source adapters are possible, but common HTTP JSON/expvar
+   boilerplate is still left to each consumer.
+
+## Sprint A: Guardrail Coverage & Source-Neutral UX
+
+Schedule: 2026-07-16 to 2026-07-19
+
+Goal: make coverage gaps visible and reduce Prometheus-specific first-use
+wording without changing library semantics.
+
+Planned work:
+
+- [x] Add diagnostics for measured SLIs that are not covered by threshold or
+  regression policy.
+- [x] Show a three-way relationship in onboarding/inspection output:
+  profile-expected SLIs, measured SLIs, and policy-covered SLIs.
+- [x] Keep the initial coverage signal advisory. Do not turn uncovered measured
+  SLIs into automatic FAIL behavior in this sprint.
+- [x] Update README/docs/examples so `MetricsFetcher`/`SnapshotFetcher` are
+  described as source-neutral, and raw Prometheus helpers are presented as
+  Prometheus-specific conveniences.
+- [x] Prefer `PromMetric(name, labels)` in Prometheus examples where it is
+  practical; keep `UnsafePromKey` documented as an escape hatch for raw
+  exposition keys.
+
+Acceptance criteria:
+
+- [x] `slint-gate inspect` identifies
+  measured-but-not-policy-covered SLIs.
+- [x] Docs do not imply Prometheus is required for kube-slint's product model.
+- [x] No window/range SLI behavior is claimed as implemented.
+
+## Sprint B: Non-Prometheus Adapters & Window Design
+
+Schedule: 2026-07-20 to 2026-07-26
+
+Goal: prove source-neutral usage beyond Prometheus scrape while keeping
+window/range semantics design-first.
+
+Planned work:
+
+- Add or document a small HTTP JSON/expvar source adapter path.
+- Factor common source-adapter boilerplate only if it reduces real duplication:
+  HTTP GET, JSON flattening, and optional start-snapshot caching.
+- Decide whether the adapter starts as an example or a public package. Prefer
+  an example if the API stability risk is unclear.
+- Draft the window/range SLI design for `WindowFetcher`, compute modes, and
+  summary/gate compatibility.
+
+Acceptance criteria:
+
+- A non-Prometheus source path is documented or demonstrated without requiring
+  custom scratch code for every consumer.
+- Window/range SLI support has an accepted design boundary before any runtime
+  implementation begins.
+
+## Non-Goals
+
+- Do not implement a full window/range engine in Sprint A.
+- Do not make policy coverage warnings fail CI by default.
+- Do not rename or remove `UnsafePromKey` in a breaking way.
+- Do not turn kube-slint into a generic correctness test framework.
+
+## Open Risks
+
+- Adding coverage diagnostics without changing gate semantics may still leave
+  some teams ignoring the warning.
+- Prometheus-specific names remain in the public API for compatibility.
+- A public JSON/expvar adapter package could become an API commitment before
+  enough consumer usage exists.
+- Window/range support may require summary schema changes, not just fetcher
+  additions.

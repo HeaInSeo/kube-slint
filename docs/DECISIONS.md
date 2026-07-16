@@ -511,3 +511,47 @@ This file records architecture/product-direction decisions that define the proje
   - Added `check_test_capture_helper_consolidation` to `hack/quality-guardrails.sh`: fails if `os.Pipe()` appears in any `cmd/slint-gate`/`pkg/gate` test file other than the two canonical fixed helpers, so a future ad-hoc capture helper can't reintroduce this pattern a sixth time.
 - Rationale:
   - Consolidating onto the existing fixed helper (rather than re-fixing each site independently) is strictly better here: one implementation to maintain, and it matches this project's general anti-duplication stance (see D-022's `ResultValues`/`CompareOp` consolidation) — three near-identical bug fixes in one PR is a stronger signal to standardize than to keep patching copies.
+
+## D-029: Real-usage SLI governance hardening sprint is accepted as the next development track
+
+- Date: 2026-07-16
+- Status: Accepted (Sprint A in progress)
+- Decision:
+  - A new real-usage hardening sprint is accepted to address four issues found
+    while using kube-slint from a consumer/development-agent workflow:
+    1. kube-slint can compute SLIs that are never covered by policy or test
+       assertions, and currently does not surface that as a first-class
+       governance risk.
+    2. Window/range/latency SLIs such as startup latency, request latency
+       percentiles, and burn-rate style checks do not fit the current
+       two-point engine without a design extension.
+    3. Public examples over-emphasize raw Prometheus key construction
+       (`UnsafePromKey`) even though kube-slint's product identity is
+       source-neutral operational SLI guardrails.
+    4. Non-Prometheus source adapters are possible through
+       `MetricsFetcher`/`SnapshotFetcher`, but common HTTP JSON/expvar
+       adapter boilerplate is not yet provided or documented as a first-class
+       path.
+  - Sprint A, "Guardrail Coverage & Source-Neutral UX", is the immediate
+    implementation sprint. It may add policy-coverage diagnostics and
+    source-neutral wording/API examples, but it must not claim that
+    window-based SLI semantics have shipped.
+  - Sprint B, "Non-Prometheus Source Adapters & Window SLI Design", follows
+    Sprint A. It may add small source-adapter examples or packages, but the
+    window/range engine extension must start as a design decision before
+    runtime behavior changes.
+  - The sprint schedule and acceptance criteria live in
+    `docs/real-usage-sli-governance-sprint.md`.
+- Rationale:
+  - D-001 defines kube-slint as a shift-left operational SLI guardrail, not
+    a Prometheus-specific metrics tool. The current implementation is already
+    source-extensible at the fetcher interface boundary, but its examples and
+    ergonomics make Prometheus text scraping feel like the only intended
+    path.
+  - D-002/D-008 keep measurement, policy evaluation, and CI failure separate.
+    A coverage diagnostic preserves that separation while making "measured
+    but not gated" visible instead of silently relying on humans to notice.
+  - `docs/verification-sources.md` already records the two-point engine
+    boundary and the unimplemented `WindowFetcher` direction. Treating
+    latency/window SLIs as a design-first track avoids fragmenting the clean
+    two-point path with ad hoc semantics.

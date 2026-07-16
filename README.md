@@ -11,7 +11,7 @@
 
 **kube-slint does not replace your tests. It measures what happens during them.**
 
-Attach kube-slint to your existing Kubernetes operator E2E session. It reads `/metrics` before and after your workload, computes operational SLI deltas (reconcile rate, workqueue depth, REST errors), and evaluates them against a declarative policy — without modifying your operator code.
+Attach kube-slint to your existing Kubernetes operator E2E session. Its default fetcher reads `/metrics` before and after your workload, but the measurement boundary is the source-neutral `MetricsFetcher` interface: any source that can produce keyed numeric samples can feed the same SLI computation and policy gate. kube-slint computes operational SLI deltas (reconcile rate, workqueue depth, REST errors) and evaluates them against a declarative policy — without modifying your operator code.
 
 **Try it now** (requires kind ≥ v0.22, Docker, and Go 1.22+):
 
@@ -153,6 +153,12 @@ mySpecs := []spec.SLISpec{
 ```
 
 Pass `mySpecs` as the `Specs` field in `SessionConfig`.
+
+For non-Prometheus sources, implement `fetch.MetricsFetcher` or
+`fetch.SnapshotFetcher` and return the same input keys used by your
+`SLISpec.Inputs`. Prometheus helpers such as `spec.PromMetric` and
+`spec.UnsafePromKey` are conveniences for Prometheus text exposition, not a
+requirement of the SLI engine.
 
 ---
 
@@ -509,7 +515,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 
 
 

@@ -33,6 +33,13 @@ func writeInspectSummary(t *testing.T, dir string, ids []string, collectionStatu
 	return path
 }
 
+func writeInspectPolicy(t *testing.T, dir string, body string) string {
+	t.Helper()
+	path := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
+	return path
+}
+
 // captureStdout redirects os.Stdout to a pipe and returns everything fn()
 // wrote to it. The read end is drained concurrently in a goroutine started
 // before fn() runs (not after), since os.Pipe()'s write end has a bounded
@@ -153,6 +160,61 @@ func TestRunInspect_InformationalTier_MeasuredShowsInformationalWording(t *testi
 	require.NoError(t, err)
 	assert.Contains(t, out, "reconcile_success_delta")
 	assert.Contains(t, out, "measured, informational only (no default threshold)")
+}
+
+func TestRunInspect_PolicyCoverageReportsMeasuredButNotCovered(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{
+		"reconcile_total_delta",
+		"reconcile_slow_delta",
+	}, "Complete")
+	policyPath := writeInspectPolicy(t, dir, `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+regression:
+  enabled: false
+`)
+
+	var err error
+	out := captureStdout(t, func() {
+		err = runInspect([]string{"--summary", summaryPath, "--policy", policyPath})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, out, "Policy coverage:")
+	assert.Contains(t, out, "Measured but not covered by policy:")
+	assert.Contains(t, out, "reconcile_slow_delta")
+	assert.Contains(t, out, "advisory: add a threshold/regression rule or mark informational")
+	assert.Contains(t, out, "Policy-covered but missing from summary: (none)")
+}
+
+func TestRunInspect_PolicyCoverageReportsPolicyMetricMissingFromSummary(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{"reconcile_total_delta"}, "Complete")
+	policyPath := writeInspectPolicy(t, dir, `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+  - name: workqueue_max
+    metric: workqueue_depth_end
+    operator: "<="
+    value: 0
+regression:
+  enabled: true
+`)
+
+	var err error
+	out := captureStdout(t, func() {
+		err = runInspect([]string{"--summary", summaryPath, "--policy", policyPath})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, out, "Policy-covered but missing from summary:")
+	assert.Contains(t, out, "workqueue_depth_end")
+	assert.Contains(t, out, "Regression coverage: enabled")
 }
 
 func TestRunInspect_InvalidSchemaVersion(t *testing.T) {

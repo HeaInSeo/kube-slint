@@ -116,7 +116,7 @@ Give the user a safe starting point, not a blank policy file.
 ### 2. Inspect Summary — implemented (Sprint 2)
 
 ```sh
-slint-gate inspect --summary artifacts/sli-summary.json
+slint-gate inspect --summary artifacts/sli-summary.json --policy .slint/policy.yaml
 ```
 
 Actual output:
@@ -133,6 +133,11 @@ Measured shift-left SLIs:
 Missing profile SLIs:
   (none)
 
+Policy coverage:
+  Measured but not covered by policy: (none)
+  Policy-covered but missing from summary: (none)
+  Regression coverage: disabled in policy.
+
 Readiness:
   Threshold policy: ready
   Baseline approval: ready
@@ -144,9 +149,13 @@ Next:
 ```
 
 When a profile SLI is absent from the summary, it's listed under "Missing
-profile SLIs" with a keep-commented-out recommendation instead. `inspect`
-never produces a gate verdict — it exits non-zero only if the summary file
-itself can't be loaded (missing, malformed, or unsupported schema version).
+profile SLIs" with a keep-commented-out recommendation instead. When a policy
+file is present, `inspect` also reports measured SLIs that are not covered by
+threshold/regression policy and policy-covered SLIs missing from the summary.
+This coverage section is advisory; it does not change gate results or CI exit
+behavior. `inspect` never produces a gate verdict — it exits non-zero only if
+the summary file itself can't be loaded (missing, malformed, or unsupported
+schema version).
 
 UX goal:
 
@@ -639,7 +648,8 @@ Result:
 A new-project onboarding UX is acceptable when:
 
 - a user can generate a starter policy from a valid summary;
-- a user can inspect missing SLIs without reading Go structs;
+- a user can inspect missing SLIs and measured-but-not-policy-covered SLIs
+  without reading Go structs;
 - a user can create a baseline through an explicit approval command;
 - CI YAML can be generated from the same paths used locally;
 - invalid summary or policy never produces `PASS`;
@@ -660,7 +670,8 @@ A new-project onboarding UX is acceptable when:
 
 Recommended implementation order:
 
-1. ~~`slint-gate inspect --summary`.~~ Done (Sprint 2).
+1. ~~`slint-gate inspect --summary`.~~ Done (Sprint 2). Updated in D-029 to
+   include advisory policy coverage diagnostics when `--policy` is present.
 2. ~~`slint-gate recommend-policy --summary --profile`.~~ Done (Sprint 2).
 3. ~~`slint-gate baseline approve`.~~ Done (Sprint 3).
 4. ~~`slint-gate ci github-actions`.~~ Done (Sprint 3).

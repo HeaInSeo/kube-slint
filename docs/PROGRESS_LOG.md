@@ -5,10 +5,40 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.6.0 Tagged (Real-Usage Hardening Batch + 2 Adversarial Review Rounds)
+## Current Status: Real-Usage SLI Governance Hardening Sprint Started
 
 **Branch:** `main`
-**Last updated:** 2026-07-09 (v1.6.0 tag + release)
+**Last updated:** 2026-07-16 (D-029 sprint planning)
+
+### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)
+
+**Source of truth:**
+
+* `docs/DECISIONS.md` D-029
+* `docs/real-usage-sli-governance-sprint.md`
+* `docs/project-status.yaml`
+
+Started a two-part hardening track based on actual consumer/development-agent
+usage feedback:
+
+* [x] Sprint A coverage diagnostic slice: `slint-gate inspect` now reads
+  `--policy` best-effort and reports measured-but-not-policy-covered SLIs plus
+  policy-covered-but-missing SLIs. Coverage remains advisory and does not
+  affect gate results.
+* [x] Sprint A source-neutral wording slice: README now describes
+  `MetricsFetcher`/`SnapshotFetcher` as the source-neutral input boundary and
+  Prometheus helpers as conveniences, not engine requirements.
+* [ ] Sprint A remaining verification/review (2026-07-16 to 2026-07-19):
+  run broader tests and review docs/CLI wording for remaining Prometheus-only
+  assumptions.
+* [ ] Sprint B (2026-07-20 to 2026-07-26): non-Prometheus HTTP JSON/expvar
+  adapter ergonomics and a design-first window/range SLI extension plan.
+
+Behavior changed:
+
+```text
+Yes. `slint-gate inspect` gained advisory policy coverage diagnostics.
+```
 
 ### v1.6.0 Release (2026-07-09)
 
