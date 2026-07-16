@@ -727,8 +727,9 @@ func TestEvaluate_ReliabilityPartial_NotRequired_Pass(t *testing.T) {
 	assert.Equal(t, gate.GatePass, result.GateResult)
 }
 
-func TestEvaluate_DefaultFailOn_Applied(t *testing.T) {
-	// FailOn 필드 비어있으면 기본값(threshold_miss, regression_detected) 적용 → FAIL
+func TestEvaluate_DefaultPromotion_Applied(t *testing.T) {
+	// Empty promotion fields apply the strict defaults:
+	// threshold_miss, regression_detected, and coverage_gap.
 	dir := t.TempDir()
 	p := policyFixture{
 		Thresholds: []map[string]any{
@@ -749,6 +750,29 @@ func TestEvaluate_DefaultFailOn_Applied(t *testing.T) {
 	})
 
 	assert.Equal(t, gate.GateFail, result.GateResult)
+}
+
+func TestEvaluate_DefaultPromotion_CoverageGapFailsWhenCoverageRequired(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		Coverage:    map[string]any{"required": true},
+		FailOn:      []string{},
+	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(
+		map[string]float64{"new_unclassified_sli": 1}, "Complete",
+	))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policy,
+	})
+
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "COVERAGE_GAP")
 }
 
 func TestEvaluate_UnnamedThreshold(t *testing.T) {

@@ -202,12 +202,12 @@ Actual behavior:
   why `lenient` omits a rule entirely instead of downgrading it;
 - refuses to overwrite an existing `--output` unless `--force` is passed;
   `--dry-run` prints the draft to stdout instead of writing it;
-- defaults to `promote_to_fail: ["threshold_miss"]` with
+- defaults to `promote_to_fail: ["threshold_miss", "coverage_gap"]` with
   `# - "regression_detected"` commented out, and `regression.enabled: false`
   — matches `init`'s existing template so both commands feel consistent;
-- emits `coverage.required: false` plus profile informational SLIs under
+- emits `coverage.required: true` plus profile informational SLIs under
   `coverage.informational`, so users have a direct edit path from an inspect
-  coverage warning without making coverage gaps fail CI by default;
+  coverage warning while making unclassified measured SLIs fail by default;
 - **Sprint 6**: when an active rule's own default operator/value is already
   violated by the currently measured value (e.g. default `<= 0` but the
   measured value is `3`), an extra `# ⚠ measured value (...) does not
@@ -250,8 +250,8 @@ reliability:
   min_level: "partial"
 
 coverage:
-  # Set true when you want measured-but-unclassified SLIs to show as coverage WARN.
-  required: false
+  # Keep true to fail on measured SLIs that are neither gated nor marked informational.
+  required: true
   # Profile informational SLIs are context signals, not default gates.
   informational:
     - "reconcile_success_delta"
@@ -260,10 +260,9 @@ coverage:
 
 promote_to_fail:
   - "threshold_miss"
+  - "coverage_gap"
   # Uncomment after baseline is established:
   # - "regression_detected"
-  # Uncomment only when coverage gaps should fail CI:
-  # - "coverage_gap"
 ```
 
 UX goal:

@@ -72,10 +72,10 @@ type Policy struct {
 	FailOn []string `yaml:"fail_on"`
 
 	// PromoteToFail lists which gate conditions ("threshold_miss",
-	// "regression_detected") are promoted from WARN to FAIL. This is the
-	// preferred name for what was previously FailOn — it disambiguates
-	// from the CLI/action's --exit-on/exit-on, which controls process
-	// exit code, not gate grade promotion.
+	// "regression_detected", "coverage_gap") are promoted from WARN to FAIL.
+	// This is the preferred name for what was previously FailOn — it
+	// disambiguates from the CLI/action's --exit-on/exit-on, which controls
+	// process exit code, not gate grade promotion.
 	PromoteToFail []string `yaml:"promote_to_fail"`
 }
 

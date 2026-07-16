@@ -14,9 +14,11 @@
   portforward, jsonendpoint, and promrange.
 - Added `docs/window-sli-example.md` with a complete `promrange`,
   `window_p95`, `window_ratio`, and policy example.
-- `slint-gate recommend-policy` now emits a conservative `coverage` block with
-  profile informational SLIs prefilled under `coverage.informational`; coverage
-  checks remain disabled and `coverage_gap` remains commented out by default.
+- `slint-gate recommend-policy` now emits a strict `coverage` block with
+  profile informational SLIs prefilled under `coverage.informational`.
+- Coverage governance is strict by default in generated policies:
+  `coverage.required: true` and `coverage_gap` in `promote_to_fail`. Omitted or
+  empty promotion lists now include `coverage_gap` in the default promotion set.
 - README, onboarding, and verification-source docs now use consistent
   point/snapshot/range/window source terminology while preserving the public Go
   API names.

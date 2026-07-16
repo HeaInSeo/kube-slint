@@ -7,7 +7,7 @@ Decision source: `docs/DECISIONS.md` D-033
 ## Confirmed Facts
 
 - `slint-gate inspect` can surface measured-but-not-policy-covered SLIs.
-- `policy.coverage.required` and `coverage.informational` provide opt-in
+- `policy.coverage.required` and `coverage.informational` provide explicit
   governance for measured-but-not-gated SLIs.
 - `SessionConfig.WindowFetcher`, `pkg/slo/fetch/promrange`, and scalar window
   compute modes are implemented.
@@ -83,12 +83,13 @@ Planned work:
 - [x] Teach policy/profile examples how to mark known informational SLIs.
 - [x] Consider whether `recommend-policy` should emit a commented
   `coverage.informational` block for informational profile candidates.
-- [x] Keep generated hard-fail behavior conservative.
+- [x] Make generated coverage-gap behavior strict by default, with
+  `coverage.required: false` as the explicit opt-out.
 
 Acceptance criteria:
 
 - [x] Users have a clear path from coverage warning to policy edit.
-- [x] `coverage_gap` is not promoted to FAIL by default.
+- [x] `coverage_gap` is promoted to FAIL by default in generated policies.
 
 ## Sprint U5: Terminology Pass
 

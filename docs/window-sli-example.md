@@ -88,8 +88,7 @@ coverage:
 
 promote_to_fail:
   - "threshold_miss"
-  # Optional:
-  # - "coverage_gap"
+  - "coverage_gap"
 ```
 
 ## Boundaries

@@ -57,15 +57,14 @@ reliability:
   min_level: "partial"
 
 coverage:
-  # Set true when you want measured-but-unclassified SLIs to show as coverage WARN.
-  required: false
+  # Keep true to fail on measured SLIs that are neither gated nor marked informational.
+  required: true
 {{ .CoverageBlock }}
 promote_to_fail:
   - "threshold_miss"
+  - "coverage_gap"
   # Uncomment after baseline is established:
   # - "regression_detected"
-  # Uncomment only when coverage gaps should fail CI:
-  # - "coverage_gap"
 `
 
 type recommendedThreshold struct {

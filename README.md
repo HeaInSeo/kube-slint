@@ -325,14 +325,13 @@ reliability:
   required: false
   min_level: "partial"
 coverage:
-  required: false
+  required: true
   informational:
     - "reconcile_success_delta"
 promote_to_fail:
   - "threshold_miss"
   - "regression_detected"
-  # Optional: fail CI on measured-but-not-gated SLIs.
-  # - "coverage_gap"
+  - "coverage_gap"
 ```
 
 **Gate result values**
@@ -341,12 +340,12 @@ promote_to_fail:
 |---|---|
 | `PASS` | All threshold and regression checks passed |
 | `WARN` | A check failed but its category is not listed in `promote_to_fail`, or a non-blocking condition (first run without baseline, reliability below minimum) |
-| `FAIL` | Policy violation listed in `promote_to_fail` — threshold miss or regression detected |
+| `FAIL` | Policy violation listed in `promote_to_fail` — threshold miss, regression detected, or coverage gap |
 | `NO_GRADE` | Evaluation not possible — missing or corrupt inputs |
 
 **`promote_to_fail` semantics**
 
-`policy.promote_to_fail` controls which violation categories promote `gate_result` to `FAIL`. Violations not listed become `WARN` — a failed check can never produce `PASS`. If `promote_to_fail` is omitted or empty, kube-slint applies the default: `threshold_miss` and `regression_detected`. (`fail_on` still works as a deprecated alias; both are unioned, and using `fail_on` adds a non-fatal notice to `slint-gate-summary.json`'s `policy_warnings`.)
+`policy.promote_to_fail` controls which violation categories promote `gate_result` to `FAIL`. Violations not listed become `WARN` — a failed check can never produce `PASS`. If `promote_to_fail` is omitted or empty, kube-slint applies the strict default: `threshold_miss`, `regression_detected`, and `coverage_gap`. Set `coverage.required: false` to turn off coverage-gap checks, or list intentional context-only SLIs under `coverage.informational`. (`fail_on` still works as a deprecated alias; both are unioned, and using `fail_on` adds a non-fatal notice to `slint-gate-summary.json`'s `policy_warnings`.)
 
 `--exit-on` (CLI flag / action input) is a separate layer that controls whether a given `gate_result` exits the process with code 1. The two settings are independent.
 

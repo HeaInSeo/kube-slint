@@ -94,7 +94,7 @@ Policy invalid cases:
 - negative regression tolerance;
 - unknown `promote_to_fail`/`fail_on` value.
 
-Coverage governance is opt-in:
+Coverage governance is strict by default in generated policies:
 
 ```yaml
 coverage:
@@ -105,8 +105,10 @@ coverage:
 
 When enabled, measured summary results with a scalar value must either be
 covered by a threshold rule or listed under `coverage.informational`.
-Uncovered measured SLIs produce `coverage` checks. They are WARN by default and
-become FAIL only when `coverage_gap` is listed in `promote_to_fail`.
+Uncovered measured SLIs produce `coverage` checks. Generated policies list
+`coverage_gap` in `promote_to_fail`, and omitted/empty `promote_to_fail` uses
+the same strict default. Set `coverage.required: false` to disable coverage-gap
+checks for a policy.
 
 ## Gate Result Semantics
 

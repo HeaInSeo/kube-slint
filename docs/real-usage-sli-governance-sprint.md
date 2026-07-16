@@ -162,9 +162,10 @@ Status: Partial complete
 
 Status: Complete
 
-- [x] Added opt-in `policy.coverage.required`.
+- [x] Added `policy.coverage.required`.
 - [x] Added `policy.coverage.informational` to distinguish intentional
   informational SLIs from accidental coverage gaps.
-- [x] Added `coverage_gap` as an optional `promote_to_fail` category.
-- [x] Default behavior remains backward-compatible: coverage governance is off
-  unless explicitly enabled.
+- [x] Added `coverage_gap` as a `promote_to_fail` category.
+- [x] D-034 later changed the default posture: generated/default promotion
+  behavior is strict, while `coverage.required: false` remains the explicit
+  opt-out.

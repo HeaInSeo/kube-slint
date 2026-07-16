@@ -33,11 +33,10 @@ features:
 Behavior changed:
 
 ```text
-Yes, CLI-generated policy text changed in U4. `recommend-policy` now emits a
-conservative `coverage` block with informational profile candidates listed, but
-coverage checks remain disabled and `coverage_gap` is not promoted to FAIL by
-default. U5 changed documentation terminology only. Runtime/library behavior did
-not change.
+Yes. `recommend-policy` and `init` now generate strict coverage governance by
+default: `coverage.required: true` and `coverage_gap` in `promote_to_fail`.
+Omitted/empty promotion lists also include `coverage_gap` in the strict default.
+U5 changed documentation terminology only.
 ```
 
 ### Real-Usage SLI Governance Hardening Sprint (Started 2026-07-16)
@@ -72,9 +71,8 @@ usage feedback:
   correctness-test failure.
 * [x] Follow-up Sprint D-G batch: wired `SessionConfig.WindowFetcher`, added
   `pkg/slo/fetch/promrange` as a concrete Prometheus `query_range`
-  `WindowFetcher`, added `window_ratio`, and added opt-in
-  `policy.coverage` governance with `coverage.informational` and
-  `promote_to_fail: ["coverage_gap"]`.
+  `WindowFetcher`, added `window_ratio`, and added `policy.coverage`
+  governance with `coverage.informational` and `coverage_gap` promotion.
 
 Behavior changed:
 
@@ -83,7 +81,8 @@ Yes. `slint-gate inspect` gained advisory policy coverage diagnostics,
 pkg/slo/fetch/jsonendpoint was added as a source-neutral JSON/expvar adapter,
 the engine gained an optional scalar window aggregation path, SessionConfig can
 carry a WindowFetcher, promrange provides a concrete range source, and gate
-policy coverage governance is available as opt-in behavior.
+policy coverage governance is available, and D-034 now makes coverage gaps fail
+by default in generated/default promotion behavior.
 ```
 
 ### v1.6.0 Release (2026-07-09)

@@ -118,8 +118,17 @@ reliability:
   required: false
   min_level: "partial"
 
+coverage:
+  # Keep true to fail on measured SLIs that are neither gated nor marked informational.
+  required: true
+  informational:
+    - "reconcile_success_delta"
+    - "workqueue_adds_total_delta"
+    - "rest_client_requests_total_delta"
+
 promote_to_fail:
   - "threshold_miss"
+  - "coverage_gap"
   # Uncomment after baseline is established:
   # - "regression_detected"
 `

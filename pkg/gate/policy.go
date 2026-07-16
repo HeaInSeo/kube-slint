@@ -145,6 +145,7 @@ func makePromotionSet(policy *Policy) map[string]bool {
 	if len(result) == 0 {
 		result["threshold_miss"] = true
 		result["regression_detected"] = true
+		result["coverage_gap"] = true
 	}
 	return result
 }

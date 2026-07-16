@@ -152,7 +152,7 @@ func TestRunRecommendPolicy_Informational_NeverActive_AnyStrictness(t *testing.T
 	}
 }
 
-func TestRunRecommendPolicy_EmitsCoverageInformationalConservatively(t *testing.T) {
+func TestRunRecommendPolicy_EmitsStrictCoverageInformationalDefaults(t *testing.T) {
 	dir := t.TempDir()
 	summaryPath := writeInspectSummary(t, dir, []string{"reconcile_success_delta"}, "Complete")
 
@@ -162,12 +162,11 @@ func TestRunRecommendPolicy_EmitsCoverageInformationalConservatively(t *testing.
 	})
 	require.NoError(t, capturedErr)
 	assert.Contains(t, stdout, "coverage:")
-	assert.Contains(t, stdout, "  required: false")
+	assert.Contains(t, stdout, "  required: true")
 	assert.Contains(t, stdout, `    - "reconcile_success_delta"`)
 	assert.Contains(t, stdout, `    - "workqueue_adds_total_delta"`)
 	assert.Contains(t, stdout, `    - "rest_client_requests_total_delta"`)
-	assert.Contains(t, stdout, `  # - "coverage_gap"`)
-	assert.NotContains(t, stdout, `  - "coverage_gap"`)
+	assert.Contains(t, stdout, `  - "coverage_gap"`)
 }
 
 func TestRunRecommendPolicy_ProfileFile_DrivesOutput(t *testing.T) {

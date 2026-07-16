@@ -345,14 +345,13 @@ reliability:
   required: false
   min_level: "partial"
 coverage:
-  required: false
+  required: true
   informational:
     - "reconcile_success_delta"
 promote_to_fail:
   - "threshold_miss"
   - "regression_detected"
-  # 선택: 측정됐지만 gate되지 않는 SLI를 CI 실패로 승격
-  # - "coverage_gap"
+  - "coverage_gap"
 ```
 
 **게이트 결과값**
@@ -361,7 +360,7 @@ promote_to_fail:
 |---|---|
 | `PASS` | 모든 임계치 및 회귀 검사 통과 |
 | `WARN` | 검사가 실패했지만 해당 항목이 `promote_to_fail`에 없거나, 비차단 조건(기준선 없는 첫 실행, 신뢰도 최솟값 미달)인 경우 |
-| `FAIL` | `promote_to_fail`에 포함된 정책 위반 — 임계치 미달 또는 회귀 감지 |
+| `FAIL` | `promote_to_fail`에 포함된 정책 위반 — 임계치 미달, 회귀 감지, coverage gap |
 | `NO_GRADE` | 평가 불가 — 입력 파일 누락 또는 손상 |
 
 **`promote_to_fail` 두 레이어 구조**
@@ -373,7 +372,7 @@ promote_to_fail:
 | `policy.promote_to_fail` (구 `fail_on`) | 어떤 위반 항목을 `gate_result=FAIL`로 승격할지 결정. 목록에 없는 위반은 `WARN`이 된다. 실패한 검사가 `PASS`가 되는 일은 없다. |
 | CLI `--exit-on` (구 `--fail-on`) | 어떤 `gate_result`에서 프로세스를 exit 1로 종료할지 결정 |
 
-`promote_to_fail`을 생략하거나 빈 배열로 두면 기본 hard-fail 항목인 `threshold_miss`, `regression_detected`가 적용된다. `fail_on`을 사용하면 `slint-gate-summary.json`의 `policy_warnings`에 마이그레이션 안내가 추가된다.
+`promote_to_fail`을 생략하거나 빈 배열로 두면 엄격 기본 hard-fail 항목인 `threshold_miss`, `regression_detected`, `coverage_gap`이 적용된다. coverage gap 검사를 끄려면 `coverage.required: false`로 두고, 의도적인 참고용 SLI는 `coverage.informational`에 넣는다. `fail_on`을 사용하면 `slint-gate-summary.json`의 `policy_warnings`에 마이그레이션 안내가 추가된다.
 
 **`checks[].observed` 타입 주의사항**
 

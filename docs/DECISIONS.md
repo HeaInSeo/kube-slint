@@ -631,14 +631,14 @@ This file records architecture/product-direction decisions that define the proje
   - `window_ratio` is accepted as the first ratio/burn-rate-style scalar
     window mode. It computes `sum(input[0]) / sum(input[1])` over the returned
     window samples and skips on missing inputs or zero denominator.
-  - `policy.coverage` is added to `slint.policy.v1` as an opt-in governance
-    check:
+  - `policy.coverage` is added to `slint.policy.v1` as a governance check:
     - `coverage.required: true` reports measured SLIs that have no threshold
       rule and are not listed as informational.
     - `coverage.informational: [...]` explicitly marks measured SLIs that are
       intentionally not gated.
     - `promote_to_fail: ["coverage_gap"]` can promote a coverage gap from WARN
-      to FAIL. Without that promotion, coverage gaps are WARN.
+      to FAIL. D-034 later makes this strict behavior the generated/default
+      policy posture.
 - Rationale:
   - D-031 made window evaluation possible at the engine boundary. Session-level
     wiring is required for normal consumers to use it without bypassing
@@ -648,8 +648,8 @@ This file records architecture/product-direction decisions that define the proje
     than becoming a special engine dependency.
   - `window_ratio` covers a useful class of error-rate/burn-rate checks while
     keeping the first ratio semantics explicit and scalar.
-  - Coverage governance closes the remaining "measured but not gated" gap
-    without making advisory diagnostics fail CI by default.
+  - Coverage governance closes the remaining "measured but not gated" gap.
+    D-034 updates the default posture from advisory-first to strict-first.
 
 ## D-033: UX follow-up sprint focuses on choices and next actions, not new engine semantics
 
@@ -679,3 +679,30 @@ This file records architecture/product-direction decisions that define the proje
     specs, and what to do with uncovered measured SLIs.
   - The next highest-leverage work is therefore CLI/docs guidance and policy
     recommendation flow, not additional runtime behavior.
+
+## D-034: Coverage gaps fail by default, with explicit opt-out
+
+- Date: 2026-07-16
+- Status: Accepted (implemented)
+- Decision:
+  - Generated policies from `slint-gate init` and
+    `slint-gate recommend-policy` now set `coverage.required: true`.
+  - Generated policies list known informational profile SLIs under
+    `coverage.informational`.
+  - Generated policies include `coverage_gap` in `promote_to_fail`.
+  - If both `promote_to_fail` and deprecated `fail_on` are omitted or empty,
+    the default promotion set is now `threshold_miss`, `regression_detected`,
+    and `coverage_gap`.
+  - Projects can still opt out explicitly with `coverage.required: false`, or
+    keep coverage strict while marking context-only SLIs under
+    `coverage.informational`.
+- Rationale:
+  - Real usage found that defined/measured SLIs could be silently ignored by
+    policy. That is more dangerous for this repo's purpose than a slightly
+    stricter first-run default.
+  - The repo has no broad existing user base that would be unexpectedly broken
+    by the stricter default. Optimizing for catching missed SLI governance is
+    therefore preferable to preserving a WARN-first compatibility posture.
+  - This preserves measurement/policy separation: kube-slint still does not
+    invent thresholds for informational signals. It only requires every
+    measured scalar to be intentionally classified as gated or informational.
