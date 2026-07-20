@@ -706,3 +706,41 @@ This file records architecture/product-direction decisions that define the proje
   - This preserves measurement/policy separation: kube-slint still does not
     invent thresholds for informational signals. It only requires every
     measured scalar to be intentionally classified as gated or informational.
+
+## D-035: slint-gate inspect is advisory, gate evaluation is authoritative
+
+- Date: 2026-07-20
+- Status: Accepted (implemented)
+- Decision:
+  - `slint-gate inspect --policy` may report measured-but-uncovered SLIs and
+    print next actions, but it remains a readiness/diagnostic command.
+  - `inspect` must exit successfully for coverage gaps when inputs are
+    otherwise readable; it must not emit `gate_result` or decide
+    `PASS`/`WARN`/`FAIL`/`NO_GRADE`.
+  - CI enforcement must use the default `slint-gate` evaluator or the
+    `.github/actions/slint-gate` composite action, not `inspect`.
+  - Coverage gaps become actual FAIL/WARN checks only through gate evaluation.
+- Rationale:
+  - Real usage needs a way to discover SLI governance gaps without turning the
+    inspection workflow itself into a second policy engine.
+  - Keeping inspect advisory preserves the measurement/policy separation from
+    D-002 and D-008 while still making missed policy coverage visible.
+
+## D-036: InputKey is the source-neutral MetricRef helper
+
+- Date: 2026-07-20
+- Status: Accepted (implemented)
+- Decision:
+  - `spec.InputKey(key)` is the preferred helper for non-Prometheus inputs,
+    mock fetchers, JSON/expvar flattened keys, and any source where the fetcher
+    and `SLISpec.Inputs` already agree on a canonical key string.
+  - `spec.PromMetric(name, labels)` remains the preferred helper for ordinary
+    Prometheus metric names and label sets.
+  - `spec.UnsafePromKey(key)` remains supported as a compatibility-preserving
+    escape hatch for raw Prometheus text keys and PromQL expressions.
+- Rationale:
+  - The engine is source-neutral, but the old public examples nudged users
+    toward an "unsafe Prometheus key" mental model even for JSON/expvar or
+    simple mock inputs.
+  - Adding `InputKey` improves first-use UX without breaking existing users or
+    changing the underlying `MetricRef` contract.

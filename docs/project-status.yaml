@@ -1,7 +1,8 @@
-current_stage: "v1.7.0 release prepared"
+current_stage: "post-v1.7.0 hardening"
 roadmap_percent: 98
 roadmap_status: "post_rc"
 current_focus:
+  - "2026-07-20: Post-v1.7.0 issue hardening: #9 guardrails keep slint-gate inspect advisory and reserve FAIL/PASS/WARN/NO_GRADE verdicts for gate evaluation; #8 added spec.InputKey(key) as the source-neutral MetricRef helper while keeping spec.UnsafePromKey(key) as a raw Prometheus/PromQL escape hatch."
   - "2026-07-16: CodeQL CI setup fixed after GitHub default setup reported Go files found but not processed. Added explicit CodeQL advanced setup for Go with manual build mode and go build ./..., added GitHub Actions workflow analysis in the same setup, and configured nested consumer-onboarding fixture modules out of the root product-module scan."
   - "v1.7.0 prepared: source-neutral/window/coverage hardening release. Adds jsonendpoint, WindowFetcher/session wiring, promrange, scalar window modes, window_ratio, strict coverage governance defaults, source/window UX docs, and strict-default consistency fixes. Not shipped yet: histogram bucket quantiles and specialized burn-rate semantics beyond generic window_ratio."
   - "2026-07-16: D-033/D-034 Source And Window UX Sprint complete. U1 shipped stronger inspect coverage-gap next-action wording, U2 added a source-selection guide, U3 added a promrange window_p95/window_ratio end-to-end example, U4 updated recommend-policy/init/default promotion behavior to make coverage gaps fail by default while allowing coverage.required: false opt-out, and U5 aligned point/snapshot/range/window source terminology in user docs."

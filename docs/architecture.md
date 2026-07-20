@@ -49,7 +49,7 @@ flowchart TD
 |---|---|
 | `pkg/slint` | Public API entry point and consumer-facing session implementation. Owns `Session`, `SessionConfig`, `NewSession`, `DefaultSpecs`, token helpers, config discovery, cleanup, and the curlpod-backed fetcher bridge to `pkg/slo/fetch`. |
 | `test/e2e/harness` | Compatibility wrapper for the historical test/e2e import path. New consumers should import `pkg/slint`. |
-| `pkg/slo/spec` | Declarative SLI definition types: `SLISpec`, `MetricRef`, `ComputeSpec` (`delta` / `start` / `end` plus scalar window modes including `window_ratio`), `JudgeSpec`, `Rule`, `Op`, `Level`. No I/O, no Kubernetes dependencies. |
+| `pkg/slo/spec` | Declarative SLI definition types: `SLISpec`, `MetricRef`, `InputKey`, `PromMetric`, `UnsafePromKey`, `ComputeSpec` (`delta` / `start` / `end` plus scalar window modes including `window_ratio`), `JudgeSpec`, `Rule`, `Op`, `Level`. No I/O, no Kubernetes dependencies. |
 | `pkg/slo/engine` | SLI computation core. `Engine.Execute()` calls `Fetch()` twice (start/end) for two-point specs, optionally calls `WindowFetcher.FetchRange()` for scalar window specs, evaluates per-spec values, runs judge rules, and calls `summary.Writer`. `ensureConfidenceScore()` computes a supplementary 0.0–1.0 reliability score. |
 | `pkg/slo/fetch` | `MetricsFetcher` interface (`Fetch(ctx, time) -> Sample`). `SnapshotFetcher` optional extension (`PreFetch(ctx)`). `WindowFetcher` optional range extension (`FetchRange(ctx, start, end) -> []Sample`). `InsideSnapshotFetch` utility. No Kubernetes dependencies at the interface level. |
 | `pkg/slo/fetch/curlpod` | Executes `kubectl run` / `kubectl logs` to create a one-shot curl pod, scrape the operator's `/metrics` HTTPS endpoint, and return raw Prometheus text. |

@@ -13,7 +13,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many Kubernetes Jobs JUMI created during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_jobs_created_total`),
+				InputKey(`jumi_jobs_created_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
@@ -24,7 +24,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks fast-fail trigger activity while changing JUMI executor behavior.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_fast_fail_trigger_total`),
+				InputKey(`jumi_fast_fail_trigger_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
@@ -35,7 +35,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many node outputs JUMI published to AH during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_artifacts_registered_total`),
+				InputKey(`jumi_artifacts_registered_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -46,7 +46,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many artifact input resolution requests JUMI issued during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_input_resolve_requests_total`),
+				InputKey(`jumi_input_resolve_requests_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -57,7 +57,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how often JUMI accepted remote-fetch resolution decisions during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_input_remote_fetch_total`),
+				InputKey(`jumi_input_remote_fetch_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -68,7 +68,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many resolved inputs required materialization during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_input_materializations_total`),
+				InputKey(`jumi_input_materializations_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -79,7 +79,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many sample runs JUMI finalized through AH during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_sample_runs_finalized_total`),
+				InputKey(`jumi_sample_runs_finalized_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -90,7 +90,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many GC evaluation requests JUMI issued to AH during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_gc_evaluate_requests_total`),
+				InputKey(`jumi_gc_evaluate_requests_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -101,7 +101,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "gauge",
 			Description: "Tracks cleanup debt visible at the end of the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`jumi_cleanup_backlog_objects`),
+				InputKey(`jumi_cleanup_backlog_objects`),
 			},
 			Compute: ComputeSpec{Mode: ComputeEnd},
 		},
@@ -112,7 +112,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how many artifacts AH accepted into inventory during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`ah_artifacts_registered_total`),
+				InputKey(`ah_artifacts_registered_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -123,7 +123,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks how often JUMI asks AH to resolve a handoff during the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`ah_resolve_requests_total`),
+				InputKey(`ah_resolve_requests_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -134,7 +134,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "delta_counter",
 			Description: "Tracks fallback decisions while validating same-node reuse versus remote fetch behavior.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`ah_fallback_total`),
+				InputKey(`ah_fallback_total`),
 			},
 			Compute: ComputeSpec{Mode: ComputeDelta},
 		},
@@ -145,7 +145,7 @@ func JUMIAHMinimumSpecs() []SLISpec {
 			Kind:        "gauge",
 			Description: "Tracks retained backlog visible at the end of the measurement window.",
 			Inputs: []MetricRef{
-				UnsafePromKey(`ah_gc_backlog_bytes`),
+				InputKey(`ah_gc_backlog_bytes`),
 			},
 			Compute: ComputeSpec{Mode: ComputeEnd},
 		},

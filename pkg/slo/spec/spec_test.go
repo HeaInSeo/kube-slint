@@ -110,6 +110,11 @@ func TestOp_UnmarshalText_Invalid(t *testing.T) {
 
 // --- PromMetric ---
 
+func TestInputKey(t *testing.T) {
+	ref := spec.InputKey("memstats.Alloc")
+	assert.Equal(t, "memstats.Alloc", ref.Key)
+}
+
 func TestPromMetric_WithLabels(t *testing.T) {
 	ref := spec.PromMetric("controller_runtime_reconcile_total", spec.Labels{"result": "error"})
 	assert.Contains(t, ref.Key, "controller_runtime_reconcile_total")

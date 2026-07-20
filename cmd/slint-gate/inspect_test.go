@@ -193,6 +193,40 @@ regression:
 	assert.Contains(t, out, "Policy-covered but missing from summary: (none)")
 }
 
+func TestRunInspect_PolicyCoverageGapIsAdvisoryEvenWhenGateWouldFail(t *testing.T) {
+	dir := t.TempDir()
+	summaryPath := writeInspectSummary(t, dir, []string{
+		"reconcile_total_delta",
+		"uncovered_delta",
+	}, "Complete")
+	policyPath := writeInspectPolicy(t, dir, `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+coverage:
+  required: true
+  informational: []
+promote_to_fail:
+  - coverage_gap
+regression:
+  enabled: false
+`)
+
+	var err error
+	out := captureStdout(t, func() {
+		err = runInspect([]string{"--summary", summaryPath, "--policy", policyPath})
+	})
+	require.NoError(t, err)
+	assert.Contains(t, out, "uncovered_delta")
+	assert.Contains(t, out, "advisory: choose one next action")
+	assert.Contains(t, out, "Next:")
+	assert.NotContains(t, out, "gate_result")
+	assert.NotContains(t, out, "Gate result")
+	assert.NotContains(t, out, "FAIL")
+}
+
 func TestRunInspect_PolicyCoverageTreatsInformationalAsCovered(t *testing.T) {
 	dir := t.TempDir()
 	summaryPath := writeInspectSummary(t, dir, []string{

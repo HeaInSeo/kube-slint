@@ -130,6 +130,15 @@ Give the user a safe starting point, not a blank policy file.
 slint-gate inspect --summary artifacts/sli-summary.json --policy .slint/policy.yaml
 ```
 
+Role boundary:
+
+- `inspect` is a readiness and diagnosis command.
+- `inspect --policy` can warn about coverage gaps and print next actions.
+- `inspect` does not emit a gate verdict and should not be wired as the CI
+  enforcement step.
+- CI enforcement must use the default `slint-gate` evaluator or the
+  `.github/actions/slint-gate` composite action.
+
 Actual output:
 
 ```text

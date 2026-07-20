@@ -96,7 +96,7 @@ Projects relying on historical `presets/...` imports will fail to compile.
 
 **Recommended migration:**
 
-* Replace hardcoded preset helpers with JSON/YAML `SessionConfig.Specs` definitions and `spec.UnsafePromKey(...)` (or equivalent current spec declarations) in test/harness-driven flows.
+* Replace hardcoded preset helpers with JSON/YAML `SessionConfig.Specs` definitions and `spec.InputKey(...)` / `spec.PromMetric(...)` declarations in test/harness-driven flows. Keep `spec.UnsafePromKey(...)` only for raw Prometheus text keys or PromQL expressions.
 
 ### Removed: `scripts/check-slo-metrics.sh`
 

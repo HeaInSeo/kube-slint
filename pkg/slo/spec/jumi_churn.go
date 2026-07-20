@@ -24,7 +24,7 @@ func JUMIChurnSpecs() []SLISpec {
 			Unit:        "count",
 			Kind:        "delta_counter",
 			Description: "Net change in Job count during the measurement window. Excludes kube-slint-managed resources.",
-			Inputs:      []MetricRef{UnsafePromKey("k8s_jobs_count")},
+			Inputs:      []MetricRef{InputKey("k8s_jobs_count")},
 			Compute:     ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
 		// --- Pod lifecycle counters ---
@@ -34,7 +34,7 @@ func JUMIChurnSpecs() []SLISpec {
 			Unit:        "count",
 			Kind:        "delta_counter",
 			Description: "Net change in Pod count during the measurement window. Excludes kube-slint-managed resources.",
-			Inputs:      []MetricRef{UnsafePromKey("k8s_pods_count")},
+			Inputs:      []MetricRef{InputKey("k8s_pods_count")},
 			Compute:     ComputeSpec{Mode: ComputeDelta, OnCounterReset: CounterResetNoGrade},
 		},
 		// --- End-of-window gauges ---
@@ -44,7 +44,7 @@ func JUMIChurnSpecs() []SLISpec {
 			Unit:        "count",
 			Kind:        "gauge",
 			Description: "Objects with no ownerReference at end of window — potential resource leak.",
-			Inputs:      []MetricRef{UnsafePromKey("k8s_pods_orphan_end")},
+			Inputs:      []MetricRef{InputKey("k8s_pods_orphan_end")},
 			Compute:     ComputeSpec{Mode: ComputeEnd},
 			Judge: &JudgeSpec{
 				Rules: []Rule{
@@ -66,7 +66,7 @@ func JUMIChurnSpecs() []SLISpec {
 			// — do not raise this to Fail without cross-kind owner
 			// resolution.
 			Description: "Objects whose ownerReference UID does not exist in the same-kind object set (same-kind check only; see D-018).",
-			Inputs:      []MetricRef{UnsafePromKey("k8s_pods_ownerref_missing_end")},
+			Inputs:      []MetricRef{InputKey("k8s_pods_ownerref_missing_end")},
 			Compute:     ComputeSpec{Mode: ComputeEnd},
 			Judge: &JudgeSpec{
 				Rules: []Rule{
@@ -80,7 +80,7 @@ func JUMIChurnSpecs() []SLISpec {
 			Unit:        "count",
 			Kind:        "gauge",
 			Description: "Objects in Terminating state beyond the configured threshold at end of window.",
-			Inputs:      []MetricRef{UnsafePromKey("k8s_pods_stuck_terminating_end")},
+			Inputs:      []MetricRef{InputKey("k8s_pods_stuck_terminating_end")},
 			Compute:     ComputeSpec{Mode: ComputeEnd},
 			Judge: &JudgeSpec{
 				Rules: []Rule{

@@ -110,6 +110,24 @@ Uncovered measured SLIs produce `coverage` checks. Generated policies list
 the same strict default. Set `coverage.required: false` to disable coverage-gap
 checks for a policy.
 
+## Inspect vs Gate
+
+Inspect readiness is not a gate verdict.
+
+`slint-gate inspect --summary ... --policy ...` is an advisory diagnostic
+command. It helps a human see which SLIs were measured, which expected profile
+SLIs are missing, and which measured SLIs are not covered by policy. It may
+print coverage-gap next actions, but it must not produce `gate_result`, must
+not decide `PASS`/`WARN`/`FAIL`/`NO_GRADE`, and must not be used as the CI
+enforcement step.
+
+CI enforcement must call the gate evaluator path: the default `slint-gate`
+command or the `.github/actions/slint-gate` composite action. Coverage gaps
+become actual gate checks only in that evaluation path. For example,
+`coverage.required: true` plus `coverage_gap` in `promote_to_fail` can produce
+`gate_result=FAIL`; `inspect --policy` with the same files should still exit
+successfully and explain what to fix.
+
 ## Gate Result Semantics
 
 Result values:

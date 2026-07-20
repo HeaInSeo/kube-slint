@@ -164,9 +164,10 @@ mySpecs := []spec.SLISpec{
   `fetch.WindowFetcher`를 구현한다.
 
 Prometheus가 아닌 point/snapshot 소스는 `SLISpec.Inputs`에서 사용하는
-같은 입력 키를 반환하면 된다. `spec.PromMetric`, `spec.UnsafePromKey`
-같은 Prometheus helper는 Prometheus text exposition을 위한 편의 기능이지
-SLI 엔진의 필수 조건이 아니다.
+같은 입력 키를 반환하면 되고, 그 입력은 `spec.InputKey(...)`로 선언한다.
+일반 Prometheus metric name + label 조합은 `spec.PromMetric(name, labels)`를
+사용한다. `spec.UnsafePromKey(...)`는 metric name + label로 표현하기 어려운
+raw Prometheus text key 또는 PromQL expression용 escape hatch다.
 
 HTTP JSON 또는 Go expvar 엔드포인트는 기본 제공 JSON endpoint fetcher를
 사용할 수 있다.
@@ -175,8 +176,13 @@ HTTP JSON 또는 Go expvar 엔드포인트는 기본 제공 JSON endpoint fetche
 import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/jsonendpoint"
 
 fetcher := jsonendpoint.New("http://127.0.0.1:8080/debug/vars")
+mySpecs := []spec.SLISpec{{
+    ID:      "heap_alloc_end",
+    Inputs:  []spec.MetricRef{spec.InputKey("memstats.Alloc")},
+    Compute: spec.ComputeSpec{Mode: spec.ComputeEnd},
+}}
 sess := slint.NewSession(slint.SessionConfig{
-    Specs:   mySpecs, // 입력은 "memstats.Alloc" 같은 flattened JSON key 사용
+    Specs:   mySpecs,
     Fetcher: fetcher,
 })
 ```

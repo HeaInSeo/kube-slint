@@ -20,7 +20,7 @@ func main() {
 		{
 			ID: "operator_churn",
 			Inputs: []spec.MetricRef{
-				spec.UnsafePromKey("workqueue_adds_total{name=\"my-operator\"}"),
+				spec.PromMetric("workqueue_adds_total", spec.Labels{"name": "my-operator"}),
 			},
 			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
 			Judge: &spec.JudgeSpec{

@@ -5,10 +5,28 @@ Update this file at the **start and end** of every stage/task.
 
 ---
 
-## Current Status: v1.7.0 Release Prepared
+## Current Status: Post-v1.7.0 Hardening
 
 **Branch:** `main`
-**Last updated:** 2026-07-16 (v1.7.0 release preparation)
+**Last updated:** 2026-07-20 (post-v1.7.0 issue hardening)
+
+### Post-v1.7.0 Issue Hardening (2026-07-20)
+
+Closed the next two real-usage follow-ups:
+
+* [x] #9: guarded the inspect-vs-gate role split. `inspect --policy` remains
+  advisory and exits successfully for coverage gaps, while FAIL verdicts are
+  produced only by gate evaluation.
+* [x] #8: added `spec.InputKey(key)` as the source-neutral MetricRef helper and
+  updated consumer-facing examples to reserve `UnsafePromKey` for raw
+  Prometheus text keys or PromQL expressions.
+
+Behavior changed:
+
+```text
+No existing library semantics were changed. A new helper API and new
+documentation/test guardrails were added.
+```
 
 ### CodeQL CI Setup Fix (2026-07-16)
 

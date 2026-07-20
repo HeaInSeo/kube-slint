@@ -1368,6 +1368,15 @@ func TestEvaluate_CoverageGapCanPromoteToFail(t *testing.T) {
 	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
 
 	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "COVERAGE_GAP")
+	var coverage gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "coverage" {
+			coverage = c
+		}
+	}
+	assert.Equal(t, "fail", coverage.Status)
+	assert.Equal(t, "uncovered_delta", coverage.Metric)
 }
 
 func TestEvaluate_CoverageInformationalSuppressesGap(t *testing.T) {

@@ -218,6 +218,34 @@ check_gate_contract() {
     "policy schema contract rejects missing/unsupported version"
   require_grep 'Invalid policy or summary input must not produce `PASS`' docs/gate-contract.md \
     "gate semantics block invalid input PASS"
+
+  local inspect_in_github
+  inspect_in_github=$(grep -REn 'slint-gate inspect|cmd/slint-gate.*inspect' .github 2>/dev/null || true)
+  if [[ -z "$inspect_in_github" ]]; then
+    pass ".github workflows/actions do not use inspect as an enforcing gate step"
+  else
+    fail ".github workflows/actions must call the gate evaluator for enforcement, not inspect: $inspect_in_github"
+  fi
+  require_grep 'Inspect readiness is not a gate verdict' docs/gate-contract.md \
+    "gate contract separates inspect readiness from gate verdicts"
+}
+
+check_metric_key_api_contract() {
+  echo "== metric key API guardrails =="
+  require_grep 'func InputKey' pkg/slo/spec/spec.go \
+    "source-neutral InputKey helper exists"
+  require_grep 'spec.InputKey\("memstats.Alloc"\)' README.md \
+    "README uses InputKey for non-Prometheus JSON/expvar input"
+  require_grep 'spec.InputKey\("memstats.Alloc"\)' "README(Kor).md" \
+    "README(Kor).md uses InputKey for non-Prometheus JSON/expvar input"
+  require_grep 'spec.PromMetric\("workqueue_adds_total", spec.Labels' test/consumer-onboarding/external-onboarding-validation/main.go \
+    "consumer onboarding uses PromMetric for labeled Prometheus metric"
+  require_grep 'spec.InputKey\("up"\)' test/consumer-onboarding/kubebuilder-default-sli/integration_test.go \
+    "kubebuilder onboarding uses InputKey for simple source-neutral input"
+  reject_grep 'UnsafePromKey\("up"\)|UnsafePromKey\(`up`\)|UnsafePromKey\("operator_up"\)|UnsafePromKey\("events_processed_total"\)|UnsafePromKey\("error_rate"\)' test/consumer-onboarding/kubebuilder-default-sli/integration_test.go \
+    "kubebuilder onboarding does not use UnsafePromKey for simple input keys"
+  reject_grep 'UnsafePromKey\("workqueue_adds_total\{name=' test/consumer-onboarding/external-onboarding-validation/main.go \
+    "external onboarding does not use UnsafePromKey for ordinary labeled Prometheus metrics"
 }
 
 check_test_strategy() {
@@ -306,6 +334,7 @@ check_curlpod_security_contract
 check_kubectl_delete_pod_resource_naming
 check_cli_dispatch_error_printing
 check_gate_contract
+check_metric_key_api_contract
 check_test_strategy
 check_test_capture_helper_consolidation
 check_flag_deprecation_docs

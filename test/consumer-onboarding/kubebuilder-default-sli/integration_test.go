@@ -76,7 +76,7 @@ var _ = BeforeSuite(func() {
 					ID:    "harness.boot.test",
 					Title: "Harness Boot Test",
 					Inputs: []spec.MetricRef{
-						spec.UnsafePromKey(`up`),
+						spec.InputKey("up"),
 					},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 				},

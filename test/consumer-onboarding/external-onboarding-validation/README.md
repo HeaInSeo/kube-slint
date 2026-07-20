@@ -28,5 +28,5 @@ go build -o /dev/null main.go
 
 ## Friction Points Observed (Consumer POV)
 - **API (Session Initialization):** Consumers must pass a completely populated `SessionConfig`. It is not instantly obvious how to correctly wire `MetricsServiceName` without reading the deeper docs.
-- **API (Specs Formulation):** Using `spec.UnsafePromKey()` vs a native string might feel slightly non-idiomatic to new users, but it forces safety.
+- **API (Specs Formulation):** Consumers can now use `spec.InputKey()` for source-neutral keys and `spec.PromMetric()` for ordinary Prometheus metric names plus labels. `spec.UnsafePromKey()` remains available only when a raw Prometheus text key or PromQL expression is really needed.
 - **Go Mod:** As expected, consuming it as a library works flawlessly.

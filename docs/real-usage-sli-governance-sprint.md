@@ -52,6 +52,10 @@ Planned work:
 - [x] Prefer `PromMetric(name, labels)` in Prometheus examples where it is
   practical; keep `UnsafePromKey` documented as an escape hatch for raw
   exposition keys.
+- [x] Add `InputKey(key)` as the source-neutral default helper for JSON,
+  expvar, mock, or custom fetchers that already agree on canonical input keys.
+- [x] Add guardrails so public onboarding examples do not drift back to
+  `UnsafePromKey` for simple input keys or ordinary labeled Prometheus metrics.
 
 Acceptance criteria:
 
@@ -59,6 +63,8 @@ Acceptance criteria:
   measured-but-not-policy-covered SLIs.
 - [x] Docs do not imply Prometheus is required for kube-slint's product model.
 - [x] No window/range SLI behavior is claimed as implemented.
+- [x] `UnsafePromKey` remains supported, but examples reserve it for raw
+  Prometheus text keys or PromQL expressions that safer helpers cannot express.
 
 ## Sprint B: Non-Prometheus Adapters & Window Design
 

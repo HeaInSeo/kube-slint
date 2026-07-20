@@ -164,9 +164,10 @@ Use the source model that matches the data shape:
   samples across the test window.
 
 For non-Prometheus point or snapshot sources, return the same input keys used
-by your `SLISpec.Inputs`. Prometheus helpers such as `spec.PromMetric` and
-`spec.UnsafePromKey` are conveniences for Prometheus text exposition, not a
-requirement of the SLI engine.
+by your `SLISpec.Inputs` and declare those inputs with `spec.InputKey(...)`.
+Use `spec.PromMetric(name, labels)` for ordinary Prometheus metrics.
+`spec.UnsafePromKey(...)` is the escape hatch for raw Prometheus text keys or
+PromQL expressions that cannot be represented as a metric name plus labels.
 
 For HTTP JSON or Go expvar endpoints, use the built-in JSON endpoint fetcher:
 
@@ -174,8 +175,13 @@ For HTTP JSON or Go expvar endpoints, use the built-in JSON endpoint fetcher:
 import "github.com/HeaInSeo/kube-slint/pkg/slo/fetch/jsonendpoint"
 
 fetcher := jsonendpoint.New("http://127.0.0.1:8080/debug/vars")
+mySpecs := []spec.SLISpec{{
+    ID:      "heap_alloc_end",
+    Inputs:  []spec.MetricRef{spec.InputKey("memstats.Alloc")},
+    Compute: spec.ComputeSpec{Mode: spec.ComputeEnd},
+}}
 sess := slint.NewSession(slint.SessionConfig{
-    Specs:   mySpecs, // Inputs use flattened JSON keys, e.g. "memstats.Alloc"
+    Specs:   mySpecs,
     Fetcher: fetcher,
 })
 ```

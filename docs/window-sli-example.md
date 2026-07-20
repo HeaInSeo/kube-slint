@@ -29,7 +29,7 @@ windowSpecs := []spec.SLISpec{
         Unit:  "seconds",
         Kind:  "window_latency",
         Inputs: []spec.MetricRef{
-            spec.UnsafePromKey("http_request_duration_seconds"),
+            spec.PromMetric("http_request_duration_seconds", nil),
         },
         Compute: spec.ComputeSpec{Mode: spec.ComputeWindowP95},
     },
@@ -97,4 +97,7 @@ promote_to_fail:
   It does not compute Prometheus histogram bucket quantiles.
 - `window_ratio` computes `sum(input[0]) / sum(input[1])` over the returned
   samples.
+- Raw PromQL expressions still use `spec.UnsafePromKey(...)` intentionally.
+  Ordinary Prometheus metric names should use `spec.PromMetric(name, labels)`;
+  non-Prometheus keys should use `spec.InputKey(key)`.
 - Specialized burn-rate semantics remain separate future work.

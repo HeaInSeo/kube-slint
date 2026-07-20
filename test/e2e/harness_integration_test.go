@@ -82,13 +82,13 @@ func TestHarnessIntegration_TableDriven(t *testing.T) {
 			specs: []spec.SLISpec{
 				{
 					ID:      "up",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("operator_up")},
+					Inputs:  []spec.MetricRef{spec.InputKey("operator_up")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 					Judge:   &spec.JudgeSpec{Rules: []spec.Rule{{Metric: "value", Op: spec.OpLT, Target: 1.0, Level: spec.LevelFail}}},
 				},
 				{
 					ID:      "wq",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey(`workqueue_adds_total{name="my-controller"}`)},
+					Inputs:  []spec.MetricRef{spec.PromMetric("workqueue_adds_total", spec.Labels{"name": "my-controller"})},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 					Judge:   &spec.JudgeSpec{Rules: []spec.Rule{{Metric: "value", Op: spec.OpLT, Target: 42.0, Level: spec.LevelFail}}},
 				},
@@ -130,7 +130,7 @@ func TestHarnessIntegration_TableDriven(t *testing.T) {
 			specs: []spec.SLISpec{
 				{
 					ID:      "up",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("operator_up")},
+					Inputs:  []spec.MetricRef{spec.InputKey("operator_up")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 				},
 			},
@@ -159,7 +159,7 @@ func TestHarnessIntegration_TableDriven(t *testing.T) {
 			specs: []spec.SLISpec{
 				{
 					ID:      "up",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("operator_up")},
+					Inputs:  []spec.MetricRef{spec.InputKey("operator_up")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 				},
 			},
@@ -201,7 +201,7 @@ func TestHarnessIntegration_TableDriven(t *testing.T) {
 			specs: []spec.SLISpec{
 				{
 					ID:      "proc",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("events_processed_total")},
+					Inputs:  []spec.MetricRef{spec.InputKey("events_processed_total")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
 					// We expect Delta = 15. The rule below says if value < 10, fail it. Since 15 > 10, it should pass.
 					Judge: &spec.JudgeSpec{Rules: []spec.Rule{{Metric: "value", Op: spec.OpLT, Target: 10.0, Level: spec.LevelFail}}},
@@ -234,13 +234,13 @@ func TestHarnessIntegration_TableDriven(t *testing.T) {
 			specs: []spec.SLISpec{
 				{
 					ID:      "up",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("operator_up")},
+					Inputs:  []spec.MetricRef{spec.InputKey("operator_up")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 					Judge:   &spec.JudgeSpec{Rules: []spec.Rule{{Metric: "value", Op: spec.OpLT, Target: 1.0, Level: spec.LevelFail}}}, // PASSes since 1.0 not < 1.0
 				},
 				{
 					ID:      "err",
-					Inputs:  []spec.MetricRef{spec.UnsafePromKey("error_rate")},
+					Inputs:  []spec.MetricRef{spec.InputKey("error_rate")},
 					Compute: spec.ComputeSpec{Mode: spec.ComputeSingle},
 					Judge:   &spec.JudgeSpec{Rules: []spec.Rule{{Metric: "value", Op: spec.OpGT, Target: 2.0, Level: spec.LevelFail}}}, // FAILs since 5.0 > 2.0
 				},
