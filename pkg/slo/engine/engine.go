@@ -53,75 +53,18 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	needsPoint, needsWindow := splitSpecNeeds(req.Specs)
 
 	var start, end fetch.Sample
-	var scrapeLatencyStart int64
 	if needsPoint {
-		if e.fetcher == nil {
-			rel.CollectionStatus = "Failed"
-			rel.BlockedReason = "point MetricsFetcher is required"
-			s := e.emptySummary(cfg, rel, []string{"point MetricsFetcher is required"})
-			e.ensureConfidenceScore(rel)
-			_ = e.writer.Write(req.OutPath, *s)
-			return s, nil
-		}
-
-		// 스냅샷 수집
-		realStart := time.Now()
-		// startSkew는 측정 지시 시점(StartedAt)과 실제 스크래핑을 시도한 시점 간의 시차를 의미함.
-		// 참고: 이는 하네스의 실행 지연을 의미하며, 오퍼레이터의 시작 지연이 아님.
-		startSkew := realStart.Sub(cfg.StartedAt).Milliseconds()
-		rel.StartSkewMs = &startSkew
-
-		var err error
-		start, err = e.fetcher.Fetch(ctx, cfg.StartedAt)
-		scrapeLatencyStart = time.Since(realStart).Milliseconds()
-		rel.ScrapeLatencyMs = &scrapeLatencyStart
-
-		if err != nil {
-			rel.CollectionStatus = "Failed"
-			rel.BlockedReason = fmt.Sprintf("fetch(start) failed: %v", err)
-			// 철학: "측정 실패는 테스트 실패가 아님" → 경고가 포함된 Summary 반환
-			s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(start) failed: %v", err)})
-			e.ensureConfidenceScore(rel)
-			_ = e.writer.Write(req.OutPath, *s)
-			return s, nil
-		}
-
-		realEnd := time.Now()
-		endSkew := realEnd.Sub(cfg.FinishedAt).Milliseconds()
-		rel.EndSkewMs = &endSkew
-
-		end, err = e.fetcher.Fetch(ctx, cfg.FinishedAt)
-		scrapeLatencyEnd := time.Since(realEnd).Milliseconds()
-		// ScrapeLatency는 시작과 종료 데이터 수집 지연 시간 중 최댓값임.
-		maxLatency := scrapeLatencyStart
-		if scrapeLatencyEnd > maxLatency {
-			maxLatency = scrapeLatencyEnd
-		}
-		rel.ScrapeLatencyMs = &maxLatency
-
-		if err != nil {
-			rel.CollectionStatus = "Failed"
-			rel.BlockedReason = fmt.Sprintf("fetch(end) failed: %v", err)
-			s := e.emptySummary(cfg, rel, []string{fmt.Sprintf("fetch(end) failed: %v", err)})
-			e.ensureConfidenceScore(rel)
-			_ = e.writer.Write(req.OutPath, *s)
-			return s, nil
+		var failSummary *summary.Summary
+		start, end, failSummary = e.fetchPointSamples(ctx, cfg, rel, req.OutPath)
+		if failSummary != nil {
+			return failSummary, nil
 		}
 	}
 
 	var windowSamples []fetch.Sample
 	var windowErr error
 	if needsWindow && req.WindowFetcher != nil {
-		realWindow := time.Now()
-		windowSamples, windowErr = req.WindowFetcher.FetchRange(ctx, cfg.StartedAt, cfg.FinishedAt)
-		windowLatency := time.Since(realWindow).Milliseconds()
-		if rel.ScrapeLatencyMs == nil || windowLatency > *rel.ScrapeLatencyMs {
-			rel.ScrapeLatencyMs = &windowLatency
-		}
-		if windowErr != nil {
-			rel.CollectionStatus = "Failed"
-			rel.BlockedReason = fmt.Sprintf("fetch(window) failed: %v", windowErr)
-		}
+		windowSamples, windowErr = e.fetchWindowSamples(ctx, cfg, req.WindowFetcher, rel)
 	}
 
 	if rel.CollectionStatus == "" {
@@ -145,15 +88,114 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 			EvidencePaths: cfg.EvidencePaths,
 		},
 		Reliability: rel,
+		Results:     evaluateSLIs(req.Specs, start, end, req.WindowFetcher != nil, windowSamples, windowErr, rel),
 	}
 
+	if len(rel.SkippedSLIs) > 0 {
+		rel.EvaluationStatus = "Partial"
+	}
+
+	e.ensureConfidenceScore(rel)
+
+	if err := e.writer.Write(req.OutPath, sum); err != nil {
+		return nil, err
+	}
+	return &sum, nil
+}
+
+// fetchPointSamples fetches the start/end point-in-time snapshots needed by
+// non-window SLIs, recording reliability metadata (skew/scrape latency) as it
+// goes. On a fetch failure it returns a non-nil failSummary — per the
+// "측정 실패는 테스트 실패가 아님" philosophy, Execute must return that summary
+// directly with a nil error, not propagate the fetch error.
+func (e *Engine) fetchPointSamples(
+	ctx context.Context, cfg RunConfig, rel *summary.Reliability, outPath string,
+) (start, end fetch.Sample, failSummary *summary.Summary) {
+	if e.fetcher == nil {
+		return start, end, e.pointFetchFailure(cfg, rel, outPath, "point MetricsFetcher is required")
+	}
+
+	// startSkew는 측정 지시 시점(StartedAt)과 실제 스크래핑을 시도한 시점 간의 시차를 의미함.
+	// 참고: 이는 하네스의 실행 지연을 의미하며, 오퍼레이터의 시작 지연이 아님.
+	realStart := time.Now()
+	startSkew := realStart.Sub(cfg.StartedAt).Milliseconds()
+	rel.StartSkewMs = &startSkew
+
+	var err error
+	start, err = e.fetcher.Fetch(ctx, cfg.StartedAt)
+	scrapeLatencyStart := time.Since(realStart).Milliseconds()
+	rel.ScrapeLatencyMs = &scrapeLatencyStart
+	if err != nil {
+		return start, end, e.pointFetchFailure(cfg, rel, outPath, fmt.Sprintf("fetch(start) failed: %v", err))
+	}
+
+	realEnd := time.Now()
+	endSkew := realEnd.Sub(cfg.FinishedAt).Milliseconds()
+	rel.EndSkewMs = &endSkew
+
+	end, err = e.fetcher.Fetch(ctx, cfg.FinishedAt)
+	scrapeLatencyEnd := time.Since(realEnd).Milliseconds()
+	// ScrapeLatency는 시작과 종료 데이터 수집 지연 시간 중 최댓값임.
+	maxLatency := scrapeLatencyStart
+	if scrapeLatencyEnd > maxLatency {
+		maxLatency = scrapeLatencyEnd
+	}
+	rel.ScrapeLatencyMs = &maxLatency
+	if err != nil {
+		return start, end, e.pointFetchFailure(cfg, rel, outPath, fmt.Sprintf("fetch(end) failed: %v", err))
+	}
+
+	return start, end, nil
+}
+
+// pointFetchFailure builds and writes the "measurement failed, not a test
+// failure" summary shared by every fetchPointSamples early-exit.
+func (e *Engine) pointFetchFailure(cfg RunConfig, rel *summary.Reliability, outPath, reason string) *summary.Summary {
+	rel.CollectionStatus = "Failed"
+	rel.BlockedReason = reason
+	s := e.emptySummary(cfg, rel, []string{reason})
+	e.ensureConfidenceScore(rel)
+	_ = e.writer.Write(outPath, *s)
+	return s
+}
+
+// fetchWindowSamples fetches the window-mode sample range, folding its
+// latency into rel.ScrapeLatencyMs (kept as the max across point+window
+// fetches) and recording a failure reason on rel without short-circuiting —
+// window fetch failures only skip window-mode SLIs, evaluated later by
+// evaluateSLIs, rather than failing the whole run like a point fetch failure.
+func (e *Engine) fetchWindowSamples(
+	ctx context.Context, cfg RunConfig, wf fetch.WindowFetcher, rel *summary.Reliability,
+) ([]fetch.Sample, error) {
+	realWindow := time.Now()
+	windowSamples, windowErr := wf.FetchRange(ctx, cfg.StartedAt, cfg.FinishedAt)
+	windowLatency := time.Since(realWindow).Milliseconds()
+	if rel.ScrapeLatencyMs == nil || windowLatency > *rel.ScrapeLatencyMs {
+		rel.ScrapeLatencyMs = &windowLatency
+	}
+	if windowErr != nil {
+		rel.CollectionStatus = "Failed"
+		rel.BlockedReason = fmt.Sprintf("fetch(window) failed: %v", windowErr)
+	}
+	return windowSamples, windowErr
+}
+
+// evaluateSLIs evaluates every spec against the fetched point/window samples,
+// appending skipped SLI IDs and (deduplicated) missing inputs to rel as it
+// goes.
+func evaluateSLIs(
+	specs []spec.SLISpec, start, end fetch.Sample,
+	hasWindowFetcher bool, windowSamples []fetch.Sample, windowErr error,
+	rel *summary.Reliability,
+) []summary.SLIResult {
+	results := make([]summary.SLIResult, 0, len(specs))
 	missingSet := map[string]bool{}
 
-	for _, s := range req.Specs {
+	for _, s := range specs {
 		var r summary.SLIResult
 		if isWindowMode(s.Compute.Mode) {
 			switch {
-			case req.WindowFetcher == nil:
+			case !hasWindowFetcher:
 				r = skippedSLI(s, "window fetcher required")
 			case windowErr != nil:
 				r = skippedSLI(s, fmt.Sprintf("fetch(window) failed: %v", windowErr))
@@ -169,22 +211,13 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 		if r.Status == summary.StatusSkip {
 			rel.SkippedSLIs = append(rel.SkippedSLIs, s.ID)
 		}
-		sum.Results = append(sum.Results, r)
+		results = append(results, r)
 	}
 
 	for missing := range missingSet {
 		rel.MissingInputs = append(rel.MissingInputs, missing)
 	}
-	if len(rel.SkippedSLIs) > 0 {
-		rel.EvaluationStatus = "Partial"
-	}
-
-	e.ensureConfidenceScore(rel)
-
-	if err := e.writer.Write(req.OutPath, sum); err != nil {
-		return nil, err
-	}
-	return &sum, nil
+	return results
 }
 
 func splitSpecNeeds(specs []spec.SLISpec) (needsPoint, needsWindow bool) {
