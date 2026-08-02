@@ -7,13 +7,14 @@
   Makefile gates), not this prose.
 -->
 
-## Cross-repo invariants live in the Platform Spec Wiki (canonical)
+## Cross-repo invariants live in the platform canonical (NodeVault §4)
 
 Cross-repo invariants — reproducibility, `casHash`, `stableRef`, the artifact
-dual-axis (`lifecycle_phase` / `integrity_health`), the sori boundary, and
-"do not record what you did not observe" (§1.10) — are owned solely by the
-**Platform Spec Wiki `1. constitution`**. This document does not restate or fork
-them; on any conflict, the wiki §1 wins.
+dual-axis (`lifecycle_phase` / `integrity_health`), the sori boundary, and the
+image-build / ResolveRecipe rules — are owned solely by the platform canonical:
+**`github.com/HeaInSeo/NodeVault` — `docs/PLATFORM_MASTER_DESIGN.md` §4**
+(immutable architecture decisions). This document does not restate or fork
+them; on any conflict, §4 wins.
 
 ## Process discipline (repo-operational — owned by this repo)
 
@@ -72,7 +73,7 @@ fixtures validated by `make semgrep-test`):
 ## §1.10 — "do not record what you did not observe"
 
 **Status: PROPOSED (not enforced in this repo).** §1.10 is a cross-repo
-invariant owned by the wiki. None of this repo's seven Semgrep rules enforce it:
+rule (not yet part of NodeVault §4). None of this repo's seven Semgrep rules enforce it:
 they cover token handling, RBAC scope, URL validation, TLS verification, PodSpec
 JSON injection, write TOCTOU, and cleanup ownership — none constrain recording
 only observed values. Marked PROPOSED, not IMPLEMENTED, until a deterministic

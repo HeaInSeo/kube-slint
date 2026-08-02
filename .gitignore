@@ -29,7 +29,9 @@ bin/
 
 # AI assistant local config (not for version control)
 .agent/
-.claude/
+.claude/*
+!.claude/skills/
+.claude/settings.local.json
 .codex/
 /CLAUDE.md
 /AGENTS.md
