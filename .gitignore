@@ -29,7 +29,9 @@ bin/
 
 # AI assistant local config (not for version control)
 .agent/
-.claude/
+.claude/*
+!.claude/skills/
+.claude/settings.local.json
 .codex/
 /CLAUDE.md
 /AGENTS.md
@@ -47,3 +49,6 @@ hello-operator-ref
 # Gate evaluation artifact (generated, not for version control)
 slint-gate-summary.json
 **/slint-gate-summary.json
+
+# Spec-kit per-feature state (generated, not for version control)
+.specify/feature.json
