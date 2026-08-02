@@ -47,3 +47,6 @@ hello-operator-ref
 # Gate evaluation artifact (generated, not for version control)
 slint-gate-summary.json
 **/slint-gate-summary.json
+
+# Spec-kit per-feature state (generated, not for version control)
+.specify/feature.json
