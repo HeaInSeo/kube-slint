@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   test:
-    name: Run on Ubuntu
+    name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
