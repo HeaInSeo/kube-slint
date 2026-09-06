@@ -44,6 +44,16 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	if cfg.StartedAt.IsZero() || cfg.FinishedAt.IsZero() {
 		return nil, fmt.Errorf("StartedAt/FinishedAt must be set")
 	}
+	// Fail closed before any measurement work if a protected (slo.v4) run is
+	// requested without its caller-authoritative coordinates (KSL-E1).
+	if err := validateTrustContract(cfg.TrustContract); err != nil {
+		return nil, err
+	}
+	if cfg.TrustContract != nil {
+		if err := validateProtectedSpecIDs(req.Specs); err != nil {
+			return nil, err
+		}
+	}
 
 	rel := req.Reliability
 	if rel == nil {
@@ -73,7 +83,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	rel.EvaluationStatus = statusComplete // 초기에는 완전함으로 설정, 누락 시 부분(Partial)으로 강등됨
 
 	sum := summary.Summary{
-		SchemaVersion: summary.SchemaVersion,
+		SchemaVersion: contractVersion(cfg, rel),
 		GeneratedAt:   time.Now(),
 		Config: summary.RunConfig{
 			RunID:      cfg.RunID,
@@ -96,6 +106,16 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	}
 
 	e.ensureConfidenceScore(rel)
+
+	// KSL-E1: only a trust-correct (slo.v4) artifact carries comparability. A failed
+	// collection is emitted as legacy v3 (contractVersion), so stamp the identity
+	// only when the run is actually v4; fail closed rather than writing a
+	// trust-correct artifact with an incomplete identity.
+	if sum.SchemaVersion == summary.SchemaVersionTrust {
+		if err := applyTrustContract(&sum, req.Specs, cfg.TrustContract); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := e.writer.Write(req.OutPath, sum); err != nil {
 		return nil, err
@@ -290,7 +310,7 @@ func (e *Engine) ensureConfidenceScore(rel *summary.Reliability) {
 
 func (e *Engine) emptySummary(cfg RunConfig, rel *summary.Reliability, warnings []string) *summary.Summary {
 	return &summary.Summary{
-		SchemaVersion: summary.SchemaVersion,
+		SchemaVersion: contractVersion(cfg, rel),
 		GeneratedAt:   time.Now(),
 		Config: summary.RunConfig{
 			RunID:         cfg.RunID,

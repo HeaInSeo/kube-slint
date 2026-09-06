@@ -24,6 +24,39 @@ type RunConfig struct {
 	Tags          map[string]string
 	Format        string
 	EvidencePaths map[string]string
+
+	// TrustContract, when non-nil, makes the producer emit the trust-correct
+	// slo.v4 measurement contract and stamp a complete per-SLI comparability
+	// identity on every result (KSL-E1). When nil, the producer emits the legacy
+	// slo.v3 contract with no comparability — historical/unprotected output is
+	// never silently reinterpreted as protected v4.
+	TrustContract *TrustContract
+}
+
+// TrustContract carries the caller-supplied authoritative coordinates a
+// trust-correct slo.v4 measurement needs but the engine cannot derive from
+// measurement semantics alone. SLIContractID is derived by the engine from each
+// SLI's measurement semantics, and WindowID from the SLI's aggregation mode plus
+// the caller's explicit window extent below; SubjectID, SourceConfigID, and the
+// window extent are the caller's responsibility (KSL-E1 properties 4, 5 and 6): the
+// engine does not invent the evidence subject, a semantically-default source config
+// must be given an explicit deterministic identity rather than left blank, and the
+// logical measurement window must be stated explicitly rather than inferred from
+// run timestamps.
+type TrustContract struct {
+	// SubjectID is the authoritative evidence subject/context (e.g. an exact
+	// PlatformRelease material identity). A human app/release label alone is
+	// insufficient where it can alias different protected subjects.
+	SubjectID string
+	// SourceConfigID is the explicit, stable identity of the measurement source
+	// configuration. Semantics-affecting source/config changes must change it.
+	SourceConfigID string
+	// WindowID is the explicit, stable identity of the logical measurement window
+	// extent (range/step), e.g. a window-config hash or "60m". It is
+	// caller-authoritative and MUST NOT be derived from StartedAt/FinishedAt elapsed
+	// runtime: two runs measured over different window extents must carry different
+	// WindowIDs so a 5m baseline and a 60m current are never treated as comparable.
+	WindowID string
 }
 
 // ExecuteRequest 는 SLO 체크 실행에 필요한 모든 데이터를 포함함.
