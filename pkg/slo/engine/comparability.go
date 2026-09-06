@@ -95,16 +95,9 @@ func applyTrustContract(sum *summary.Summary, specs []spec.SLISpec, tc *TrustCon
 // display name), the advisory-only difference between counter-reset policies that
 // keep the same value, and any run-scoped data.
 //
-// Input order is part of the measurement identity for every mode that combines its
-// inputs into the value: evalSLI and the window min/max/avg/percentile loops
-// accumulate float64 in the supplied order, and floating-point addition is not
-// associative (e.g. 1e16, -1e16, 1 sums to 1 or 0 depending on order), so reordering
-// can change the measured value — sorting would let specs that measure DIFFERENTLY
-// share an identity (a false regression/pass). The one exception is window_ratio,
-// whose value uses only inputs[0] (numerator) and inputs[1] (denominator); any
-// inputs[2:] are an unordered required-present set (the windowValues evidence check),
-// not part of the value, so their order is canonicalized while positions 0/1 are
-// kept, avoiding a false BASELINE_INCOMPARABLE from a mere tail reorder.
+// Input identity is canonicalized per mode by canonicalInputKeys so that two specs
+// which measure the same value share an SLIContractID while two that can measure
+// differently do not.
 func sliContractID(s spec.SLISpec) string {
 	h := sha256.New()
 	writeField(h, "kube-slint.sli.contract.v1")
@@ -119,22 +112,58 @@ func sliContractID(s spec.SLISpec) string {
 	if mode == spec.ComputeDelta {
 		writeField(h, "reset="+counterResetMeasurementEffect(s.Compute.OnCounterReset))
 	}
-	writeField(h, fmt.Sprintf("inputs=%d", len(s.Inputs)))
-	if mode == spec.ComputeWindowRatio && len(s.Inputs) > 2 {
-		keys := make([]string, len(s.Inputs))
-		for i, in := range s.Inputs {
-			keys[i] = in.Key
-		}
-		sort.Strings(keys[2:]) // tail is an unordered required set, not part of the value
-		for _, k := range keys {
-			writeField(h, k)
-		}
-	} else {
-		for _, in := range s.Inputs {
-			writeField(h, in.Key)
-		}
+	keys := canonicalInputKeys(mode, s.Inputs)
+	writeField(h, fmt.Sprintf("inputs=%d", len(keys)))
+	for _, k := range keys {
+		writeField(h, k)
 	}
 	return "slic-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
+}
+
+// canonicalInputKeys returns the input keys to hash for a mode's measurement
+// identity, canonicalized so that reorderings/duplications that cannot change the
+// measured value produce the same identity, while never merging inputs that can
+// change it (which would risk a false comparison):
+//
+//   - window_min/max/p95/p99 select over the pooled samples (min/max compare;
+//     percentile sorts a copy), so input ORDER cannot change the value → sort the
+//     keys. Multiplicity is kept: a repeated input is pooled twice and shifts a
+//     percentile.
+//   - window_ratio's value uses only inputs[0] (numerator) and inputs[1]
+//     (denominator); inputs[2:] are an unordered required-PRESENCE set, so the tail's
+//     order and multiplicity — and any tail entry duplicating position 0/1 — cannot
+//     change value or evidence → keep positions 0/1, then the sorted unique tail
+//     excluding keys already required by 0/1.
+//   - all other modes (single/start/end/delta point sums, window_avg) combine inputs
+//     by float addition, which is not associative, so input order is part of the
+//     value → preserve it exactly.
+func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string {
+	keys := make([]string, len(inputs))
+	for i, in := range inputs {
+		keys[i] = in.Key
+	}
+	switch mode {
+	case spec.ComputeWindowMin, spec.ComputeWindowMax, spec.ComputeWindowP95, spec.ComputeWindowP99:
+		sort.Strings(keys)
+		return keys
+	case spec.ComputeWindowRatio:
+		if len(keys) <= 2 {
+			return keys
+		}
+		seen := map[string]bool{keys[0]: true, keys[1]: true}
+		tail := make([]string, 0, len(keys)-2)
+		for _, k := range keys[2:] {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			tail = append(tail, k)
+		}
+		sort.Strings(tail)
+		return append(keys[:2:2], tail...)
+	default:
+		return keys
+	}
 }
 
 // canonicalMeasurementMode folds compute modes that produce an identical

@@ -245,6 +245,41 @@ func TestSLIContractID_InputOrderIsSemantic(t *testing.T) {
 	}
 }
 
+// E1 (P2): selection window modes (min/max/p95/p99) are order-independent, so input
+// order must be canonicalized; multiplicity still matters for percentiles; and the
+// window_ratio required tail is a unique set (excluding positions 0/1).
+func TestSLIContractID_OrderIndependentModesAndRatioSet(t *testing.T) {
+	pool := func(mode string, keys ...string) spec.SLISpec {
+		ins := make([]spec.MetricRef, len(keys))
+		for i, k := range keys {
+			ins[i] = spec.MetricRef{Key: k}
+		}
+		return spec.SLISpec{
+			ID: "x", Unit: "ms", Kind: "latency",
+			Inputs: ins, Compute: spec.ComputeSpec{Mode: spec.ComputeMode(mode)},
+		}
+	}
+	for _, m := range []string{"window_min", "window_max", "window_p95", "window_p99"} {
+		if sliContractID(pool(m, "a", "b")) != sliContractID(pool(m, "b", "a")) {
+			t.Fatalf("%s is order-independent; reordering inputs must not change SLIContractID", m)
+		}
+	}
+	// Multiplicity is preserved: a repeated input is pooled twice and shifts a percentile.
+	if sliContractID(pool("window_p95", "a")) == sliContractID(pool("window_p95", "a", "a")) {
+		t.Fatal("a repeated input changes the percentile distribution and must change SLIContractID")
+	}
+	// window_ratio tail is a unique presence set: a duplicate tail entry, or a tail
+	// entry repeating a required position, does not change value or evidence.
+	if sliContractID(pool("window_ratio", "num", "den", "a")) !=
+		sliContractID(pool("window_ratio", "num", "den", "a", "a")) {
+		t.Fatal("a duplicate window_ratio tail reference must not change SLIContractID")
+	}
+	if sliContractID(pool("window_ratio", "num", "den")) !=
+		sliContractID(pool("window_ratio", "num", "den", "num")) {
+		t.Fatal("a tail entry duplicating a required position must not change SLIContractID")
+	}
+}
+
 // E1 (P2): ComputeSingle (legacy "single") and ComputeStart are evaluated
 // identically (start snapshot), so they must share one measurement identity — both
 // SLIContractID and WindowID — so migrating "single"->"start" does not report a
