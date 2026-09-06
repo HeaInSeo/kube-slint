@@ -316,13 +316,7 @@ func mergeIdentityResult(mode string, baseV, curV float64, baseWin, newWin strin
 		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp(newWin)}},
 	}
 	appended, updated, _ := computeMergePlan(mode, baseline, cur, map[string]string{})
-	curSkipped := map[string]bool{}
-	if cur.Reliability != nil {
-		for _, id := range cur.Reliability.SkippedSLIs {
-			curSkipped[id] = true
-		}
-	}
-	applyMergePlan(&baseline, appended, updated, curSkipped)
+	applyMergePlan(&baseline, appended, updated, cur, mode)
 	return baseline.Results[0]
 }
 
@@ -407,13 +401,7 @@ func TestApplyMergePlan_ReplacesStaleEvidenceRecord(t *testing.T) {
 		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
 	}
 	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
-	curSkipped := map[string]bool{}
-	if cur.Reliability != nil {
-		for _, id := range cur.Reliability.SkippedSLIs {
-			curSkipped[id] = true
-		}
-	}
-	applyMergePlan(&baseline, appended, updated, curSkipped)
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
 
 	got := baseline.Results[0]
 	if len(got.InputsMissing) != 0 {
@@ -446,7 +434,7 @@ func TestApplyMergePlan_ForceReplaceRefreshesEvidenceOnEqualValueAndIdentity(t *
 		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: fullCmp()}}, // clean, same value+identity
 	}
 	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
-	applyMergePlan(&baseline, appended, updated, map[string]bool{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
 	if len(baseline.Results[0].InputsMissing) != 0 {
 		t.Fatalf("force-replace must refresh evidence on equal value+identity; got InputsMissing=%v", baseline.Results[0].InputsMissing)
 	}
@@ -467,7 +455,7 @@ func TestApplyMergePlan_ImportsCurrentSkippedMarker(t *testing.T) {
 		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
 	}
 	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
-	applyMergePlan(&baseline, appended, updated, map[string]bool{"m": true})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
 	found := false
 	for _, id := range baseline.Reliability.SkippedSLIs {
 		if id == "m" {
@@ -476,5 +464,30 @@ func TestApplyMergePlan_ImportsCurrentSkippedMarker(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("current skipped marker must be imported; got %v", baseline.Reliability.SkippedSLIs)
+	}
+}
+
+// KSL-T3 regression guard: force-replace reconciles skipped membership for a shared
+// SLI even when its full record is byte-identical (so it never enters `updated`) but
+// its top-level skipped membership changed.
+func TestApplyMergePlan_ForceReplaceReconcilesSkipOnEqualRecord(t *testing.T) {
+	v := 5.0
+	rec := func() summary.SLIResult { return summary.SLIResult{ID: "m", Value: &v, Comparability: fullCmp()} }
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{rec()},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{rec()},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"}, // m NOT skipped
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			t.Fatalf("a stale skip must be dropped for an equal-record force-replace; got %v", baseline.Reliability.SkippedSLIs)
+		}
 	}
 }
