@@ -51,11 +51,19 @@ const (
 	reasonMeasInputMissing        = "MEASUREMENT_INPUT_MISSING"
 	reasonMeasInputCorrupt        = "MEASUREMENT_INPUT_CORRUPT"
 	reasonMeasSchemaUnsupported   = "MEASUREMENT_SCHEMA_UNSUPPORTED"
-	reasonResultStatusFail        = "RESULT_STATUS_FAIL"
 	reasonPolicyMissing           = "POLICY_MISSING"
 	reasonPolicyInvalid           = "POLICY_INVALID"
 	reasonReliabilityInsufficient = "RELIABILITY_INSUFFICIENT"
 	reasonCollectionFailed        = "COLLECTION_FAILED"
+	// reasonEvidenceInsufficient marks a required check that cannot be graded
+	// because the referenced SLI's evidence is not positively sufficient/reliable
+	// (skipped, missing inputs, or no value) — determined from typed measurement
+	// facts, never from the producer's diagnostic status verdict (KSL-T3).
+	reasonEvidenceInsufficient = "EVIDENCE_INSUFFICIENT"
+	// reasonBaselineIncomparable marks a regression check that cannot be graded
+	// because the current and baseline evidence are not provably comparable across
+	// all coordinates that affect meaning (KSL-T4).
+	reasonBaselineIncomparable = "BASELINE_INCOMPARABLE"
 )
 
 // Policy is the deserialized .slint/policy.yaml.
@@ -79,12 +87,15 @@ type Policy struct {
 	PromoteToFail []string `yaml:"promote_to_fail"`
 }
 
-// ThresholdRule is a single absolute threshold check.
+// ThresholdRule is a single absolute threshold check. Value is a pointer so a
+// missing `value:` key (nil) is distinguishable from an explicit 0 and rejected
+// as an absent required coordinate at validation (KSL-T1), rather than silently
+// defaulting to a "metric >= 0"-style always-pass rule.
 type ThresholdRule struct {
-	Name     string  `yaml:"name"`
-	Metric   string  `yaml:"metric"`
-	Operator string  `yaml:"operator"`
-	Value    float64 `yaml:"value"`
+	Name     string   `yaml:"name"`
+	Metric   string   `yaml:"metric"`
+	Operator string   `yaml:"operator"`
+	Value    *float64 `yaml:"value"`
 }
 
 // RegressionCfg holds regression comparison configuration.

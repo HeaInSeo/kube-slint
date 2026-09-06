@@ -26,8 +26,10 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn, 
 	}
 
 	collectionStatus := ""
+	evaluationStatus := ""
 	if s != nil && s.Reliability != nil {
 		collectionStatus = s.Reliability.CollectionStatus
+		evaluationStatus = s.Reliability.EvaluationStatus
 	}
 
 	check := Check{
@@ -40,9 +42,15 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn, 
 		Message:  "reliability requirement satisfied",
 	}
 
-	if strings.EqualFold(collectionStatus, "Failed") {
+	// A failed collection OR a failed evaluation makes the whole run untrustworthy
+	// and is an UNCONDITIONAL run-level NO_GRADE — independent of reliability.required
+	// and of whether any threshold/regression/coverage check happens to reference an
+	// SLI. This ensures an explicitly-failed run cannot return a protected PASS even
+	// when the policy has no checks (KSL-T3).
+	if strings.EqualFold(strings.TrimSpace(collectionStatus), "Failed") ||
+		strings.EqualFold(strings.TrimSpace(evaluationStatus), "Failed") {
 		check.Status = "no_grade"
-		check.Message = "collection failed; measurement is not trustworthy"
+		check.Message = "collection or evaluation failed; measurement is not trustworthy"
 		addReason(&out.Reasons, reasonCollectionFailed)
 		out.MeasurementStatus = measInsufficient
 		out.Checks = append(out.Checks, check)

@@ -1,24 +1,16 @@
 package gate
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
-
-// knownPolicyKeys is the set of top-level keys that policy.yaml supports.
-var knownPolicyKeys = map[string]bool{
-	"schema_version":  true,
-	"thresholds":      true,
-	"regression":      true,
-	"reliability":     true,
-	"coverage":        true,
-	"fail_on":         true,
-	"promote_to_fail": true,
-}
 
 func loadPolicy(path string) (*Policy, string, []string) {
 	if path == "" {
@@ -36,20 +28,35 @@ func loadPolicy(path string) (*Policy, string, []string) {
 		return nil, policyInvalid, []string{fmt.Sprintf("could not read policy file %s: %v", path, err)}
 	}
 
-	var warnings []string
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err == nil {
-		warnings = collectUnknownPolicyKeys(&doc)
+	// KSL-T1: whole-policy strict validity before any protected grade. An
+	// unknown key at ANY semantic level, a duplicate mapping key, or a trailing
+	// second YAML document makes the policy invalid (fail-closed) rather than a
+	// silently-ignored or warn-only condition. KnownFields(true) rejects unknown
+	// fields recursively (top-level and nested); yaml.v3 rejects duplicate
+	// mapping keys on its own. An invalid-but-readable policy must never yield a
+	// protected grade, so the caller maps policyInvalid to NO_GRADE.
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	var p Policy
+	if err := dec.Decode(&p); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, policyInvalid, []string{"policy.yaml is empty"}
+		}
+		return nil, policyInvalid, []string{fmt.Sprintf("policy.yaml is invalid: %v", err)}
+	}
+	// Exactly one document: a trailing second YAML document is rejected so a
+	// policy cannot smuggle in a second, unevaluated definition.
+	if err := dec.Decode(new(yaml.Node)); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return nil, policyInvalid, []string{"policy.yaml must contain exactly one YAML document"}
+		}
+		return nil, policyInvalid, []string{fmt.Sprintf("policy.yaml is invalid after the first document: %v", err)}
 	}
 
-	var p Policy
-	if err := yaml.Unmarshal(data, &p); err != nil {
-		return nil, policyInvalid, warnings
-	}
 	if err := validatePolicy(p); err != nil {
-		warnings = append(warnings, err.Error())
-		return nil, policyInvalid, warnings
+		return nil, policyInvalid, []string{err.Error()}
 	}
+	var warnings []string
 	if len(p.FailOn) > 0 {
 		warnings = append(warnings,
 			"policy.yaml: 'fail_on' is deprecated; use 'promote_to_fail' instead (both are honored during the deprecation window)")
@@ -57,9 +64,27 @@ func loadPolicy(path string) (*Policy, string, []string) {
 	return &p, policyOK, warnings
 }
 
+// Policy-contract versions (KSL-T5 / packet §4). policyContractTrust
+// ("slint.policy.v2") is the trust-correct policy contract required to consume
+// the trust-correct measurement contract for a protected baseline comparison;
+// policyContractLegacy ("slint.policy.v1") is still accepted and evaluated but is
+// explicitly legacy — it never silently acquires the v2 trust-correct semantics.
+const (
+	policyContractLegacy = "slint.policy.v1"
+	policyContractTrust  = "slint.policy.v2"
+)
+
+// policyIsTrustCorrect reports whether the policy declares the trust-correct
+// contract (slint.policy.v2).
+func policyIsTrustCorrect(p *Policy) bool {
+	return strings.TrimSpace(p.SchemaVersion) == policyContractTrust
+}
+
 func validatePolicy(p Policy) error {
-	if strings.TrimSpace(p.SchemaVersion) != "slint.policy.v1" {
-		return fmt.Errorf("unsupported schema_version %q (want slint.policy.v1)", p.SchemaVersion)
+	sv := strings.TrimSpace(p.SchemaVersion)
+	if sv != policyContractLegacy && sv != policyContractTrust {
+		return fmt.Errorf("unsupported schema_version %q (want %s or %s)",
+			p.SchemaVersion, policyContractLegacy, policyContractTrust)
 	}
 	for _, item := range p.FailOn {
 		v := normalizePromotionValue(item)
@@ -83,10 +108,40 @@ func validatePolicy(p Policy) error {
 	if minLevel != "" && minLevel != "partial" && minLevel != "complete" {
 		return fmt.Errorf("unsupported reliability.min_level %q", p.Reliability.MinLevel)
 	}
+	if err := validateThresholds(p.Thresholds); err != nil {
+		return err
+	}
+	// A malformed regression tolerance invalidates the policy regardless of
+	// whether regression is currently enabled (KSL-T1): enabling it later must not
+	// silently activate a nonsensical tolerance. Reject negative and non-finite.
+	tol := p.Regression.TolerancePercent
+	if tol < 0 || math.IsNaN(tol) || math.IsInf(tol, 0) {
+		return fmt.Errorf("regression.tolerance_percent must be a non-negative finite number (got %v)", tol)
+	}
+	return nil
+}
+
+// validateThresholds enforces KSL-T1 strict validity for threshold rules: required
+// semantic coordinates present, a supported operator, no NaN value, and unique
+// non-empty identities — all before any evaluation.
+func validateThresholds(rules []ThresholdRule) error {
 	seenNames := map[string]bool{}
-	for _, rule := range p.Thresholds {
-		if math.IsNaN(rule.Value) {
-			return fmt.Errorf("threshold %q has a NaN value", rule.Name)
+	for _, rule := range rules {
+		if rule.Value == nil {
+			return fmt.Errorf("threshold %q has no value (a required coordinate)", rule.Name)
+		}
+		if math.IsNaN(*rule.Value) || math.IsInf(*rule.Value, 0) {
+			return fmt.Errorf("threshold %q has a non-finite value (%v)", rule.Name, *rule.Value)
+		}
+		if strings.TrimSpace(rule.Metric) == "" {
+			return fmt.Errorf("threshold %q has an empty metric (a required coordinate)", rule.Name)
+		}
+		op := strings.TrimSpace(rule.Operator)
+		if op == "" {
+			return fmt.Errorf("threshold %q has an empty operator (a required coordinate)", rule.Name)
+		}
+		if !supportedOperators[op] {
+			return fmt.Errorf("threshold %q has an unsupported operator %q", rule.Name, rule.Operator)
 		}
 		name := strings.TrimSpace(rule.Name)
 		if name == "" {
@@ -97,32 +152,7 @@ func validatePolicy(p Policy) error {
 		}
 		seenNames[name] = true
 	}
-	if p.Regression.Enabled && p.Regression.TolerancePercent < 0 {
-		return fmt.Errorf("regression.tolerance_percent must not be negative (got %v)", p.Regression.TolerancePercent)
-	}
 	return nil
-}
-
-// collectUnknownPolicyKeys walks the top-level mapping node and returns
-// warning messages for any key not in knownPolicyKeys.
-func collectUnknownPolicyKeys(doc *yaml.Node) []string {
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
-		return nil
-	}
-	root := doc.Content[0]
-	if root.Kind != yaml.MappingNode {
-		return nil
-	}
-	var warnings []string
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		key := root.Content[i].Value
-		if !knownPolicyKeys[key] {
-			warnings = append(warnings,
-				fmt.Sprintf("unknown field %q in policy.yaml (line %d) — ignored; supported fields: schema_version, thresholds, regression, reliability, coverage, fail_on (deprecated), promote_to_fail",
-					key, root.Content[i].Line))
-		}
-	}
-	return warnings
 }
 
 func makePromotionSet(policy *Policy) map[string]bool {
@@ -154,6 +184,17 @@ var allowedPromotionValues = map[string]bool{
 	"threshold_miss":      true,
 	"regression_detected": true,
 	"coverage_gap":        true,
+}
+
+// supportedOperators is the set of threshold operators CompareOp understands.
+// Policy validation (KSL-T1) rejects any threshold whose operator is not in this
+// set before evaluation, so an unsupported operator is whole-policy invalidity
+// rather than a per-check no_grade discovered mid-evaluation.
+var supportedOperators = map[string]bool{
+	"<=": true, "=<": true,
+	">=": true, "=>": true,
+	"<": true, ">": true,
+	"==": true, "=": true,
 }
 
 func normalizePromotionValue(v string) string {

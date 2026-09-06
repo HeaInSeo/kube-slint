@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "slo.v3",
+  "schemaVersion": "slo.v4",
   "generatedAt": "2026-07-02T00:00:00Z",
   "config": {
     "runId": "slint-gate-fixture",
@@ -23,7 +23,13 @@
       "unit": "count",
       "kind": "delta_counter",
       "value": 3,
-      "status": "pass"
+      "status": "pass",
+      "comparability": {
+        "sliContractId": "reconcile_total_delta@v1",
+        "subjectId": "hello-operator",
+        "windowId": "session",
+        "sourceConfigId": "slint-gate-fixture"
+      }
     },
     {
       "id": "workqueue_depth_end",
@@ -31,7 +37,13 @@
       "unit": "count",
       "kind": "gauge",
       "value": 0,
-      "status": "pass"
+      "status": "pass",
+      "comparability": {
+        "sliContractId": "workqueue_depth_end@v1",
+        "subjectId": "hello-operator",
+        "windowId": "session",
+        "sourceConfigId": "slint-gate-fixture"
+      }
     }
   ]
 }

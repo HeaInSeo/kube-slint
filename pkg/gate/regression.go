@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
-func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (failed, anyWarn, anyNoGrade bool) {
+func runRegression(out *Summary, policy *Policy, measurement, baseline *summary.Summary) (failed, anyWarn, anyNoGrade bool) {
 	if !policy.Regression.Enabled {
 		return false, false, false
 	}
@@ -17,12 +19,38 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 	case baseUnavailable, baseCorrupt:
 		return false, false, true
 	}
+
+	// KSL-T4/T5: a protected baseline comparison may run only under the
+	// trust-correct contracts — a trust-correct policy (slint.policy.v2) AND a
+	// trust-correct measurement+baseline (slo.v4) that carry comparability
+	// identity. Legacy contracts (slint.policy.v1 / slo.v3) cannot prove
+	// comparability, so regression is NO_GRADE (baseline-incomparable), never a
+	// silent comparison against evidence of unknown comparability.
+	if !policyIsTrustCorrect(policy) || measurement == nil || baseline == nil ||
+		!summary.IsTrustCorrectContract(*measurement) || !summary.IsTrustCorrectContract(*baseline) {
+		addReason(&out.Reasons, reasonBaselineIncomparable)
+		out.Checks = append(out.Checks, Check{
+			Name:     "regression-comparability",
+			Category: "regression",
+			Status:   "no_grade",
+			Metric:   "*",
+			Expected: "trust-correct policy (slint.policy.v2) + measurement/baseline (slo.v4) with comparability identity",
+			Message:  "baseline comparability cannot be proven under legacy contracts; regression not graded",
+		})
+		return false, false, true
+	}
+
+	curEv := newEvidenceIndex(measurement)
+	baseEv := newEvidenceIndex(baseline)
+	curCmp := comparabilityIndex(measurement)
+	baseCmp := comparabilityIndex(baseline)
 	promote := makePromotionSet(policy)
 	for _, rule := range policy.Thresholds {
 		if rule.Metric == "" {
 			continue
 		}
-		check, rFailed, rWarnCheck, rNoGrade := evalRegressionCheck(rule, cur, base, policy.Regression.TolerancePercent, promote)
+		check, rFailed, rWarnCheck, rNoGrade := evalRegressionCheck(
+			rule, curEv, baseEv, curCmp, baseCmp, policy.Regression.TolerancePercent, promote)
 		if rFailed {
 			failed = true
 		}
@@ -40,10 +68,27 @@ func runRegression(out *Summary, policy *Policy, cur, base map[string]float64) (
 	return failed, anyWarn, anyNoGrade
 }
 
+// comparabilityIndex maps each SLI ID to its recorded comparability identity (nil
+// when absent) so a regression check can prove per-SLI comparability (KSL-T4).
+func comparabilityIndex(s *summary.Summary) map[string]*summary.Comparability {
+	m := map[string]*summary.Comparability{}
+	if s == nil {
+		return m
+	}
+	for _, r := range s.Results {
+		m[r.ID] = r.Comparability
+	}
+	return m
+}
+
 // evalRegressionCheck returns (result, failed, warn, noGrade).
 // failed=true  → regression detected and regression_detected is in the promotion set → gate FAIL
 // warn=true    → regression detected but regression_detected not in the promotion set → gate WARN (never PASS)
-func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, tolerancePct float64, promote map[string]bool) (thresholdResult, bool, bool, bool) {
+//
+// KSL-T3/T4: the check grades only when both current and baseline evidence are
+// positively sufficient AND their comparability identities match on every
+// coordinate; otherwise it is NO_GRADE, never a silent comparison.
+func evalRegressionCheck(rule ThresholdRule, curEv, baseEv evidenceIndex, curCmp, baseCmp map[string]*summary.Comparability, tolerancePct float64, promote map[string]bool) (thresholdResult, bool, bool, bool) {
 	c := thresholdResult{
 		Check: Check{
 			Name:     fmt.Sprintf("regression:%s", rule.Metric),
@@ -54,10 +99,16 @@ func evalRegressionCheck(rule ThresholdRule, cur, base map[string]float64, toler
 		},
 	}
 
-	curVal, hasCur := cur[rule.Metric]
-	baseVal, hasBase := base[rule.Metric]
-	if !hasCur || !hasBase {
-		c.Message = "metric missing in current/baseline"
+	curVal, curOK, _ := curEv.valueSufficient(rule.Metric)
+	baseVal, baseOK, _ := baseEv.valueSufficient(rule.Metric)
+	if !curOK || !baseOK {
+		c.Message = "current or baseline evidence insufficient to grade regression"
+		c.pendingReasons = []string{reasonEvidenceInsufficient}
+		return c, false, false, true
+	}
+	if !curCmp[rule.Metric].Equal(baseCmp[rule.Metric]) {
+		c.Message = "current and baseline are not provably comparable for this SLI"
+		c.pendingReasons = []string{reasonBaselineIncomparable}
 		return c, false, false, true
 	}
 

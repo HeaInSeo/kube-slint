@@ -7,22 +7,56 @@ package summary
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
-// SchemaVersion is the single supported summary schema version.
-// All measurement outputs must set schemaVersion to this value.
-const SchemaVersion = "slo.v3"
+// Measurement-contract versions (KSL-T5). The contract is an explicit fence:
+//   - SchemaVersionLegacy ("slo.v3") is the historical contract. It carries no
+//     comparability identity, so it can never be silently treated as trust-correct
+//     protected evidence for baseline comparison.
+//   - SchemaVersionTrust ("slo.v4") is the trust-correct contract. It adds the
+//     per-SLI Comparability identity required for provable baseline comparability
+//     (KSL-T4). A consumer that only understands the legacy contract must reject or
+//     non-protect a v4 artifact rather than silently ignore its trust-required
+//     fields.
+//
+// SchemaVersion remains the legacy version that current producers stamp; upgrading
+// producers to emit the trust-correct contract with real comparability identity is
+// owned by the later KSL-E packet, not KSL-T.
+const (
+	SchemaVersionLegacy = "slo.v3"
+	SchemaVersionTrust  = "slo.v4"
 
-// ValidateSchemaVersion returns an error if s.SchemaVersion is empty or not SchemaVersion.
+	// SchemaVersion is the version current producers stamp (still the legacy
+	// contract until KSL-E wires real trust-correct measurement).
+	SchemaVersion = SchemaVersionLegacy
+)
+
+// supportedSchemaVersions is the set of measurement contracts a consumer accepts.
+var supportedSchemaVersions = map[string]bool{
+	SchemaVersionLegacy: true,
+	SchemaVersionTrust:  true,
+}
+
+// ValidateSchemaVersion returns an error if s.SchemaVersion is empty or is not a
+// supported measurement contract (legacy or trust-correct).
 func ValidateSchemaVersion(s Summary) error {
 	if s.SchemaVersion == "" {
 		return fmt.Errorf("schemaVersion is empty")
 	}
-	if s.SchemaVersion != SchemaVersion {
-		return fmt.Errorf("unsupported schemaVersion %q (want %q)", s.SchemaVersion, SchemaVersion)
+	if !supportedSchemaVersions[s.SchemaVersion] {
+		return fmt.Errorf("unsupported schemaVersion %q (want %q or %q)",
+			s.SchemaVersion, SchemaVersionLegacy, SchemaVersionTrust)
 	}
 	return nil
+}
+
+// IsTrustCorrectContract reports whether s uses the trust-correct measurement
+// contract (slo.v4). Only a trust-correct measurement can carry the comparability
+// identity required for a protected baseline comparison (KSL-T4/T5).
+func IsTrustCorrectContract(s Summary) bool {
+	return s.SchemaVersion == SchemaVersionTrust
 }
 
 // allowedStatuses is the enum of valid SLIResult.Status values.
@@ -59,7 +93,30 @@ func Validate(s Summary) error {
 			return fmt.Errorf("results[%d].status %q is not a recognized status", i, r.Status)
 		}
 	}
+	// A non-empty reliability status must be a recognized enum value. A mistyped
+	// status (e.g. "Fialed") would otherwise slip past the collection-failure and
+	// reliability checks and let a malformed artifact produce a protected grade.
+	if s.Reliability != nil {
+		if st := s.Reliability.CollectionStatus; st != "" && !isReliabilityStatus(st) {
+			return fmt.Errorf("reliability.collectionStatus %q is not a recognized status", st)
+		}
+		if st := s.Reliability.EvaluationStatus; st != "" && !isReliabilityStatus(st) {
+			return fmt.Errorf("reliability.evaluationStatus %q is not a recognized status", st)
+		}
+	}
 	return nil
+}
+
+// isReliabilityStatus reports whether s is a recognized reliability status
+// (Complete/Partial/Failed), case-insensitively — consumers compare these values
+// case-insensitively, so validation must accept the same set.
+func isReliabilityStatus(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "complete", "partial", "failed":
+		return true
+	default:
+		return false
+	}
 }
 
 // Status 는 SLIResult의 정규화된 평가 상태임.
@@ -146,6 +203,51 @@ type SLIResult struct {
 
 	InputsUsed    []string `json:"inputsUsed,omitempty"`
 	InputsMissing []string `json:"inputsMissing,omitempty"`
+
+	// Comparability is the trust-correct contract (slo.v4) identity that makes a
+	// baseline comparison provably meaningful (KSL-T4). It is only meaningful under
+	// the trust-correct measurement contract; a legacy (slo.v3) result never carries
+	// it, so a legacy result can never satisfy protected comparability.
+	Comparability *Comparability `json:"comparability,omitempty"`
+}
+
+// Comparability identifies every coordinate that affects the meaning of an SLI's
+// value, so a regression comparison can be proven meaningful before it runs
+// (KSL-T4). Two results are comparable only when all four coordinates are present
+// and equal; window semantics come from an explicit WindowID, never inferred from
+// run start/finish times.
+type Comparability struct {
+	// SLIContractID identifies the SLI/measurement contract semantics (what is
+	// measured and how it is evaluated).
+	SLIContractID string `json:"sliContractId,omitempty"`
+	// SubjectID identifies the subject/context whose value is being measured.
+	SubjectID string `json:"subjectId,omitempty"`
+	// WindowID identifies the window/aggregation/query semantics.
+	WindowID string `json:"windowId,omitempty"`
+	// SourceConfigID identifies the source/config identity when it changes value meaning.
+	SourceConfigID string `json:"sourceConfigId,omitempty"`
+}
+
+// Complete reports whether every comparability coordinate is present and
+// non-blank. A whitespace-only coordinate is not a real identity, so it is
+// treated as absent; an incomplete identity cannot prove comparability and
+// yields NO_GRADE rather than a silent comparison.
+func (c *Comparability) Complete() bool {
+	return c != nil &&
+		strings.TrimSpace(c.SLIContractID) != "" && strings.TrimSpace(c.SubjectID) != "" &&
+		strings.TrimSpace(c.WindowID) != "" && strings.TrimSpace(c.SourceConfigID) != ""
+}
+
+// Equal reports whether two comparability identities match on every coordinate.
+// A nil or incomplete identity is never equal to another.
+func (c *Comparability) Equal(other *Comparability) bool {
+	if !c.Complete() || !other.Complete() {
+		return false
+	}
+	return c.SLIContractID == other.SLIContractID &&
+		c.SubjectID == other.SubjectID &&
+		c.WindowID == other.WindowID &&
+		c.SourceConfigID == other.SourceConfigID
 }
 
 // ResultValues flattens Results into a map of SLI ID to value, omitting any

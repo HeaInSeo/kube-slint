@@ -190,7 +190,9 @@ func loadInspectPolicyCoverage(path string) (inspectPolicyCoverage, error) {
 	if err := yaml.Unmarshal(data, &policy); err != nil {
 		return inspectPolicyCoverage{}, fmt.Errorf("could not parse %s: %w", path, err)
 	}
-	if strings.TrimSpace(policy.SchemaVersion) != "slint.policy.v1" {
+	// Both the legacy (v1) and trust-correct (v2) policy contracts are accepted,
+	// matching pkg/gate policy validation (KSL-T5).
+	if sv := strings.TrimSpace(policy.SchemaVersion); sv != "slint.policy.v1" && sv != "slint.policy.v2" {
 		return inspectPolicyCoverage{}, fmt.Errorf("%s has unsupported schema_version %q", path, policy.SchemaVersion)
 	}
 	metrics := make(map[string]bool, len(policy.Thresholds)+len(policy.Coverage.Informational))

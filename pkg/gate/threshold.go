@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-func runThresholds(out *Summary, rules []ThresholdRule, cur map[string]float64, promote map[string]bool) (failed, warn, anyNoGrade bool) {
+func runThresholds(out *Summary, rules []ThresholdRule, ev evidenceIndex, promote map[string]bool) (failed, warn, anyNoGrade bool) {
 	for _, rule := range rules {
-		check, ruleFailed, ruleWarn, ruleNoGrade := evalThreshold(rule, cur, promote)
+		check, ruleFailed, ruleWarn, ruleNoGrade := evalThreshold(rule, ev, promote)
 		if ruleFailed {
 			failed = true
 		}
@@ -33,7 +33,12 @@ type thresholdResult struct {
 // evalThreshold returns (result, failed, warn, noGrade).
 // failed=true  → threshold miss and threshold_miss is in the promotion set → gate FAIL
 // warn=true    → threshold miss but threshold_miss not in the promotion set → gate WARN (never PASS)
-func evalThreshold(rule ThresholdRule, cur map[string]float64, promote map[string]bool) (thresholdResult, bool, bool, bool) {
+//
+// KSL-T3: a threshold may grade only when the referenced SLI's evidence is
+// positively sufficient (proven from typed measurement facts via evidenceIndex).
+// Missing/unavailable/unreliable evidence → NO_GRADE for this check; because the
+// judgment is per-SLI, an unrelated insufficient SLI cannot poison this one.
+func evalThreshold(rule ThresholdRule, ev evidenceIndex, promote map[string]bool) (thresholdResult, bool, bool, bool) {
 	name := rule.Name
 	if name == "" {
 		name = "unnamed-threshold"
@@ -44,19 +49,24 @@ func evalThreshold(rule ThresholdRule, cur map[string]float64, promote map[strin
 			Category: "threshold",
 			Status:   "no_grade",
 			Metric:   rule.Metric,
-			Expected: fmt.Sprintf("%s %v", rule.Operator, rule.Value),
+			// rule.Value is guaranteed non-nil here: evalThreshold runs only after
+			// the policy validated (a nil value is rejected as invalid), so Evaluate
+			// has already returned NO_GRADE for such a policy before reaching this.
+			Expected: fmt.Sprintf("%s %v", rule.Operator, *rule.Value),
 		},
 	}
 
-	observed, ok := cur[rule.Metric]
-	if rule.Metric == "" || !ok {
-		c.Message = "metric missing or invalid threshold target"
-		c.pendingReasons = []string{reasonMeasInputMissing}
+	observed, sufficient, insufficientReason := ev.valueSufficient(rule.Metric)
+	if !sufficient {
+		c.Message = "required evidence is not positively sufficient to grade this check"
+		c.pendingReasons = []string{insufficientReason}
 		return c, false, false, true
 	}
 
 	c.Observed = observed
-	matched, err := CompareOp(observed, rule.Operator, rule.Value)
+	// The operator was validated at policy load (KSL-T1), so CompareOp cannot fail
+	// here; the error branch is retained as defense in depth and maps to no_grade.
+	matched, err := CompareOp(observed, rule.Operator, *rule.Value)
 	if err != nil {
 		c.Message = "invalid operator"
 		c.pendingReasons = []string{reasonPolicyInvalid}

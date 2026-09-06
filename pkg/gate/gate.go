@@ -33,19 +33,21 @@ func Evaluate(req Request) *Summary {
 		return out
 	}
 
-	cur := resultValueMap(measurement)
-	base := resultValueMap(baseline)
+	ev := newEvidenceIndex(measurement)
 	promote := makePromotionSet(policy)
 
-	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, cur, promote)
-	rFailed, rWarn, rNoGrade := runRegression(out, policy, cur, base)
+	tFailed, tWarn, tNoGrade := runThresholds(out, policy.Thresholds, ev, promote)
+	rFailed, rWarn, rNoGrade := runRegression(out, policy, measurement, baseline)
 	relWarn, relNoGrade := runReliability(out, policy, measurement)
-	rsFailed, rsWarn, rsNoGrade := runResultStatus(out, measurement)
-	covFailed, covWarn := runCoverage(out, policy, measurement, promote)
+	// KSL-T2: producer status is recorded as a non-authoritative diagnostic only;
+	// it never contributes to the protected grade (Gate Policy is the sole
+	// qualification authority).
+	recordProducerDiagnostics(out, measurement)
+	covFailed, covWarn := runCoverage(out, policy, measurement, ev, promote)
 
-	anyFailed := tFailed || rFailed || rsFailed || covFailed
-	anyNoGrade := tNoGrade || rNoGrade || rsNoGrade || relNoGrade
-	hasWarn := rWarn || relWarn || tWarn || rsWarn || covWarn
+	anyFailed := tFailed || rFailed || covFailed
+	anyNoGrade := tNoGrade || rNoGrade || relNoGrade
+	hasWarn := rWarn || relWarn || tWarn || covWarn
 
 	out.EvaluationStatus = computeEvalStatus(out.Checks, anyNoGrade)
 	out.GateResult = computeGateResult(anyFailed, hasWarn, anyNoGrade, out.BaselineStatus, policy.Regression.Enabled)
@@ -132,49 +134,35 @@ func initBaseline(out *Summary, path string) *summary.Summary {
 	return s
 }
 
-// runResultStatus propagates per-SLI status from the measurement into gate checks.
-//
-// Rules (no policy override in MVP):
-//
-//	fail / block → check "fail", failed=true, reason RESULT_STATUS_FAIL
-//	warn         → check "warn", anyWarn=true
-//	skip (value==nil) → check "no_grade", anyNoGrade=true
-//	pass         → no check added
-func runResultStatus(out *Summary, s *summary.Summary) (failed, anyWarn, anyNoGrade bool) {
+// recordProducerDiagnostics records each SLI's producer status (warn/fail/block/
+// skip) as a NON-AUTHORITATIVE diagnostic check (KSL-T2). The producer verdict is
+// informational only: it never sets the protected grade, which is owned solely by
+// Gate Policy (thresholds/regression/reliability/coverage). Evidence problems
+// that must affect the grade are consumed as TYPED facts — value presence, the
+// skipped-SLI set, per-SLI missing inputs (evidenceIndex, KSL-T3), and the
+// collection-wide reliability record (runReliability) — never from these verdict
+// strings. A pass (or unset) status adds no diagnostic.
+func recordProducerDiagnostics(out *Summary, s *summary.Summary) {
 	if s == nil {
 		return
 	}
 	for _, r := range s.Results {
+		if r.Status == summary.StatusPass || r.Status == "" {
+			continue
+		}
 		check := Check{
-			Name:     fmt.Sprintf("result-status:%s", r.ID),
-			Category: "result_status",
+			Name:     fmt.Sprintf("measurement-diagnostic:%s", r.ID),
+			Category: "measurement_diagnostic",
+			Status:   "info",
 			Metric:   r.ID,
-			Message:  r.Reason,
+			Expected: "producer status is diagnostic only; Gate Policy owns the grade",
+			Message:  fmt.Sprintf("producer status=%s: %s", r.Status, r.Reason),
 		}
 		if r.Value != nil {
 			check.Observed = *r.Value
 		}
-
-		switch r.Status {
-		case summary.StatusFail, summary.StatusBlock:
-			check.Status = "fail"
-			addReason(&out.Reasons, reasonResultStatusFail)
-			failed = true
-		case summary.StatusWarn:
-			check.Status = "warn"
-			anyWarn = true
-		case summary.StatusSkip:
-			if r.Value != nil {
-				continue // skip with a value: threshold check handles it
-			}
-			check.Status = "no_grade"
-			anyNoGrade = true
-		default:
-			continue // pass: no check needed
-		}
 		out.Checks = append(out.Checks, check)
 	}
-	return
 }
 
 // --- result computation ---

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 	"github.com/stretchr/testify/assert"
@@ -297,4 +298,228 @@ func TestRunBaselineMerge_InPlaceMergeNeverNeedsForce(t *testing.T) {
 
 	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", cur, "--policy", policy, "--output", baseline})
 	require.NoError(t, err)
+}
+
+// mergeIdentityResult merges a single-SLI baseline (value baseV, windowId
+// baseWin) against a single-SLI current (value curV, windowId newWin) in the
+// given mode and returns the merged baseline's first result.
+func mergeIdentityResult(mode string, baseV, curV float64, baseWin, newWin string) summary.SLIResult {
+	cmp := func(win string) *summary.Comparability {
+		return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: win, SourceConfigID: "cfg"}
+	}
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: cmp(baseWin)}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp(newWin)}},
+	}
+	appended, updated, _ := computeMergePlan(mode, baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, mode)
+	return baseline.Results[0]
+}
+
+// KSL-T4 regression guard for baseline merges: a value replacement (and a
+// force-replace even on an unchanged value) must carry the CURRENT comparability
+// identity into the baseline, while a non-force mode leaves an unchanged value's
+// identity untouched — so a later regression against the current artifact is not
+// spuriously BASELINE_INCOMPARABLE.
+func TestApplyMergePlan_ComparabilityIdentity(t *testing.T) {
+	cases := []struct {
+		name        string
+		mode        string
+		baseV, curV float64
+		wantVal     float64
+		wantWindow  string
+	}{
+		{"value change carries new identity", "force-replace", 1, 2, 2, "new"},
+		{"force-replace refreshes identity on equal value", "force-replace", 5, 5, 5, "new"},
+		{"append-new-only leaves unchanged value identity", "append-new-only", 5, 5, 5, "old"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mergeIdentityResult(tc.mode, tc.baseV, tc.curV, "old", "new")
+			if got.Value == nil || *got.Value != tc.wantVal {
+				t.Fatalf("merged value = %v, want %v", got.Value, tc.wantVal)
+			}
+			if got.Comparability == nil || got.Comparability.WindowID != tc.wantWindow {
+				t.Fatalf("merged identity windowId = %+v, want %q", got.Comparability, tc.wantWindow)
+			}
+		})
+	}
+}
+
+// KSL-T5 guard: a cross-contract merge (e.g. slo.v3 baseline + slo.v4 current) is
+// rejected rather than written as a hybrid baseline a later regression would treat
+// as legacy.
+func TestRunBaselineMerge_RejectsCrossContractMerge(t *testing.T) {
+	dir := t.TempDir()
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath,
+		[]byte("schema_version: \"slint.policy.v2\"\nregression:\n  enabled: false\n"), 0o644))
+
+	// Legacy (slo.v3) baseline.
+	baseline := writeDiffSummary(t, dir, "baseline.json", map[string]float64{"reconcile_total_delta": 5})
+
+	// Trust-correct (slo.v4) current, which passes the trivial policy.
+	v := 5.0
+	curSum := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		GeneratedAt:   time.Now(),
+		Results: []summary.SLIResult{{
+			ID: "reconcile_total_delta", Value: &v, Status: summary.StatusPass,
+			Comparability: &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"},
+		}},
+		Reliability: &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	curPath := filepath.Join(dir, "summary.json")
+	require.NoError(t, summary.WriteFile(curPath, curSum))
+
+	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", curPath, "--policy", policyPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cross")
+}
+
+// KSL-T3 regression guard: updating an existing SLI must replace the FULL evidence
+// record and reconcile the skipped set, so stale insufficiency facts (InputsMissing,
+// SkippedSLIs) do not survive alongside the new value and mislead a later
+// newEvidenceIndex(baseline).
+func TestApplyMergePlan_ReplacesStaleEvidenceRecord(t *testing.T) {
+	cmp := func(w string) *summary.Comparability {
+		return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: w, SourceConfigID: "cfg"}
+	}
+	baseV, curV := 1.0, 2.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: cmp("old"), InputsMissing: []string{"x"}}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp("new")}}, // clean: no InputsMissing
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+
+	got := baseline.Results[0]
+	if len(got.InputsMissing) != 0 {
+		t.Fatalf("stale InputsMissing must be cleared by the full-record replace, got %v", got.InputsMissing)
+	}
+	if len(baseline.Reliability.SkippedSLIs) != 0 {
+		t.Fatalf("an updated SLI must be removed from SkippedSLIs, got %v", baseline.Reliability.SkippedSLIs)
+	}
+	if got.Comparability == nil || got.Comparability.WindowID != "new" || got.Value == nil || *got.Value != 2 {
+		t.Fatalf("merged record must be the current one, got %+v value=%v", got.Comparability, got.Value)
+	}
+}
+
+// fullCmp is a complete comparability identity for merge tests.
+func fullCmp() *summary.Comparability {
+	return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"}
+}
+
+// KSL-T3 regression guard: force-replace refreshes the evidence record even when
+// value AND comparability are unchanged but other evidence differs (here stale
+// InputsMissing), so newEvidenceIndex(baseline) is not later misled.
+func TestApplyMergePlan_ForceReplaceRefreshesEvidenceOnEqualValueAndIdentity(t *testing.T) {
+	baseV, curV := 5.0, 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: fullCmp(), InputsMissing: []string{"x"}}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: fullCmp()}}, // clean, same value+identity
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	if len(baseline.Results[0].InputsMissing) != 0 {
+		t.Fatalf("force-replace must refresh evidence on equal value+identity; got InputsMissing=%v", baseline.Results[0].InputsMissing)
+	}
+}
+
+// KSL-T3 regression guard: a current skipped marker for a merged SLI is imported
+// into the merged baseline, so an unreliable value is not later treated as
+// sufficient.
+func TestApplyMergePlan_ImportsCurrentSkippedMarker(t *testing.T) {
+	v := 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &v, Comparability: fullCmp()}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	found := false
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("current skipped marker must be imported; got %v", baseline.Reliability.SkippedSLIs)
+	}
+}
+
+// KSL-T3 regression guard: force-replace reconciles skipped membership for a shared
+// SLI even when its full record is byte-identical (so it never enters `updated`) but
+// its top-level skipped membership changed.
+func TestApplyMergePlan_ForceReplaceReconcilesSkipOnEqualRecord(t *testing.T) {
+	v := 5.0
+	rec := func() summary.SLIResult { return summary.SLIResult{ID: "m", Value: &v, Comparability: fullCmp()} }
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{rec()},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{rec()},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"}, // m NOT skipped
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			t.Fatalf("a stale skip must be dropped for an equal-record force-replace; got %v", baseline.Reliability.SkippedSLIs)
+		}
+	}
+}
+
+// KSL-T3 regression guard: a skip marker for a shared SLI the current run did NOT
+// replace (current value is nil, so computeMergePlan leaves the baseline record
+// untouched) must be retained — removing it would expose the stale baseline value.
+func TestApplyMergePlan_ForceReplaceKeepsSkipForNilCurrentValue(t *testing.T) {
+	bv := 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &bv, Comparability: fullCmp()}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: nil, Status: summary.StatusSkip}}, // nil value, not listed skipped
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	found := false
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("skip marker must be retained when current did not replace the record; got %v", baseline.Reliability.SkippedSLIs)
+	}
+	// The baseline's original value must also be untouched.
+	if baseline.Results[0].Value == nil || *baseline.Results[0].Value != 5 {
+		t.Fatalf("baseline record must be untouched for a nil-current SLI; got %v", baseline.Results[0].Value)
+	}
 }

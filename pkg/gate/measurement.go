@@ -42,10 +42,3 @@ func loadMeasurement(path string) (*summary.Summary, string) {
 	}
 	return &s, measOK
 }
-
-func resultValueMap(s *summary.Summary) map[string]float64 {
-	if s == nil {
-		return map[string]float64{}
-	}
-	return s.ResultValues()
-}

@@ -179,11 +179,60 @@ emits a deprecation notice.
 
 Unknown `--exit-on`/`exit-on` values are invalid.
 
+## KSL-T Trust-Correct Contracts
+
+KSL-T brings protected qualification behavior into conformance with the canonical
+trust rules `KSL-R1~R4`. It introduces explicit trust-correct contracts and fences
+the legacy ones; **it does not activate protected qualification** — real
+policy-neutral measurement wiring (KSL-E) and a separate central activation
+decision remain outstanding.
+
+Trust-correct contract versions:
+
+| Contract | Legacy | Trust-correct |
+|---|---|---|
+| policy | `slint.policy.v1` | `slint.policy.v2` |
+| measurement | `slo.v3` | `slo.v4` (adds per-SLI `comparability`) |
+
+Both versions are accepted, but a legacy contract is never silently treated as
+trust-correct.
+
+- **T1 — whole-policy strict validity.** A policy is validated in full before any
+  protected grade: unknown keys at **every** level are rejected (not warned),
+  exactly one YAML document is allowed, duplicate mapping keys are rejected,
+  operators/enums/numeric domains must be supported, required coordinates
+  (`metric`, `operator`) must be present, and identities (`name`) must be unique.
+  An invalid-but-readable policy yields `NO_GRADE`; an ordinary check `FAIL` never
+  masks policy invalidity.
+- **T2 — producer verdict is non-authoritative.** A measurement producer's
+  `pass/warn/fail/block/skip` status is recorded as a diagnostic
+  (`measurement_diagnostic`) only; it never creates a protected
+  `PASS/WARN/FAIL/NO_GRADE`. Gate Policy is the sole qualification authority.
+- **T3 — positive per-check evidence sufficiency.** A check grades only when the
+  referenced SLI's evidence is positively sufficient, judged from typed facts
+  (value present, not in the reliability skipped-set, no missing inputs) — never
+  from the producer verdict. Missing/unreliable evidence for a required check is
+  `NO_GRADE` for that check; an unrelated insufficient SLI does not poison an
+  independently sufficient one.
+- **T4 — provable baseline comparability.** Regression runs only when current and
+  baseline carry a complete, matching `comparability` identity across all
+  coordinates (`sliContractId`, `subjectId`, `windowId`, `sourceConfigId`).
+  Window semantics come from the explicit `windowId`, never inferred from run
+  start/finish. Absent/mismatched comparability is `NO_GRADE`
+  (`BASELINE_INCOMPARABLE`), never a silent comparison.
+- **T5 — explicit measurement-contract fence.** Comparability lives behind the
+  trust-correct measurement contract (`slo.v4`). A legacy `slo.v3` measurement, or
+  a legacy `slint.policy.v1` policy, cannot satisfy protected comparability by
+  silently ignoring the trust-required fields — such regressions are `NO_GRADE`.
+  Historical artifacts are never silently reinterpreted under the new semantics.
+
 ## Open Decisions
 
 - ~~Whether NaN/Inf metric values are invalid input or measurement failure.~~
   Resolved (Priority 0 implementation): summary-side NaN/Inf is invalid JSON
   and is rejected as `measCorrupt` before any policy logic runs; policy-side
   NaN threshold values are explicitly rejected by `validatePolicy`.
-- Which unknown summary/policy fields may be ignored for compatibility.
+- ~~Which unknown summary/policy fields may be ignored for compatibility.~~
+  Resolved (KSL-T1): unknown policy keys at any level are rejected as invalid;
+  no unknown policy field is silently ignored.
 - Whether required baseline absence should produce `NO_GRADE` or `FAIL`.

@@ -9,7 +9,7 @@ import (
 
 const reasonCoverageGap = "COVERAGE_GAP"
 
-func runCoverage(out *Summary, policy *Policy, s *summary.Summary, promote map[string]bool) (failed, warn bool) {
+func runCoverage(out *Summary, policy *Policy, s *summary.Summary, ev evidenceIndex, promote map[string]bool) (failed, warn bool) {
 	if policy == nil || s == nil || !policy.Coverage.Required {
 		return false, false
 	}
@@ -30,6 +30,12 @@ func runCoverage(out *Summary, policy *Policy, s *summary.Summary, promote map[s
 
 	for _, r := range s.Results {
 		if r.Value == nil || r.ID == "" || covered[r.ID] || informational[r.ID] {
+			continue
+		}
+		// KSL-T3: only an SLI with positively sufficient evidence counts as a graded
+		// "measured" SLI for coverage; an insufficient/unreliable value must not
+		// produce a coverage-gap grade.
+		if _, sufficient, _ := ev.valueSufficient(r.ID); !sufficient {
 			continue
 		}
 		check := Check{
