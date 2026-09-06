@@ -208,8 +208,11 @@ func TestSLIContractID_CounterResetCanonicalization(t *testing.T) {
 
 // E1 (P2): input order is semantic only for window_ratio (numerator vs
 // denominator). Commutative modes sum/pool their inputs order-independently, so
-// reordering equivalent inputs must not change the measurement identity.
-func TestSLIContractID_InputOrderCanonicalization(t *testing.T) {
+// input order is part of the measurement identity (float addition is not
+// associative and window_ratio is positional), so reordering inputs must change the
+// SLIContractID rather than be canonicalized away — otherwise two specs that can
+// measure different values would be treated as comparable.
+func TestSLIContractID_InputOrderIsSemantic(t *testing.T) {
 	pool := func(mode string, keys ...string) spec.SLISpec {
 		ins := make([]spec.MetricRef, len(keys))
 		for i, k := range keys {
@@ -220,28 +223,18 @@ func TestSLIContractID_InputOrderCanonicalization(t *testing.T) {
 			Inputs: ins, Compute: spec.ComputeSpec{Mode: spec.ComputeMode(mode)},
 		}
 	}
-	// window_avg pools its inputs: order must NOT matter.
-	if sliContractID(pool("window_avg", "a", "b")) != sliContractID(pool("window_avg", "b", "a")) {
-		t.Fatal("reordering inputs for a commutative (pooling) mode must not change SLIContractID")
+	// Summing/pooling modes accumulate in supplied order; float addition is not
+	// associative, so a reorder can change the value and MUST change identity.
+	if sliContractID(pool("window_avg", "a", "b", "c")) == sliContractID(pool("window_avg", "a", "c", "b")) {
+		t.Fatal("reordering summing/pooling inputs must change SLIContractID (float non-associativity)")
 	}
-	// window_ratio is order-sensitive: order MUST matter.
-	if sliContractID(pool("window_ratio", "a", "b")) == sliContractID(pool("window_ratio", "b", "a")) {
-		t.Fatal("input order is semantic for window_ratio and must change SLIContractID")
+	// window_ratio is positional (numerator vs denominator).
+	if sliContractID(pool("window_ratio", "num", "den")) == sliContractID(pool("window_ratio", "den", "num")) {
+		t.Fatal("window_ratio numerator/denominator order must change SLIContractID")
 	}
-	// A genuinely different input set still differs under a commutative mode.
+	// A different input set still differs.
 	if sliContractID(pool("window_avg", "a", "b")) == sliContractID(pool("window_avg", "a", "c")) {
 		t.Fatal("a different input set must change SLIContractID")
-	}
-	// window_ratio: positions 0/1 are semantic (num/den) but the tail is an
-	// unordered required set — reordering only the tail must not change identity,
-	// while swapping numerator/denominator must.
-	if sliContractID(pool("window_ratio", "num", "den", "a", "b")) !=
-		sliContractID(pool("window_ratio", "num", "den", "b", "a")) {
-		t.Fatal("reordering only the window_ratio tail must not change SLIContractID")
-	}
-	if sliContractID(pool("window_ratio", "num", "den")) ==
-		sliContractID(pool("window_ratio", "den", "num")) {
-		t.Fatal("swapping window_ratio numerator/denominator must change SLIContractID")
 	}
 }
 
