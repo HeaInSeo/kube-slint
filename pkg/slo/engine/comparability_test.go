@@ -103,6 +103,22 @@ func TestExecute_ProtectedMissingCoordinateFailsClosed(t *testing.T) {
 	}
 }
 
+// E1: a protected run with blank or duplicate SLI IDs fails closed at entry rather
+// than emitting an slo.v4 artifact that summary.Validate would reject as corrupt.
+func TestExecute_ProtectedDuplicateOrBlankSLIID_FailsClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		specs []spec.SLISpec
+	}{
+		{"duplicate", []spec.SLISpec{e1WindowSpec("dup", "window_avg"), e1WindowSpec("dup", "window_p95")}},
+		{"blank", []spec.SLISpec{e1WindowSpec("", "window_avg")}},
+	} {
+		if _, err := e1Run(t, RunConfig{TrustContract: e1TrustContract()}, tc.specs...); err == nil {
+			t.Fatalf("%s SLI IDs must fail closed for a protected run", tc.name)
+		}
+	}
+}
+
 // E1: a protected run whose collection FAILS is emitted as legacy slo.v3 (a failed
 // measurement is not protected evidence), never as a v4 artifact that carries no
 // comparability identity for the requested SLIs.

@@ -49,6 +49,11 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	if err := validateTrustContract(cfg.TrustContract); err != nil {
 		return nil, err
 	}
+	if cfg.TrustContract != nil {
+		if err := validateProtectedSpecIDs(req.Specs); err != nil {
+			return nil, err
+		}
+	}
 
 	rel := req.Reliability
 	if rel == nil {

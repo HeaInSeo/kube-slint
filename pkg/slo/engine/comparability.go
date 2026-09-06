@@ -47,6 +47,26 @@ func validateTrustContract(tc *TrustContract) error {
 	return nil
 }
 
+// validateProtectedSpecIDs fails closed on a protected request whose SLI IDs are
+// blank or duplicated, BEFORE any collection or stamping. A duplicate ID would make
+// applyTrustContract stamp both results from whichever spec last won the id→spec map
+// (misattributing the first result's identity), and Execute would then emit an slo.v4
+// artifact with duplicate/blank result IDs that summary.Validate rejects as corrupt.
+// Failing cleanly is better than producing unusable protected evidence.
+func validateProtectedSpecIDs(specs []spec.SLISpec) error {
+	seen := make(map[string]bool, len(specs))
+	for _, s := range specs {
+		if strings.TrimSpace(s.ID) == "" {
+			return fmt.Errorf("trust-correct measurement requires every SLI to have a non-empty ID")
+		}
+		if seen[s.ID] {
+			return fmt.Errorf("trust-correct measurement requires unique SLI IDs; %q is duplicated", s.ID)
+		}
+		seen[s.ID] = true
+	}
+	return nil
+}
+
 // applyTrustContract stamps a complete per-SLI comparability identity on every
 // result of a trust-correct (slo.v4) summary, failing closed if any identity is
 // incomplete or a result has no spec to derive from. It is a no-op when no
