@@ -253,7 +253,11 @@ func applyMergePlan(baseline *summary.Summary, appended []summary.SLIResult, upd
 	reconcileFor := map[string]bool{}
 	if mode == "force-replace" {
 		for _, r := range cur.Results {
-			if mergedIDs[r.ID] {
+			// Only reconcile SLIs whose record was actually applied from current: a
+			// current result with a nil value is omitted by computeMergePlan, so the
+			// baseline's old numeric record is untouched — removing its skip marker
+			// would expose that stale value to a later regression.
+			if r.Value != nil && mergedIDs[r.ID] {
 				reconcileFor[r.ID] = true
 			}
 		}

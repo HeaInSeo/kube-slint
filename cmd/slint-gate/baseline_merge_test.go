@@ -491,3 +491,35 @@ func TestApplyMergePlan_ForceReplaceReconcilesSkipOnEqualRecord(t *testing.T) {
 		}
 	}
 }
+
+// KSL-T3 regression guard: a skip marker for a shared SLI the current run did NOT
+// replace (current value is nil, so computeMergePlan leaves the baseline record
+// untouched) must be retained — removing it would expose the stale baseline value.
+func TestApplyMergePlan_ForceReplaceKeepsSkipForNilCurrentValue(t *testing.T) {
+	bv := 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &bv, Comparability: fullCmp()}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: nil, Status: summary.StatusSkip}}, // nil value, not listed skipped
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, cur, "force-replace")
+	found := false
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("skip marker must be retained when current did not replace the record; got %v", baseline.Reliability.SkippedSLIs)
+	}
+	// The baseline's original value must also be untouched.
+	if baseline.Results[0].Value == nil || *baseline.Results[0].Value != 5 {
+		t.Fatalf("baseline record must be untouched for a nil-current SLI; got %v", baseline.Results[0].Value)
+	}
+}
