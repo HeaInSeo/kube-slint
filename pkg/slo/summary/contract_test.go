@@ -50,6 +50,9 @@ func TestComparability_CompleteAndEqual(t *testing.T) {
 	if (&Comparability{SLIContractID: "c"}).Complete() {
 		t.Fatal("partial identity must not be complete")
 	}
+	if (&Comparability{SLIContractID: " ", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"}).Complete() {
+		t.Fatal("a whitespace-only coordinate must not count as present")
+	}
 	if !full.Equal(&Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"}) {
 		t.Fatal("identical full identities must be equal")
 	}

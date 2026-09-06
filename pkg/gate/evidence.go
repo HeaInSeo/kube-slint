@@ -1,6 +1,10 @@
 package gate
 
-import "github.com/HeaInSeo/kube-slint/pkg/slo/summary"
+import (
+	"strings"
+
+	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
+)
 
 // evidenceIndex answers positive per-SLI evidence-sufficiency questions from
 // TYPED measurement facts only — value presence, the skipped-SLI set, and
@@ -12,6 +16,10 @@ import "github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 type evidenceIndex struct {
 	byID    map[string]summary.SLIResult
 	skipped map[string]bool
+	// collectionFailed is true when the measurement's reliability record reports a
+	// failed collection: the whole run's values are untrustworthy, so NO SLI has
+	// sufficient evidence to grade, regardless of an individual value being present.
+	collectionFailed bool
 }
 
 func newEvidenceIndex(s *summary.Summary) evidenceIndex {
@@ -26,6 +34,7 @@ func newEvidenceIndex(s *summary.Summary) evidenceIndex {
 		for _, id := range s.Reliability.SkippedSLIs {
 			idx.skipped[id] = true
 		}
+		idx.collectionFailed = strings.EqualFold(strings.TrimSpace(s.Reliability.CollectionStatus), "Failed")
 	}
 	return idx
 }
@@ -36,6 +45,11 @@ func newEvidenceIndex(s *summary.Summary) evidenceIndex {
 // The judgment uses only typed facts, so a producer status verdict can neither
 // promote unreliable evidence into a grade nor demote reliable evidence.
 func (e evidenceIndex) valueSufficient(id string) (float64, bool, string) {
+	if e.collectionFailed {
+		// The whole collection failed: every value is untrustworthy, so no check
+		// may grade on it (matches the collection-wide reliability NO_GRADE).
+		return 0, false, reasonEvidenceInsufficient
+	}
 	r, ok := e.byID[id]
 	if !ok {
 		// The referenced SLI was not produced at all: nothing to grade against.

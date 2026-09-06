@@ -7,6 +7,7 @@ package summary
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -204,13 +205,14 @@ type Comparability struct {
 	SourceConfigID string `json:"sourceConfigId,omitempty"`
 }
 
-// Complete reports whether every comparability coordinate is present. An
-// incomplete identity cannot prove comparability, so it yields NO_GRADE rather
-// than a silent comparison.
+// Complete reports whether every comparability coordinate is present and
+// non-blank. A whitespace-only coordinate is not a real identity, so it is
+// treated as absent; an incomplete identity cannot prove comparability and
+// yields NO_GRADE rather than a silent comparison.
 func (c *Comparability) Complete() bool {
 	return c != nil &&
-		c.SLIContractID != "" && c.SubjectID != "" &&
-		c.WindowID != "" && c.SourceConfigID != ""
+		strings.TrimSpace(c.SLIContractID) != "" && strings.TrimSpace(c.SubjectID) != "" &&
+		strings.TrimSpace(c.WindowID) != "" && strings.TrimSpace(c.SourceConfigID) != ""
 }
 
 // Equal reports whether two comparability identities match on every coordinate.

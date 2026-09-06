@@ -43,7 +43,7 @@ func Evaluate(req Request) *Summary {
 	// it never contributes to the protected grade (Gate Policy is the sole
 	// qualification authority).
 	recordProducerDiagnostics(out, measurement)
-	covFailed, covWarn := runCoverage(out, policy, measurement, promote)
+	covFailed, covWarn := runCoverage(out, policy, measurement, ev, promote)
 
 	anyFailed := tFailed || rFailed || covFailed
 	anyNoGrade := tNoGrade || rNoGrade || relNoGrade

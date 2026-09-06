@@ -1002,6 +1002,13 @@ promote_to_fail: [not_a_category]
 		"duplicate yaml mapping key": `schema_version: "slint.policy.v1"
 schema_version: "slint.policy.v1"
 `,
+		"negative tolerance while regression disabled": `schema_version: "slint.policy.v1"
+regression: {enabled: false, tolerance_percent: -5}
+`,
+		"infinite threshold value": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: t, metric: m, operator: "<=", value: .inf}
+`,
 	}
 	for name, policyYAML := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1523,6 +1530,59 @@ func TestEvaluate_EvidenceSufficiency_IsPerCheckIndependent(t *testing.T) {
 	}
 	assert.Equal(t, "pass", goodCheck.Status, "an independently sufficient check still grades")
 	assert.Equal(t, "no_grade", skippedCheck.Status, "an insufficient check is NO_GRADE")
+}
+
+// KSL-T3: when the collection failed, every value is untrustworthy — a threshold
+// check must NO_GRADE on evidence insufficiency, never grade on the recorded value.
+func TestEvaluate_FailedCollection_ValuesNotGraded(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{{"name": "t", "metric": "m", "operator": ">=", "value": 1}},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	// A value is present, but the collection is Failed: it must not be graded.
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	s.Reliability.CollectionStatus = "Failed"
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	var tCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "threshold" && c.Metric == "m" {
+			tCheck = c
+		}
+	}
+	assert.Equal(t, "no_grade", tCheck.Status, "a value from a failed collection must not be graded")
+}
+
+// KSL-T3: a coverage-gap check counts an SLI as "measured" only when its evidence
+// is positively sufficient; an SLI with a value but insufficient evidence (here,
+// skipped) must not produce a coverage gap.
+func TestEvaluate_Coverage_IgnoresInsufficientEvidence(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+		Coverage:    map[string]any{"required": true},
+	}
+	policy := writePolicyFile(t, dir, p)
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "uncovered", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	s.Reliability.SkippedSLIs = []string{"uncovered"} // insufficient evidence
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.NotContains(t, result.Reasons, "COVERAGE_GAP",
+		"an SLI with insufficient evidence must not produce a coverage gap")
 }
 
 // KSL-T4: regression grades only when the current and baseline comparability

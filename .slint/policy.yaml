@@ -1,4 +1,4 @@
-schema_version: "slint.policy.v1"
+schema_version: "slint.policy.v2"
 
 thresholds:
   - name: "reconcile_total_delta_min"

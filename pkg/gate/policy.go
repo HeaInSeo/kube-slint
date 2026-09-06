@@ -111,8 +111,12 @@ func validatePolicy(p Policy) error {
 	if err := validateThresholds(p.Thresholds); err != nil {
 		return err
 	}
-	if p.Regression.Enabled && p.Regression.TolerancePercent < 0 {
-		return fmt.Errorf("regression.tolerance_percent must not be negative (got %v)", p.Regression.TolerancePercent)
+	// A malformed regression tolerance invalidates the policy regardless of
+	// whether regression is currently enabled (KSL-T1): enabling it later must not
+	// silently activate a nonsensical tolerance. Reject negative and non-finite.
+	tol := p.Regression.TolerancePercent
+	if tol < 0 || math.IsNaN(tol) || math.IsInf(tol, 0) {
+		return fmt.Errorf("regression.tolerance_percent must be a non-negative finite number (got %v)", tol)
 	}
 	return nil
 }
@@ -123,8 +127,8 @@ func validatePolicy(p Policy) error {
 func validateThresholds(rules []ThresholdRule) error {
 	seenNames := map[string]bool{}
 	for _, rule := range rules {
-		if math.IsNaN(rule.Value) {
-			return fmt.Errorf("threshold %q has a NaN value", rule.Name)
+		if math.IsNaN(rule.Value) || math.IsInf(rule.Value, 0) {
+			return fmt.Errorf("threshold %q has a non-finite value (%v)", rule.Name, rule.Value)
 		}
 		if strings.TrimSpace(rule.Metric) == "" {
 			return fmt.Errorf("threshold %q has an empty metric (a required coordinate)", rule.Name)
