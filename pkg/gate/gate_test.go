@@ -31,9 +31,12 @@ type policyFixture struct {
 	PromoteToFail []string         `yaml:"promote_to_fail,omitempty"`
 }
 
+// defaultPolicy returns the trust-correct policy contract (slint.policy.v2), so
+// the shared helpers exercise the protected path by default. legacyPolicy covers
+// the legacy (slint.policy.v1) fence.
 func defaultPolicy() policyFixture {
 	return policyFixture{
-		SchemaVersion: "slint.policy.v1",
+		SchemaVersion: "slint.policy.v2",
 		Thresholds: []map[string]any{
 			{"name": "reconcile_min", "metric": "reconcile_total_delta", "operator": ">=", "value": 1},
 			{"name": "workqueue_max", "metric": "workqueue_depth_end", "operator": "<=", "value": 5},
@@ -44,10 +47,17 @@ func defaultPolicy() policyFixture {
 	}
 }
 
+// legacyPolicy returns the same policy under the legacy contract (slint.policy.v1).
+func legacyPolicy() policyFixture {
+	p := defaultPolicy()
+	p.SchemaVersion = "slint.policy.v1"
+	return p
+}
+
 func writePolicyFile(t *testing.T, dir string, p policyFixture) string {
 	t.Helper()
 	if p.SchemaVersion == "" {
-		p.SchemaVersion = "slint.policy.v1"
+		p.SchemaVersion = "slint.policy.v2"
 	}
 	data, err := yaml.Marshal(p)
 	require.NoError(t, err)
@@ -56,17 +66,56 @@ func writePolicyFile(t *testing.T, dir string, p policyFixture) string {
 	return path
 }
 
+// defaultComparability is the trust-correct comparability identity the shared
+// helpers stamp on every SLI, so a current/baseline pair built from the same
+// helper is provably comparable by default (KSL-T4). Tests that need an
+// incomparable pair override it explicitly.
+func defaultComparability() *summary.Comparability {
+	return &summary.Comparability{
+		SLIContractID:  "contract-1",
+		SubjectID:      "subject-1",
+		WindowID:       "5m-avg",
+		SourceConfigID: "cfg-1",
+	}
+}
+
+// makeMeasurement builds a trust-correct (slo.v4) measurement with a complete,
+// uniform comparability identity per SLI.
 func makeMeasurement(values map[string]float64, collectionStatus string) summary.Summary {
 	results := make([]summary.SLIResult, 0, len(values))
 	for id, v := range values {
-		results = append(results, summary.SLIResult{ID: id, Value: &v, Status: summary.StatusPass})
+		results = append(results, summary.SLIResult{
+			ID: id, Value: &v, Status: summary.StatusPass,
+			Comparability: defaultComparability(),
+		})
 	}
 	return summary.Summary{
-		SchemaVersion: "slo.v3",
+		SchemaVersion: summary.SchemaVersionTrust,
 		GeneratedAt:   time.Now(),
 		Results:       results,
 		Reliability:   &summary.Reliability{CollectionStatus: collectionStatus},
 	}
+}
+
+// makeLegacyMeasurement builds a legacy (slo.v3) measurement — no comparability
+// identity, so it can never satisfy protected baseline comparability.
+func makeLegacyMeasurement(values map[string]float64, collectionStatus string) summary.Summary {
+	s := makeMeasurement(values, collectionStatus)
+	s.SchemaVersion = summary.SchemaVersionLegacy
+	for i := range s.Results {
+		s.Results[i].Comparability = nil
+	}
+	return s
+}
+
+// makeMeasurementWithComparability builds a trust-correct measurement stamping a
+// specific comparability identity (or nil) on every SLI.
+func makeMeasurementWithComparability(values map[string]float64, cmp *summary.Comparability) summary.Summary {
+	s := makeMeasurement(values, "Complete")
+	for i := range s.Results {
+		s.Results[i].Comparability = cmp
+	}
+	return s
 }
 
 func writeMeasurementFile(t *testing.T, dir, name string, s summary.Summary) string {
@@ -826,12 +875,14 @@ func TestEvaluate_RegressionMetricMissingInBaseline(t *testing.T) {
 	assert.Equal(t, "partially_evaluated", result.EvaluationStatus)
 }
 
-// --- policy unknown field warning tests ---
+// --- policy unknown field validity tests (KSL-T1) ---
 
-func TestEvaluate_PolicyUnknownField_EmitsWarning(t *testing.T) {
+// KSL-T1: an unknown top-level key makes the whole policy invalid (fail-closed),
+// not a warn-and-still-evaluate condition. An invalid-but-readable policy must
+// never yield a protected grade, so the gate is NO_GRADE, never PASS.
+func TestEvaluate_PolicyUnknownTopLevelField_IsInvalid(t *testing.T) {
 	dir := t.TempDir()
 
-	// Write a policy with an unknown top-level field.
 	policyYAML := `schema_version: "slint.policy.v1"
 thresholds:
   - name: reconcile_min
@@ -839,8 +890,8 @@ thresholds:
     operator: ">="
     value: 1
 metadata:
-  author: test     # unknown field — should produce a warning
-severity: high     # another unknown field
+  author: test     # unknown top-level field — must invalidate the policy
+severity: high     # another unknown top-level field
 `
 	policyPath := filepath.Join(dir, "policy.yaml")
 	require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
@@ -854,12 +905,136 @@ severity: high     # another unknown field
 		PolicyPath:      policyPath,
 	})
 
-	require.Equal(t, gate.GatePass, result.GateResult)
-	require.Len(t, result.PolicyWarnings, 2, "expected two unknown-field warnings")
+	require.Equal(t, gate.GateNoGrade, result.GateResult)
+	require.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
 
-	for _, w := range result.PolicyWarnings {
-		assert.Contains(t, w, "unknown field")
+// KSL-T1: an unknown NESTED key (inside a threshold rule) is equally invalid —
+// strict validity applies at every semantic level, not only the top level.
+func TestEvaluate_PolicyUnknownNestedField_IsInvalid(t *testing.T) {
+	dir := t.TempDir()
+
+	policyYAML := `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+    severty: high    # misspelled nested key — must invalidate the policy
+`
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
+
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"reconcile_total_delta": 2,
+	}, "complete"))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policyPath,
+	})
+
+	require.Equal(t, gate.GateNoGrade, result.GateResult)
+	require.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
+// KSL-T1: a trailing second YAML document is invalid — a policy may not smuggle
+// in a second, unevaluated definition.
+func TestEvaluate_PolicyTrailingDocument_IsInvalid(t *testing.T) {
+	dir := t.TempDir()
+
+	policyYAML := `schema_version: "slint.policy.v1"
+thresholds:
+  - name: reconcile_min
+    metric: reconcile_total_delta
+    operator: ">="
+    value: 1
+---
+schema_version: "slint.policy.v1"
+`
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
+
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{
+		"reconcile_total_delta": 2,
+	}, "complete"))
+
+	result := gate.Evaluate(gate.Request{
+		MeasurementPath: meas,
+		PolicyPath:      policyPath,
+	})
+
+	require.Equal(t, gate.GateNoGrade, result.GateResult)
+	require.Equal(t, "invalid", result.PolicyStatus)
+	assert.Contains(t, result.Reasons, "POLICY_INVALID")
+}
+
+// KSL-T1: the policy-validity matrix — each malformed policy must invalidate the
+// whole policy (NO_GRADE / POLICY_INVALID) before evaluation, never silently
+// evaluate a partial policy.
+func TestEvaluate_PolicyValidityMatrix(t *testing.T) {
+	cases := map[string]string{
+		"unsupported operator": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: t, metric: m, operator: "!=", value: 1}
+`,
+		"empty operator": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: t, metric: m, value: 1}
+`,
+		"empty metric": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: t, operator: ">=", value: 1}
+`,
+		"duplicate threshold identity": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: dup, metric: a, operator: ">=", value: 1}
+  - {name: dup, metric: b, operator: ">=", value: 1}
+`,
+		"bad reliability enum": `schema_version: "slint.policy.v1"
+reliability: {required: true, min_level: sometimes}
+`,
+		"bad promote value": `schema_version: "slint.policy.v1"
+promote_to_fail: [not_a_category]
+`,
+		"duplicate yaml mapping key": `schema_version: "slint.policy.v1"
+schema_version: "slint.policy.v1"
+`,
 	}
+	for name, policyYAML := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			policyPath := filepath.Join(dir, "policy.yaml")
+			require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
+			meas := writeMeasurementFile(t, dir, "meas.json",
+				makeMeasurement(map[string]float64{"m": 2, "a": 2, "b": 2}, "complete"))
+			result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policyPath})
+			require.Equal(t, gate.GateNoGrade, result.GateResult, "invalid policy must be NO_GRADE")
+			require.Equal(t, "invalid", result.PolicyStatus)
+			assert.Contains(t, result.Reasons, "POLICY_INVALID")
+		})
+	}
+}
+
+// KSL-T1: policy invalidity must not be maskable by an otherwise-genuine check
+// FAIL. A policy that is invalid (unknown key) AND contains a threshold a valid
+// policy would FAIL on must still be NO_GRADE, never FAIL.
+func TestEvaluate_PolicyInvalidityNotMaskedByFail(t *testing.T) {
+	dir := t.TempDir()
+	policyYAML := `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: would-fail, metric: m, operator: ">=", value: 100}
+bogus_top_level: true
+`
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath, []byte(policyYAML), 0o644))
+	// m=1 < 100 would be a genuine threshold FAIL under a valid policy.
+	meas := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(map[string]float64{"m": 1}, "complete"))
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policyPath})
+	require.Equal(t, gate.GateNoGrade, result.GateResult, "invalidity must not be masked by a would-be FAIL")
+	require.Equal(t, "invalid", result.PolicyStatus)
 }
 
 // --- promote_to_fail / fail_on dual support ---
@@ -1199,7 +1374,7 @@ func TestEvaluate_PolicyKnownFieldsOnly_NoWarnings(t *testing.T) {
 // makeResultsMeasurement builds a Summary from a slice of SLIResults directly.
 func makeResultsMeasurement(results []summary.SLIResult) summary.Summary {
 	return summary.Summary{
-		SchemaVersion: "slo.v3",
+		SchemaVersion: summary.SchemaVersionTrust,
 		GeneratedAt:   time.Now(),
 		Results:       results,
 		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
@@ -1208,116 +1383,216 @@ func makeResultsMeasurement(results []summary.SLIResult) summary.Summary {
 
 func ptr(v float64) *float64 { return &v }
 
-func TestEvaluate_ResultStatus_WarnProducesGateWarn(t *testing.T) {
-	// Engine-reported warn (e.g. counter reset) should surface as WARN even with no threshold.
-	dir := t.TempDir()
-	p := policyFixture{
-		Thresholds:  []map[string]any{},
-		Regression:  map[string]any{"enabled": false},
-		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
+// KSL-T2: a producer status of warn/fail/block is recorded as a NON-AUTHORITATIVE
+// diagnostic and never drives the protected grade. With no Gate Policy check on
+// the SLI, the gate is PASS (nothing to grade), and a measurement_diagnostic check
+// records the producer verdict for visibility.
+func TestEvaluate_ProducerStatus_IsDiagnosticOnly(t *testing.T) {
+	cases := []struct {
+		name   string
+		result summary.SLIResult
+	}{
+		{"warn", summary.SLIResult{ID: "churn_delta", Status: summary.StatusWarn, Reason: "counter reset suspected", Value: ptr(-3)}},
+		{"fail", summary.SLIResult{ID: "reconcile_total", Status: summary.StatusFail, Reason: "producer rule fail", Value: ptr(50)}},
+		{"block", summary.SLIResult{ID: "pipeline_blocked", Status: summary.StatusBlock, Reason: "upstream pipeline failure"}},
 	}
-	policy := writePolicyFile(t, dir, p)
-	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
-		{ID: "churn_delta", Status: summary.StatusWarn, Reason: "delta < 0 (counter reset suspected)", Value: ptr(-3)},
-	}))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			p := policyFixture{
+				Thresholds:  []map[string]any{},
+				Regression:  map[string]any{"enabled": false},
+				Reliability: map[string]any{"required": false},
+				FailOn:      []string{"threshold_miss"},
+			}
+			policy := writePolicyFile(t, dir, p)
+			meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{tc.result}))
 
-	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+			result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
 
-	assert.Equal(t, gate.GateWarn, result.GateResult)
-	var rsCheck gate.Check
-	for _, c := range result.Checks {
-		if c.Category == "result_status" {
-			rsCheck = c
-		}
+			assert.Equal(t, gate.GatePass, result.GateResult, "producer verdict must not drive the grade")
+			assert.NotContains(t, result.Reasons, "RESULT_STATUS_FAIL")
+			var diag gate.Check
+			for _, c := range result.Checks {
+				if c.Category == "measurement_diagnostic" {
+					diag = c
+				}
+			}
+			assert.Equal(t, "info", diag.Status, "producer status is recorded as a diagnostic")
+			assert.Equal(t, tc.result.ID, diag.Metric)
+		})
 	}
-	assert.Equal(t, "warn", rsCheck.Status)
-	assert.Equal(t, "churn_delta", rsCheck.Metric)
 }
 
-func TestEvaluate_ResultStatus_FailProducesGateFail(t *testing.T) {
+// KSL-T2/T3: value=10 with producer status=fail but a Gate Policy threshold that
+// passes must be PASS — the producer verdict cannot manufacture a FAIL.
+func TestEvaluate_ProducerFail_PolicyThresholdPasses_IsPass(t *testing.T) {
 	dir := t.TempDir()
 	p := policyFixture{
-		Thresholds:  []map[string]any{},
+		Thresholds:  []map[string]any{{"name": "t", "metric": "m", "operator": "<=", "value": 100}},
 		Regression:  map[string]any{"enabled": false},
 		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
 	}
 	policy := writePolicyFile(t, dir, p)
 	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
-		{ID: "reconcile_total", Status: summary.StatusFail, Reason: "rule fail: value >= 100", Value: ptr(50)},
+		{ID: "m", Status: summary.StatusFail, Reason: "producer says fail", Value: ptr(10),
+			Comparability: defaultComparability()},
 	}))
-
 	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
-
-	assert.Equal(t, gate.GateFail, result.GateResult)
-	assert.Contains(t, result.Reasons, "RESULT_STATUS_FAIL")
-}
-
-func TestEvaluate_ResultStatus_BlockProducesGateFail(t *testing.T) {
-	dir := t.TempDir()
-	p := policyFixture{
-		Thresholds:  []map[string]any{},
-		Regression:  map[string]any{"enabled": false},
-		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
-	}
-	policy := writePolicyFile(t, dir, p)
-	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
-		{ID: "pipeline_blocked", Status: summary.StatusBlock, Reason: "upstream pipeline failure"},
-	}))
-
-	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
-
-	assert.Equal(t, gate.GateFail, result.GateResult)
-	assert.Contains(t, result.Reasons, "RESULT_STATUS_FAIL")
-}
-
-func TestEvaluate_ResultStatus_SkipNoValueProducesNoGrade(t *testing.T) {
-	dir := t.TempDir()
-	p := policyFixture{
-		Thresholds:  []map[string]any{},
-		Regression:  map[string]any{"enabled": false},
-		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
-	}
-	policy := writePolicyFile(t, dir, p)
-	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
-		{ID: "missing_metric", Status: summary.StatusSkip, Reason: "missing input metrics", Value: nil},
-	}))
-
-	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
-
-	assert.Equal(t, gate.GateNoGrade, result.GateResult)
-	var rsCheck gate.Check
-	for _, c := range result.Checks {
-		if c.Category == "result_status" {
-			rsCheck = c
-		}
-	}
-	assert.Equal(t, "no_grade", rsCheck.Status)
-}
-
-func TestEvaluate_ResultStatus_PassNoEffect(t *testing.T) {
-	// pass status should not add any result_status check
-	dir := t.TempDir()
-	p := policyFixture{
-		Thresholds:  []map[string]any{},
-		Regression:  map[string]any{"enabled": false},
-		Reliability: map[string]any{"required": false},
-		FailOn:      []string{"threshold_miss"},
-	}
-	policy := writePolicyFile(t, dir, p)
-	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
-		{ID: "reconcile_total", Status: summary.StatusPass, Value: ptr(5)},
-	}))
-
-	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
-
 	assert.Equal(t, gate.GatePass, result.GateResult)
-	for _, c := range result.Checks {
-		assert.NotEqual(t, "result_status", c.Category, "pass status must not produce a result_status check")
+}
+
+// KSL-T2: a genuine Gate Policy violation (threshold miss) remains FAIL — the
+// grade authority is Gate Policy, and it still fails on a real violation.
+func TestEvaluate_PolicyThresholdViolation_IsFail(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:    []map[string]any{{"name": "t", "metric": "m", "operator": ">=", "value": 100}},
+		Regression:    map[string]any{"enabled": false},
+		Reliability:   map[string]any{"required": false},
+		PromoteToFail: []string{"threshold_miss"},
 	}
+	policy := writePolicyFile(t, dir, p)
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: ptr(10), Comparability: defaultComparability()},
+	}))
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+	assert.Equal(t, gate.GateFail, result.GateResult)
+	assert.Contains(t, result.Reasons, "THRESHOLD_MISS")
+}
+
+// KSL-T2/T3: producer status=pass but the required evidence is missing (no value)
+// must NOT PASS — evidence insufficiency (a typed fact) makes the required check
+// NO_GRADE, without relying on the producer verdict word.
+func TestEvaluate_ProducerPass_EvidenceMissing_IsNoGrade(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{{"name": "t", "metric": "m", "operator": ">=", "value": 1}},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	// status=pass but Value=nil: the producer verdict claims pass, yet there is no
+	// evidence to grade the required threshold on.
+	meas := writeMeasurementFile(t, dir, "meas.json", makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: nil, Comparability: defaultComparability()},
+	}))
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Contains(t, result.Reasons, "EVIDENCE_INSUFFICIENT")
+}
+
+// KSL-T3: a required SLI whose evidence is unreliable (recorded in the skipped set
+// or with missing inputs) is NO_GRADE, while an independently sufficient SLI in
+// the same run still grades — an unrelated insufficient SLI must not poison it.
+func TestEvaluate_EvidenceSufficiency_IsPerCheckIndependent(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds: []map[string]any{
+			{"name": "ok", "metric": "good", "operator": ">=", "value": 1},
+			{"name": "bad", "metric": "skipped", "operator": ">=", "value": 1},
+		},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "good", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+		{ID: "skipped", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	// "skipped" carries a value but is positively marked skipped by the reliability
+	// record: its evidence is not sufficient, so its check must NO_GRADE.
+	s.Reliability.SkippedSLIs = []string{"skipped"}
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	// One check NO_GRADE (skipped), one graded PASS (good). Run-level result is
+	// NO_GRADE (a required check could not be graded), but the "good" check is
+	// still evaluated rather than poisoned.
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	assert.Contains(t, result.Reasons, "EVIDENCE_INSUFFICIENT")
+	var goodCheck, skippedCheck gate.Check
+	for _, c := range result.Checks {
+		switch c.Metric {
+		case "good":
+			goodCheck = c
+		case "skipped":
+			skippedCheck = c
+		}
+	}
+	assert.Equal(t, "pass", goodCheck.Status, "an independently sufficient check still grades")
+	assert.Equal(t, "no_grade", skippedCheck.Status, "an insufficient check is NO_GRADE")
+}
+
+// KSL-T4: regression grades only when the current and baseline comparability
+// identities match on every coordinate; any single-coordinate mismatch, or a
+// missing identity, yields NO_GRADE (baseline-incomparable), never a silent
+// comparison.
+func TestEvaluate_RegressionComparabilityMatrix(t *testing.T) {
+	base := &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"}
+	regressionPolicy := func() policyFixture {
+		return policyFixture{
+			SchemaVersion: "slint.policy.v2",
+			Thresholds:    []map[string]any{{"name": "t", "metric": "m", "operator": "<=", "value": 1000}},
+			Regression:    map[string]any{"enabled": true, "tolerance_percent": 5},
+			Reliability:   map[string]any{"required": false},
+			PromoteToFail: []string{"regression_detected"},
+		}
+	}
+	mismatches := map[string]*summary.Comparability{
+		"different subject":     {SLIContractID: "c", SubjectID: "s2", WindowID: "w", SourceConfigID: "cfg"},
+		"changed SLI semantics": {SLIContractID: "c2", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"},
+		"different window":      {SLIContractID: "c", SubjectID: "s", WindowID: "w2", SourceConfigID: "cfg"},
+		"changed source/config": {SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg2"},
+		"missing comparability": nil,
+	}
+	for name, curCmp := range mismatches {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			policy := writePolicyFile(t, dir, regressionPolicy())
+			cur := writeMeasurementFile(t, dir, "meas.json", makeMeasurementWithComparability(map[string]float64{"m": 100}, curCmp))
+			basePath := writeMeasurementFile(t, dir, "baseline.json", makeMeasurementWithComparability(map[string]float64{"m": 100}, base))
+			result := gate.Evaluate(gate.Request{MeasurementPath: cur, PolicyPath: policy, BaselinePath: basePath})
+			assert.Equal(t, gate.GateNoGrade, result.GateResult, "incomparable baseline must be NO_GRADE")
+			assert.Contains(t, result.Reasons, "BASELINE_INCOMPARABLE")
+		})
+	}
+	t.Run("fully matching identity grades", func(t *testing.T) {
+		dir := t.TempDir()
+		policy := writePolicyFile(t, dir, regressionPolicy())
+		cur := writeMeasurementFile(t, dir, "meas.json", makeMeasurementWithComparability(map[string]float64{"m": 100}, base))
+		basePath := writeMeasurementFile(t, dir, "baseline.json", makeMeasurementWithComparability(map[string]float64{"m": 100}, base))
+		result := gate.Evaluate(gate.Request{MeasurementPath: cur, PolicyPath: policy, BaselinePath: basePath})
+		assert.Equal(t, gate.GatePass, result.GateResult)
+		assert.NotContains(t, result.Reasons, "BASELINE_INCOMPARABLE")
+	})
+}
+
+// KSL-T5 version boundaries: a legacy policy (v1) is never read with trust-correct
+// (v2) semantics, and a legacy measurement contract (slo.v3) can never satisfy
+// protected comparability by silently ignoring the trust-required fields.
+func TestEvaluate_VersionBoundaries(t *testing.T) {
+	vals := map[string]float64{"reconcile_total_delta": 3, "workqueue_depth_end": 0}
+
+	t.Run("v1 policy is not trust-correct (regression not protected)", func(t *testing.T) {
+		dir := t.TempDir()
+		policy := writePolicyFile(t, dir, legacyPolicy()) // slint.policy.v1
+		// Trust-correct v4 measurements that DO match — only the v1 policy blocks it.
+		cur := writeMeasurementFile(t, dir, "meas.json", makeMeasurement(vals, "Complete"))
+		basePath := writeMeasurementFile(t, dir, "baseline.json", makeMeasurement(vals, "Complete"))
+		result := gate.Evaluate(gate.Request{MeasurementPath: cur, PolicyPath: policy, BaselinePath: basePath})
+		assert.Contains(t, result.Reasons, "BASELINE_INCOMPARABLE")
+	})
+
+	t.Run("v3 measurement cannot satisfy protected comparability", func(t *testing.T) {
+		dir := t.TempDir()
+		policy := writePolicyFile(t, dir, defaultPolicy()) // slint.policy.v2
+		cur := writeMeasurementFile(t, dir, "meas.json", makeLegacyMeasurement(vals, "Complete"))
+		basePath := writeMeasurementFile(t, dir, "baseline.json", makeLegacyMeasurement(vals, "Complete"))
+		result := gate.Evaluate(gate.Request{MeasurementPath: cur, PolicyPath: policy, BaselinePath: basePath})
+		assert.Contains(t, result.Reasons, "BASELINE_INCOMPARABLE")
+	})
 }
 
 func TestEvaluate_CoverageRequiredWarnsOnUncoveredMeasuredSLI(t *testing.T) {
