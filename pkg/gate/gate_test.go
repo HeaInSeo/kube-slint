@@ -1617,6 +1617,29 @@ func TestEvaluate_FailedEvaluation_NoChecks_IsNoGrade(t *testing.T) {
 	assert.Contains(t, result.Reasons, "COLLECTION_FAILED")
 }
 
+// KSL-T3: a whitespace-padded failure status (accepted by the validator, which
+// trims) must still be detected as a failure at the run-level check.
+func TestEvaluate_WhitespacePaddedFailure_IsNoGrade(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	s.Reliability.CollectionStatus = "Complete"
+	s.Reliability.EvaluationStatus = " Failed "
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult, "a whitespace-padded Failed must still be detected")
+	assert.Contains(t, result.Reasons, "COLLECTION_FAILED")
+}
+
 // KSL-T3: a coverage-gap check counts an SLI as "measured" only when its evidence
 // is positively sufficient; an SLI with a value but insufficient evidence (here,
 // skipped) must not produce a coverage gap.

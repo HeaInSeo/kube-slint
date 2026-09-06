@@ -110,6 +110,15 @@ func runBaselineMerge(args []string) error {
 		return fmt.Errorf("could not load summary: %w", err)
 	}
 
+	// Reject a cross-contract merge rather than write a hybrid baseline (e.g. an
+	// slo.v3 top-level carrying slo.v4 comparability), which a later regression
+	// would reject as legacy. Rebaselining across contracts is a migration concern,
+	// not a merge; regenerate the baseline from a matching-contract summary instead.
+	if baseline.SchemaVersion != cur.SchemaVersion {
+		return fmt.Errorf("cannot merge across measurement contracts: baseline is %q but the current summary is %q; regenerate the baseline from a matching-contract summary",
+			baseline.SchemaVersion, cur.SchemaVersion)
+	}
+
 	baseValues := baseline.ResultValues()
 
 	var directions map[string]string

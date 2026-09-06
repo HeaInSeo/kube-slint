@@ -47,7 +47,8 @@ func runReliability(out *Summary, policy *Policy, s *summary.Summary) (anyWarn, 
 	// and of whether any threshold/regression/coverage check happens to reference an
 	// SLI. This ensures an explicitly-failed run cannot return a protected PASS even
 	// when the policy has no checks (KSL-T3).
-	if strings.EqualFold(collectionStatus, "Failed") || strings.EqualFold(evaluationStatus, "Failed") {
+	if strings.EqualFold(strings.TrimSpace(collectionStatus), "Failed") ||
+		strings.EqualFold(strings.TrimSpace(evaluationStatus), "Failed") {
 		check.Status = "no_grade"
 		check.Message = "collection or evaluation failed; measurement is not trustworthy"
 		addReason(&out.Reasons, reasonCollectionFailed)

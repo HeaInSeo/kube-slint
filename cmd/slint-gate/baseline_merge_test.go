@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 	"github.com/stretchr/testify/assert"
@@ -347,4 +348,35 @@ func TestApplyMergePlan_ComparabilityIdentity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// KSL-T5 guard: a cross-contract merge (e.g. slo.v3 baseline + slo.v4 current) is
+// rejected rather than written as a hybrid baseline a later regression would treat
+// as legacy.
+func TestRunBaselineMerge_RejectsCrossContractMerge(t *testing.T) {
+	dir := t.TempDir()
+	policyPath := filepath.Join(dir, "policy.yaml")
+	require.NoError(t, os.WriteFile(policyPath,
+		[]byte("schema_version: \"slint.policy.v2\"\nregression:\n  enabled: false\n"), 0o644))
+
+	// Legacy (slo.v3) baseline.
+	baseline := writeDiffSummary(t, dir, "baseline.json", map[string]float64{"reconcile_total_delta": 5})
+
+	// Trust-correct (slo.v4) current, which passes the trivial policy.
+	v := 5.0
+	curSum := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		GeneratedAt:   time.Now(),
+		Results: []summary.SLIResult{{
+			ID: "reconcile_total_delta", Value: &v, Status: summary.StatusPass,
+			Comparability: &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"},
+		}},
+		Reliability: &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	curPath := filepath.Join(dir, "summary.json")
+	require.NoError(t, summary.WriteFile(curPath, curSum))
+
+	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", curPath, "--policy", policyPath})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cross")
 }
