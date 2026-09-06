@@ -232,6 +232,13 @@ func TestSLIContractID_InputOrderIsSemantic(t *testing.T) {
 	if sliContractID(pool("window_ratio", "num", "den")) == sliContractID(pool("window_ratio", "den", "num")) {
 		t.Fatal("window_ratio numerator/denominator order must change SLIContractID")
 	}
+	// window_ratio's tail (inputs[2:]) is an unordered required set, not part of the
+	// value, so reordering only the tail must NOT change identity — while swapping
+	// numerator/denominator still must.
+	if sliContractID(pool("window_ratio", "num", "den", "a", "b")) !=
+		sliContractID(pool("window_ratio", "num", "den", "b", "a")) {
+		t.Fatal("reordering only the window_ratio tail must not change SLIContractID")
+	}
 	// A different input set still differs.
 	if sliContractID(pool("window_avg", "a", "b")) == sliContractID(pool("window_avg", "a", "c")) {
 		t.Fatal("a different input set must change SLIContractID")

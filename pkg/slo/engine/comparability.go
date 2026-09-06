@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"sort"
 	"strings"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
@@ -94,16 +95,16 @@ func applyTrustContract(sum *summary.Summary, specs []spec.SLISpec, tc *TrustCon
 // display name), the advisory-only difference between counter-reset policies that
 // keep the same value, and any run-scoped data.
 //
-// Input order is part of the measurement identity and is preserved exactly. The
-// producer consumes inputs in the supplied order — evalSLI and the window-average
-// loop accumulate float64 values in that order, and floating-point addition is not
-// associative (e.g. 1e16, -1e16, 1 sums to 1 or 0 depending on order), and
-// window_ratio reads position 0 as numerator and 1 as denominator — so reordering
-// inputs can change the measured value. Canonicalizing (sorting) the keys would
-// therefore let two specs that measure DIFFERENTLY share an identity and be compared
-// as if equivalent (a false regression/pass); preserving order can at worst make two
-// truly-equivalent orderings look incomparable, which the gate degrades to NO_GRADE
-// — the safe direction.
+// Input order is part of the measurement identity for every mode that combines its
+// inputs into the value: evalSLI and the window min/max/avg/percentile loops
+// accumulate float64 in the supplied order, and floating-point addition is not
+// associative (e.g. 1e16, -1e16, 1 sums to 1 or 0 depending on order), so reordering
+// can change the measured value — sorting would let specs that measure DIFFERENTLY
+// share an identity (a false regression/pass). The one exception is window_ratio,
+// whose value uses only inputs[0] (numerator) and inputs[1] (denominator); any
+// inputs[2:] are an unordered required-present set (the windowValues evidence check),
+// not part of the value, so their order is canonicalized while positions 0/1 are
+// kept, avoiding a false BASELINE_INCOMPARABLE from a mere tail reorder.
 func sliContractID(s spec.SLISpec) string {
 	h := sha256.New()
 	writeField(h, "kube-slint.sli.contract.v1")
@@ -119,8 +120,19 @@ func sliContractID(s spec.SLISpec) string {
 		writeField(h, "reset="+counterResetMeasurementEffect(s.Compute.OnCounterReset))
 	}
 	writeField(h, fmt.Sprintf("inputs=%d", len(s.Inputs)))
-	for _, in := range s.Inputs {
-		writeField(h, in.Key)
+	if mode == spec.ComputeWindowRatio && len(s.Inputs) > 2 {
+		keys := make([]string, len(s.Inputs))
+		for i, in := range s.Inputs {
+			keys[i] = in.Key
+		}
+		sort.Strings(keys[2:]) // tail is an unordered required set, not part of the value
+		for _, k := range keys {
+			writeField(h, k)
+		}
+	} else {
+		for _, in := range s.Inputs {
+			writeField(h, in.Key)
+		}
 	}
 	return "slic-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
 }
