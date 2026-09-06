@@ -105,11 +105,12 @@ func sliContractID(s spec.SLISpec) string {
 	writeField(h, s.ID)
 	writeField(h, s.Unit)
 	writeField(h, s.Kind)
-	writeField(h, string(s.Compute.Mode))
+	mode := canonicalMeasurementMode(s.Compute.Mode)
+	writeField(h, string(mode))
 	// Counter-reset policy only affects the measured value under delta, and there
 	// only via whether the value is preserved or cleared — the warn/fail choice is
 	// a non-authoritative producer verdict, so it must not change identity.
-	if s.Compute.Mode == spec.ComputeDelta {
+	if mode == spec.ComputeDelta {
 		writeField(h, "reset="+counterResetMeasurementEffect(s.Compute.OnCounterReset))
 	}
 	writeField(h, fmt.Sprintf("inputs=%d", len(s.Inputs)))
@@ -117,13 +118,33 @@ func sliContractID(s spec.SLISpec) string {
 	for i, in := range s.Inputs {
 		keys[i] = in.Key
 	}
-	if s.Compute.Mode != spec.ComputeWindowRatio {
+	if mode == spec.ComputeWindowRatio {
+		// window_ratio reads only positions 0 (numerator) and 1 (denominator); any
+		// further inputs form an unordered required-present set (windowValues), so
+		// preserve the first two positions and canonicalize the tail.
+		if len(keys) > 2 {
+			sort.Strings(keys[2:])
+		}
+	} else {
 		sort.Strings(keys)
 	}
 	for _, k := range keys {
 		writeField(h, k)
 	}
 	return "slic-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
+}
+
+// canonicalMeasurementMode folds compute modes that produce an identical
+// measurement onto one representative, so a non-semantic spelling change does not
+// change identity. The legacy ComputeSingle ("single") is evaluated identically to
+// ComputeStart (evalSLI handles them in one fallthrough branch: value = start
+// snapshot), so migrating an otherwise-unchanged SLI from "single" to "start" must
+// keep the same SLIContractID/WindowID rather than reporting BASELINE_INCOMPARABLE.
+func canonicalMeasurementMode(m spec.ComputeMode) spec.ComputeMode {
+	if m == spec.ComputeSingle {
+		return spec.ComputeStart
+	}
+	return m
 }
 
 // counterResetMeasurementEffect canonicalizes a counter-reset policy to its effect
@@ -150,7 +171,7 @@ func counterResetMeasurementEffect(p spec.CounterResetPolicy) string {
 func windowID(s spec.SLISpec, logicalWindow string) string {
 	h := sha256.New()
 	writeField(h, "kube-slint.sli.window.v1")
-	writeField(h, string(s.Compute.Mode))
+	writeField(h, string(canonicalMeasurementMode(s.Compute.Mode)))
 	writeField(h, logicalWindow)
 	return "win-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
 }

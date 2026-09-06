@@ -232,6 +232,39 @@ func TestSLIContractID_InputOrderCanonicalization(t *testing.T) {
 	if sliContractID(pool("window_avg", "a", "b")) == sliContractID(pool("window_avg", "a", "c")) {
 		t.Fatal("a different input set must change SLIContractID")
 	}
+	// window_ratio: positions 0/1 are semantic (num/den) but the tail is an
+	// unordered required set — reordering only the tail must not change identity,
+	// while swapping numerator/denominator must.
+	if sliContractID(pool("window_ratio", "num", "den", "a", "b")) !=
+		sliContractID(pool("window_ratio", "num", "den", "b", "a")) {
+		t.Fatal("reordering only the window_ratio tail must not change SLIContractID")
+	}
+	if sliContractID(pool("window_ratio", "num", "den")) ==
+		sliContractID(pool("window_ratio", "den", "num")) {
+		t.Fatal("swapping window_ratio numerator/denominator must change SLIContractID")
+	}
+}
+
+// E1 (P2): ComputeSingle (legacy "single") and ComputeStart are evaluated
+// identically (start snapshot), so they must share one measurement identity — both
+// SLIContractID and WindowID — so migrating "single"->"start" does not report a
+// false BASELINE_INCOMPARABLE. ComputeEnd measures differently and must not fold in.
+func TestSLIContractID_EquivalentStartModes(t *testing.T) {
+	point := func(mode string) spec.SLISpec {
+		return spec.SLISpec{
+			ID: "p", Unit: "count", Kind: "gauge",
+			Inputs: []spec.MetricRef{{Key: "k"}}, Compute: spec.ComputeSpec{Mode: spec.ComputeMode(mode)},
+		}
+	}
+	if sliContractID(point("single")) != sliContractID(point("start")) {
+		t.Fatal("single and start are measurement-equivalent; SLIContractID must match")
+	}
+	if windowID(point("single"), "60m") != windowID(point("start"), "60m") {
+		t.Fatal("single and start are measurement-equivalent; WindowID must match")
+	}
+	if sliContractID(point("single")) == sliContractID(point("end")) {
+		t.Fatal("end measures differently and must not fold onto start")
+	}
 }
 
 // E1: WindowID is the window/aggregation semantics + the caller's explicit window
