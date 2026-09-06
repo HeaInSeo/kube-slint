@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -124,8 +125,14 @@ func runBaselineMerge(args []string) error {
 	if *mode == "review-existing" {
 		directions = loadMetricDirections(*policyPath)
 	}
+	curSkipped := map[string]bool{}
+	if cur.Reliability != nil {
+		for _, id := range cur.Reliability.SkippedSLIs {
+			curSkipped[id] = true
+		}
+	}
 	appended, updated, rejected := computeMergePlan(*mode, baseline, cur, directions)
-	applyMergePlan(&baseline, appended, updated)
+	applyMergePlan(&baseline, appended, updated, curSkipped)
 
 	// kube-slint-no-stat-before-write: the os.Stat calls above are a
 	// --baseline existence precondition and a --force overwrite guard on
@@ -151,9 +158,9 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 	for _, r := range cur.Results {
 		curByID[r.ID] = r
 	}
-	baseCmpByID := make(map[string]*summary.Comparability, len(baseline.Results))
+	baseByID := make(map[string]summary.SLIResult, len(baseline.Results))
 	for _, r := range baseline.Results {
-		baseCmpByID[r.ID] = r.Comparability
+		baseByID[r.ID] = r
 	}
 
 	for _, r := range cur.Results {
@@ -171,11 +178,12 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 			continue
 		}
 		if curVal == baseVal {
-			// Value unchanged: force-replace still refreshes a CHANGED comparability
-			// identity so the baseline matches the current artifact (otherwise a later
-			// regression against that current artifact is spuriously
-			// BASELINE_INCOMPARABLE). Other modes leave an unchanged value untouched.
-			if mode == "force-replace" && !sameComparability(baseCmpByID[id], curByID[id].Comparability) {
+			// Value unchanged: force-replace still refreshes the record when ANY part
+			// of the current evidence differs (comparability, InputsMissing, status,
+			// …), so the baseline fully matches the current artifact and a later
+			// newEvidenceIndex(baseline)/regression is not misled by stale evidence.
+			// Other modes leave an unchanged value untouched.
+			if mode == "force-replace" && !reflect.DeepEqual(baseByID[id], curByID[id]) {
 				updated = append(updated, mergeUpdate{ID: id, OldVal: baseVal, NewVal: curVal, Cur: curByID[id]})
 			}
 			continue
@@ -193,17 +201,6 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 	return appended, updated, rejected
 }
 
-// sameComparability reports whether two comparability identities are identical,
-// treating both-nil as the same and one-nil as different. Used to decide whether a
-// force-replace must refresh a baseline result's identity even when its value is
-// unchanged.
-func sameComparability(a, b *summary.Comparability) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
-}
-
 // mergeChangeApplies reports whether an existing SLI's changed value should
 // be applied to the baseline, per mode: force-replace always applies;
 // review-existing applies only a confirmed improvement in direction;
@@ -219,37 +216,36 @@ func mergeChangeApplies(mode, direction string, oldVal, newVal float64) bool {
 	}
 }
 
-// applyMergePlan mutates baseline in place: appends new SLIs and overwrites
-// the Value of any existing SLI in updated.
-func applyMergePlan(baseline *summary.Summary, appended []summary.SLIResult, updated []mergeUpdate) {
+// applyMergePlan mutates baseline in place: appends new SLIs, replaces the full
+// record of any existing SLI in updated, and reconciles the top-level skipped set
+// against the current run (curSkipped is the set of SLI IDs the current summary
+// marks skipped).
+func applyMergePlan(baseline *summary.Summary, appended []summary.SLIResult, updated []mergeUpdate, curSkipped map[string]bool) {
 	baseline.Results = append(baseline.Results, appended...)
-	if len(updated) == 0 {
-		return
-	}
-	updateByID := make(map[string]summary.SLIResult, len(updated))
-	for _, u := range updated {
-		updateByID[u.ID] = u.Cur
-	}
-	for i := range baseline.Results {
-		if cur, ok := updateByID[baseline.Results[i].ID]; ok {
-			// Replace the FULL evidence record (value, comparability, inputs, status)
-			// so no stale baseline evidence fact survives alongside the new value and
-			// misleads a later newEvidenceIndex(baseline) (KSL-T3/T4).
-			baseline.Results[i] = cur
+	if len(updated) > 0 {
+		updateByID := make(map[string]summary.SLIResult, len(updated))
+		for _, u := range updated {
+			updateByID[u.ID] = u.Cur
+		}
+		for i := range baseline.Results {
+			if cur, ok := updateByID[baseline.Results[i].ID]; ok {
+				// Replace the FULL evidence record (value, comparability, inputs, status)
+				// so no stale baseline evidence fact survives alongside the new value and
+				// misleads a later newEvidenceIndex(baseline) (KSL-T3/T4).
+				baseline.Results[i] = cur
+			}
 		}
 	}
-	reconcileSkippedSLIs(baseline, appended, updated)
+	reconcileSkippedSLIs(baseline, appended, updated, curSkipped)
 }
 
-// reconcileSkippedSLIs drops from the baseline's top-level skipped set every SLI
-// whose record now comes from the current run (appended or updated). Such an SLI
-// has a current value and is therefore not skipped, so a stale skipped marker must
-// not remain to make a later regression treat its baseline value as insufficient
-// (KSL-T3).
-func reconcileSkippedSLIs(baseline *summary.Summary, appended []summary.SLIResult, updated []mergeUpdate) {
-	if baseline.Reliability == nil || len(baseline.Reliability.SkippedSLIs) == 0 {
-		return
-	}
+// reconcileSkippedSLIs makes the merged baseline's top-level skipped set match the
+// current run for every SLI whose record now comes from the current run (appended
+// or updated): such an SLI's skipped status is redecided from curSkipped. This both
+// drops a stale marker (so a merged value is not treated as insufficient) and
+// imports a genuine current skip (so an unreliable value is not treated as
+// sufficient) — KSL-T3. Baseline-only SLIs keep their existing markers.
+func reconcileSkippedSLIs(baseline *summary.Summary, appended []summary.SLIResult, updated []mergeUpdate, curSkipped map[string]bool) {
 	fromCurrent := make(map[string]bool, len(appended)+len(updated))
 	for _, r := range appended {
 		fromCurrent[r.ID] = true
@@ -257,12 +253,34 @@ func reconcileSkippedSLIs(baseline *summary.Summary, appended []summary.SLIResul
 	for _, u := range updated {
 		fromCurrent[u.ID] = true
 	}
-	kept := make([]string, 0, len(baseline.Reliability.SkippedSLIs))
-	for _, id := range baseline.Reliability.SkippedSLIs {
-		if !fromCurrent[id] {
-			kept = append(kept, id)
+	var toAdd []string
+	for id := range fromCurrent {
+		if curSkipped[id] {
+			toAdd = append(toAdd, id)
 		}
 	}
+	if (baseline.Reliability == nil || len(baseline.Reliability.SkippedSLIs) == 0) && len(toAdd) == 0 {
+		return
+	}
+	if baseline.Reliability == nil {
+		baseline.Reliability = &summary.Reliability{}
+	}
+	seen := map[string]bool{}
+	kept := make([]string, 0, len(baseline.Reliability.SkippedSLIs)+len(toAdd))
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		// Drop markers for SLIs sourced from current; their status is redecided below.
+		if !fromCurrent[id] && !seen[id] {
+			kept = append(kept, id)
+			seen[id] = true
+		}
+	}
+	for _, id := range toAdd {
+		if !seen[id] {
+			kept = append(kept, id)
+			seen[id] = true
+		}
+	}
+	sort.Strings(kept)
 	baseline.Reliability.SkippedSLIs = kept
 }
 

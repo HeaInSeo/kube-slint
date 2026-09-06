@@ -316,7 +316,13 @@ func mergeIdentityResult(mode string, baseV, curV float64, baseWin, newWin strin
 		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp(newWin)}},
 	}
 	appended, updated, _ := computeMergePlan(mode, baseline, cur, map[string]string{})
-	applyMergePlan(&baseline, appended, updated)
+	curSkipped := map[string]bool{}
+	if cur.Reliability != nil {
+		for _, id := range cur.Reliability.SkippedSLIs {
+			curSkipped[id] = true
+		}
+	}
+	applyMergePlan(&baseline, appended, updated, curSkipped)
 	return baseline.Results[0]
 }
 
@@ -401,7 +407,13 @@ func TestApplyMergePlan_ReplacesStaleEvidenceRecord(t *testing.T) {
 		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
 	}
 	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
-	applyMergePlan(&baseline, appended, updated)
+	curSkipped := map[string]bool{}
+	if cur.Reliability != nil {
+		for _, id := range cur.Reliability.SkippedSLIs {
+			curSkipped[id] = true
+		}
+	}
+	applyMergePlan(&baseline, appended, updated, curSkipped)
 
 	got := baseline.Results[0]
 	if len(got.InputsMissing) != 0 {
@@ -412,5 +424,57 @@ func TestApplyMergePlan_ReplacesStaleEvidenceRecord(t *testing.T) {
 	}
 	if got.Comparability == nil || got.Comparability.WindowID != "new" || got.Value == nil || *got.Value != 2 {
 		t.Fatalf("merged record must be the current one, got %+v value=%v", got.Comparability, got.Value)
+	}
+}
+
+// fullCmp is a complete comparability identity for merge tests.
+func fullCmp() *summary.Comparability {
+	return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "w", SourceConfigID: "cfg"}
+}
+
+// KSL-T3 regression guard: force-replace refreshes the evidence record even when
+// value AND comparability are unchanged but other evidence differs (here stale
+// InputsMissing), so newEvidenceIndex(baseline) is not later misled.
+func TestApplyMergePlan_ForceReplaceRefreshesEvidenceOnEqualValueAndIdentity(t *testing.T) {
+	baseV, curV := 5.0, 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: fullCmp(), InputsMissing: []string{"x"}}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: fullCmp()}}, // clean, same value+identity
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, map[string]bool{})
+	if len(baseline.Results[0].InputsMissing) != 0 {
+		t.Fatalf("force-replace must refresh evidence on equal value+identity; got InputsMissing=%v", baseline.Results[0].InputsMissing)
+	}
+}
+
+// KSL-T3 regression guard: a current skipped marker for a merged SLI is imported
+// into the merged baseline, so an unreliable value is not later treated as
+// sufficient.
+func TestApplyMergePlan_ImportsCurrentSkippedMarker(t *testing.T) {
+	v := 5.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &v, Comparability: fullCmp()}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated, map[string]bool{"m": true})
+	found := false
+	for _, id := range baseline.Reliability.SkippedSLIs {
+		if id == "m" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("current skipped marker must be imported; got %v", baseline.Reliability.SkippedSLIs)
 	}
 }
