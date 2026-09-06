@@ -206,6 +206,34 @@ func TestSLIContractID_CounterResetCanonicalization(t *testing.T) {
 	}
 }
 
+// E1 (P2): input order is semantic only for window_ratio (numerator vs
+// denominator). Commutative modes sum/pool their inputs order-independently, so
+// reordering equivalent inputs must not change the measurement identity.
+func TestSLIContractID_InputOrderCanonicalization(t *testing.T) {
+	pool := func(mode string, keys ...string) spec.SLISpec {
+		ins := make([]spec.MetricRef, len(keys))
+		for i, k := range keys {
+			ins[i] = spec.MetricRef{Key: k}
+		}
+		return spec.SLISpec{
+			ID: "x", Unit: "ms", Kind: "latency",
+			Inputs: ins, Compute: spec.ComputeSpec{Mode: spec.ComputeMode(mode)},
+		}
+	}
+	// window_avg pools its inputs: order must NOT matter.
+	if sliContractID(pool("window_avg", "a", "b")) != sliContractID(pool("window_avg", "b", "a")) {
+		t.Fatal("reordering inputs for a commutative (pooling) mode must not change SLIContractID")
+	}
+	// window_ratio is order-sensitive: order MUST matter.
+	if sliContractID(pool("window_ratio", "a", "b")) == sliContractID(pool("window_ratio", "b", "a")) {
+		t.Fatal("input order is semantic for window_ratio and must change SLIContractID")
+	}
+	// A genuinely different input set still differs under a commutative mode.
+	if sliContractID(pool("window_avg", "a", "b")) == sliContractID(pool("window_avg", "a", "c")) {
+		t.Fatal("a different input set must change SLIContractID")
+	}
+}
+
 // E1: WindowID is the window/aggregation semantics + the caller's explicit window
 // extent, not elapsed runtime. An aggregation change or an extent change must change
 // it; the same semantics + same extent are deterministic.
