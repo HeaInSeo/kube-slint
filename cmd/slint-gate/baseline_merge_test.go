@@ -380,3 +380,37 @@ func TestRunBaselineMerge_RejectsCrossContractMerge(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cross")
 }
+
+// KSL-T3 regression guard: updating an existing SLI must replace the FULL evidence
+// record and reconcile the skipped set, so stale insufficiency facts (InputsMissing,
+// SkippedSLIs) do not survive alongside the new value and mislead a later
+// newEvidenceIndex(baseline).
+func TestApplyMergePlan_ReplacesStaleEvidenceRecord(t *testing.T) {
+	cmp := func(w string) *summary.Comparability {
+		return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: w, SourceConfigID: "cfg"}
+	}
+	baseV, curV := 1.0, 2.0
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: cmp("old"), InputsMissing: []string{"x"}}},
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete", SkippedSLIs: []string{"m"}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp("new")}}, // clean: no InputsMissing
+		Reliability:   &summary.Reliability{CollectionStatus: "Complete"},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated)
+
+	got := baseline.Results[0]
+	if len(got.InputsMissing) != 0 {
+		t.Fatalf("stale InputsMissing must be cleared by the full-record replace, got %v", got.InputsMissing)
+	}
+	if len(baseline.Reliability.SkippedSLIs) != 0 {
+		t.Fatalf("an updated SLI must be removed from SkippedSLIs, got %v", baseline.Reliability.SkippedSLIs)
+	}
+	if got.Comparability == nil || got.Comparability.WindowID != "new" || got.Value == nil || *got.Value != 2 {
+		t.Fatalf("merged record must be the current one, got %+v value=%v", got.Comparability, got.Value)
+	}
+}
