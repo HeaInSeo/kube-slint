@@ -143,6 +143,10 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 	for _, r := range cur.Results {
 		curCmpByID[r.ID] = r.Comparability
 	}
+	baseCmpByID := make(map[string]*summary.Comparability, len(baseline.Results))
+	for _, r := range baseline.Results {
+		baseCmpByID[r.ID] = r.Comparability
+	}
 
 	for _, r := range cur.Results {
 		if r.Value == nil {
@@ -155,7 +159,17 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 
 	for id, baseVal := range baseValues {
 		curVal, ok := curValues[id]
-		if !ok || curVal == baseVal {
+		if !ok {
+			continue
+		}
+		if curVal == baseVal {
+			// Value unchanged: force-replace still refreshes a CHANGED comparability
+			// identity so the baseline matches the current artifact (otherwise a later
+			// regression against that current artifact is spuriously
+			// BASELINE_INCOMPARABLE). Other modes leave an unchanged value untouched.
+			if mode == "force-replace" && !sameComparability(baseCmpByID[id], curCmpByID[id]) {
+				updated = append(updated, mergeUpdate{ID: id, OldVal: baseVal, NewVal: curVal, Cmp: curCmpByID[id]})
+			}
 			continue
 		}
 		if mergeChangeApplies(mode, directions[id], baseVal, curVal) {
@@ -169,6 +183,17 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 	sort.Slice(updated, func(i, j int) bool { return updated[i].ID < updated[j].ID })
 	sort.Strings(rejected)
 	return appended, updated, rejected
+}
+
+// sameComparability reports whether two comparability identities are identical,
+// treating both-nil as the same and one-nil as different. Used to decide whether a
+// force-replace must refresh a baseline result's identity even when its value is
+// unchanged.
+func sameComparability(a, b *summary.Comparability) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // mergeChangeApplies reports whether an existing SLI's changed value should

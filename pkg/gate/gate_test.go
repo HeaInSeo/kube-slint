@@ -1594,6 +1594,29 @@ func TestEvaluate_FailedEvaluation_ValuesNotGraded(t *testing.T) {
 	assert.Equal(t, "no_grade", tCheck.Status, "a value from a failed evaluation must not be graded")
 }
 
+// KSL-T3: an explicitly failed evaluation is an UNCONDITIONAL run-level NO_GRADE,
+// even when the policy has no checks that would consult evidence sufficiency.
+func TestEvaluate_FailedEvaluation_NoChecks_IsNoGrade(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	s.Reliability.CollectionStatus = "Complete"
+	s.Reliability.EvaluationStatus = "Failed"
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult, "a failed evaluation must be NO_GRADE even with no checks")
+	assert.Contains(t, result.Reasons, "COLLECTION_FAILED")
+}
+
 // KSL-T3: a coverage-gap check counts an SLI as "measured" only when its evidence
 // is positively sufficient; an SLI with a value but insufficient evidence (here,
 // skipped) must not produce a coverage gap.

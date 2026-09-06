@@ -299,28 +299,52 @@ func TestRunBaselineMerge_InPlaceMergeNeverNeedsForce(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// KSL-T4 regression guard: when a baseline value is replaced by a current value,
-// its comparability identity must be replaced together with the value, so a later
-// regression against the same current artifact is not spuriously incomparable.
-func TestApplyMergePlan_ReplacesComparabilityWithValue(t *testing.T) {
-	oldV, newV := 1.0, 2.0
-	oldCmp := &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "old", SourceConfigID: "cfg"}
-	newCmp := &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "new", SourceConfigID: "cfg"}
+// mergeIdentityResult merges a single-SLI baseline (value baseV, windowId
+// baseWin) against a single-SLI current (value curV, windowId newWin) in the
+// given mode and returns the merged baseline's first result.
+func mergeIdentityResult(mode string, baseV, curV float64, baseWin, newWin string) summary.SLIResult {
+	cmp := func(win string) *summary.Comparability {
+		return &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: win, SourceConfigID: "cfg"}
+	}
 	baseline := summary.Summary{
 		SchemaVersion: summary.SchemaVersionTrust,
-		Results:       []summary.SLIResult{{ID: "m", Value: &oldV, Comparability: oldCmp}},
+		Results:       []summary.SLIResult{{ID: "m", Value: &baseV, Comparability: cmp(baseWin)}},
 	}
 	cur := summary.Summary{
 		SchemaVersion: summary.SchemaVersionTrust,
-		Results:       []summary.SLIResult{{ID: "m", Value: &newV, Comparability: newCmp}},
+		Results:       []summary.SLIResult{{ID: "m", Value: &curV, Comparability: cmp(newWin)}},
 	}
-	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	appended, updated, _ := computeMergePlan(mode, baseline, cur, map[string]string{})
 	applyMergePlan(&baseline, appended, updated)
-	got := baseline.Results[0]
-	if got.Value == nil || *got.Value != 2 {
-		t.Fatalf("merged value = %v, want 2", got.Value)
+	return baseline.Results[0]
+}
+
+// KSL-T4 regression guard for baseline merges: a value replacement (and a
+// force-replace even on an unchanged value) must carry the CURRENT comparability
+// identity into the baseline, while a non-force mode leaves an unchanged value's
+// identity untouched — so a later regression against the current artifact is not
+// spuriously BASELINE_INCOMPARABLE.
+func TestApplyMergePlan_ComparabilityIdentity(t *testing.T) {
+	cases := []struct {
+		name        string
+		mode        string
+		baseV, curV float64
+		wantVal     float64
+		wantWindow  string
+	}{
+		{"value change carries new identity", "force-replace", 1, 2, 2, "new"},
+		{"force-replace refreshes identity on equal value", "force-replace", 5, 5, 5, "new"},
+		{"append-new-only leaves unchanged value identity", "append-new-only", 5, 5, 5, "old"},
 	}
-	if got.Comparability == nil || got.Comparability.WindowID != "new" {
-		t.Fatalf("merged baseline must carry the current comparability (windowId=new), got %+v", got.Comparability)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mergeIdentityResult(tc.mode, tc.baseV, tc.curV, "old", "new")
+			if got.Value == nil || *got.Value != tc.wantVal {
+				t.Fatalf("merged value = %v, want %v", got.Value, tc.wantVal)
+			}
+			if got.Comparability == nil || got.Comparability.WindowID != tc.wantWindow {
+				t.Fatalf("merged identity windowId = %+v, want %q", got.Comparability, tc.wantWindow)
+			}
+		})
 	}
 }
