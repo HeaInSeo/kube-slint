@@ -280,9 +280,16 @@ func TestSLIContractID_OrderIndependentModesAndRatioSet(t *testing.T) {
 			t.Fatalf("%s is order-independent; reordering inputs must not change SLIContractID", m)
 		}
 	}
-	// Percentiles: multiplicity is preserved (a repeated input shifts the distribution).
-	if sliContractID(pool("window_p95", "a")) == sliContractID(pool("window_p95", "a", "a")) {
-		t.Fatal("a repeated input changes the percentile distribution and must change SLIContractID")
+	// Percentiles: UNIFORM replication of the whole input set is the same distribution
+	// and must share an id; NON-uniform multiplicity shifts the rank and must not.
+	if sliContractID(pool("window_p95", "a", "b")) != sliContractID(pool("window_p95", "a", "a", "b", "b")) {
+		t.Fatal("uniform replication must not change the percentile SLIContractID")
+	}
+	if sliContractID(pool("window_p95", "a")) != sliContractID(pool("window_p95", "a", "a")) {
+		t.Fatal("uniform replication of a single input must not change the percentile SLIContractID")
+	}
+	if sliContractID(pool("window_p95", "a", "b")) == sliContractID(pool("window_p95", "a", "a", "b")) {
+		t.Fatal("non-uniform multiplicity shifts the percentile rank and must change SLIContractID")
 	}
 	// min/max: multiplicity is inert (repeating a key leaves the extremes unchanged).
 	if sliContractID(pool("window_min", "a")) != sliContractID(pool("window_min", "a", "a")) {

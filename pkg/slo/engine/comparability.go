@@ -149,8 +149,11 @@ func sliContractID(s spec.SLISpec) string {
 //     changes the value (pooling a key twice repeats identical samples, leaving the
 //     extremes unchanged) → sort AND dedup the keys.
 //   - window_p95/p99 sort a copy before selecting a rank, so input ORDER cannot
-//     change the value → sort the keys; but MULTIPLICITY is kept, because a repeated
-//     input is pooled twice and shifts the percentile distribution.
+//     change the value. MULTIPLICITY matters only in RELATIVE terms: uniformly
+//     replicating every key (e.g. [a,b] → [a,a,b,b]) pools an identical distribution
+//     and selects the same rank, whereas non-uniform multiplicity ([a,a,b]) shifts
+//     it. So sort the keys and divide each key's multiplicity by their common factor
+//     (GCD) — merging uniform replications while preserving non-uniform ratios.
 //   - window_ratio's value uses only inputs[0] (numerator) and inputs[1]
 //     (denominator); inputs[2:] are an unordered required-PRESENCE set, so the tail's
 //     order and multiplicity — and any tail entry duplicating position 0/1 — cannot
@@ -169,8 +172,7 @@ func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string
 		sort.Strings(keys)
 		return dedupSorted(keys)
 	case spec.ComputeWindowP95, spec.ComputeWindowP99:
-		sort.Strings(keys)
-		return keys
+		return normalizePercentileMultiplicity(keys)
 	case spec.ComputeWindowRatio:
 		if len(keys) <= 2 {
 			return keys
@@ -189,6 +191,45 @@ func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string
 	default:
 		return keys
 	}
+}
+
+// normalizePercentileMultiplicity returns the keys sorted, with each distinct key's
+// multiplicity divided by the GCD of all multiplicities. This canonicalizes uniform
+// replication of the whole input set (which does not change a percentile) while
+// preserving non-uniform multiplicity ratios (which do). E.g. [a,a,b,b] → [a,b] but
+// [a,a,b] → [a,a,b].
+func normalizePercentileMultiplicity(keys []string) []string {
+	if len(keys) < 2 {
+		return keys
+	}
+	counts := make(map[string]int, len(keys))
+	distinct := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if counts[k] == 0 {
+			distinct = append(distinct, k)
+		}
+		counts[k]++
+	}
+	g := 0
+	for _, k := range distinct {
+		g = gcdInt(g, counts[k])
+	}
+	sort.Strings(distinct)
+	out := make([]string, 0, len(keys))
+	for _, k := range distinct {
+		for i := 0; i < counts[k]/g; i++ {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// gcdInt returns the greatest common divisor of a and b (gcdInt(0, n) == n).
+func gcdInt(a, b int) int {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
 }
 
 // dedupSorted returns the sorted slice with consecutive duplicates removed. The
