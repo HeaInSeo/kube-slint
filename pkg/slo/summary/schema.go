@@ -93,7 +93,30 @@ func Validate(s Summary) error {
 			return fmt.Errorf("results[%d].status %q is not a recognized status", i, r.Status)
 		}
 	}
+	// A non-empty reliability status must be a recognized enum value. A mistyped
+	// status (e.g. "Fialed") would otherwise slip past the collection-failure and
+	// reliability checks and let a malformed artifact produce a protected grade.
+	if s.Reliability != nil {
+		if st := s.Reliability.CollectionStatus; st != "" && !isReliabilityStatus(st) {
+			return fmt.Errorf("reliability.collectionStatus %q is not a recognized status", st)
+		}
+		if st := s.Reliability.EvaluationStatus; st != "" && !isReliabilityStatus(st) {
+			return fmt.Errorf("reliability.evaluationStatus %q is not a recognized status", st)
+		}
+	}
 	return nil
+}
+
+// isReliabilityStatus reports whether s is a recognized reliability status
+// (Complete/Partial/Failed), case-insensitively — consumers compare these values
+// case-insensitively, so validation must accept the same set.
+func isReliabilityStatus(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "complete", "partial", "failed":
+		return true
+	default:
+		return false
+	}
 }
 
 // Status 는 SLIResult의 정규화된 평가 상태임.

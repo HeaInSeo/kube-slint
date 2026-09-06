@@ -298,3 +298,29 @@ func TestRunBaselineMerge_InPlaceMergeNeverNeedsForce(t *testing.T) {
 	err := runBaselineMerge([]string{"--baseline", baseline, "--summary", cur, "--policy", policy, "--output", baseline})
 	require.NoError(t, err)
 }
+
+// KSL-T4 regression guard: when a baseline value is replaced by a current value,
+// its comparability identity must be replaced together with the value, so a later
+// regression against the same current artifact is not spuriously incomparable.
+func TestApplyMergePlan_ReplacesComparabilityWithValue(t *testing.T) {
+	oldV, newV := 1.0, 2.0
+	oldCmp := &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "old", SourceConfigID: "cfg"}
+	newCmp := &summary.Comparability{SLIContractID: "c", SubjectID: "s", WindowID: "new", SourceConfigID: "cfg"}
+	baseline := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &oldV, Comparability: oldCmp}},
+	}
+	cur := summary.Summary{
+		SchemaVersion: summary.SchemaVersionTrust,
+		Results:       []summary.SLIResult{{ID: "m", Value: &newV, Comparability: newCmp}},
+	}
+	appended, updated, _ := computeMergePlan("force-replace", baseline, cur, map[string]string{})
+	applyMergePlan(&baseline, appended, updated)
+	got := baseline.Results[0]
+	if got.Value == nil || *got.Value != 2 {
+		t.Fatalf("merged value = %v, want 2", got.Value)
+	}
+	if got.Comparability == nil || got.Comparability.WindowID != "new" {
+		t.Fatalf("merged baseline must carry the current comparability (windowId=new), got %+v", got.Comparability)
+	}
+}

@@ -87,12 +87,15 @@ type Policy struct {
 	PromoteToFail []string `yaml:"promote_to_fail"`
 }
 
-// ThresholdRule is a single absolute threshold check.
+// ThresholdRule is a single absolute threshold check. Value is a pointer so a
+// missing `value:` key (nil) is distinguishable from an explicit 0 and rejected
+// as an absent required coordinate at validation (KSL-T1), rather than silently
+// defaulting to a "metric >= 0"-style always-pass rule.
 type ThresholdRule struct {
-	Name     string  `yaml:"name"`
-	Metric   string  `yaml:"metric"`
-	Operator string  `yaml:"operator"`
-	Value    float64 `yaml:"value"`
+	Name     string   `yaml:"name"`
+	Metric   string   `yaml:"metric"`
+	Operator string   `yaml:"operator"`
+	Value    *float64 `yaml:"value"`
 }
 
 // RegressionCfg holds regression comparison configuration.

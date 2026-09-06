@@ -49,7 +49,10 @@ func evalThreshold(rule ThresholdRule, ev evidenceIndex, promote map[string]bool
 			Category: "threshold",
 			Status:   "no_grade",
 			Metric:   rule.Metric,
-			Expected: fmt.Sprintf("%s %v", rule.Operator, rule.Value),
+			// rule.Value is guaranteed non-nil here: evalThreshold runs only after
+			// the policy validated (a nil value is rejected as invalid), so Evaluate
+			// has already returned NO_GRADE for such a policy before reaching this.
+			Expected: fmt.Sprintf("%s %v", rule.Operator, *rule.Value),
 		},
 	}
 
@@ -63,7 +66,7 @@ func evalThreshold(rule ThresholdRule, ev evidenceIndex, promote map[string]bool
 	c.Observed = observed
 	// The operator was validated at policy load (KSL-T1), so CompareOp cannot fail
 	// here; the error branch is retained as defense in depth and maps to no_grade.
-	matched, err := CompareOp(observed, rule.Operator, rule.Value)
+	matched, err := CompareOp(observed, rule.Operator, *rule.Value)
 	if err != nil {
 		c.Message = "invalid operator"
 		c.pendingReasons = []string{reasonPolicyInvalid}

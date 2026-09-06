@@ -1009,6 +1009,10 @@ regression: {enabled: false, tolerance_percent: -5}
 thresholds:
   - {name: t, metric: m, operator: "<=", value: .inf}
 `,
+		"missing threshold value": `schema_version: "slint.policy.v1"
+thresholds:
+  - {name: t, metric: m, operator: ">="}
+`,
 	}
 	for name, policyYAML := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1559,6 +1563,35 @@ func TestEvaluate_FailedCollection_ValuesNotGraded(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "no_grade", tCheck.Status, "a value from a failed collection must not be graded")
+}
+
+// KSL-T3: a failed EVALUATION phase (not only a failed collection) makes the run
+// untrustworthy — values must not be graded.
+func TestEvaluate_FailedEvaluation_ValuesNotGraded(t *testing.T) {
+	dir := t.TempDir()
+	p := policyFixture{
+		Thresholds:  []map[string]any{{"name": "t", "metric": "m", "operator": ">=", "value": 1}},
+		Regression:  map[string]any{"enabled": false},
+		Reliability: map[string]any{"required": false},
+	}
+	policy := writePolicyFile(t, dir, p)
+	s := makeResultsMeasurement([]summary.SLIResult{
+		{ID: "m", Status: summary.StatusPass, Value: ptr(5), Comparability: defaultComparability()},
+	})
+	s.Reliability.CollectionStatus = "Complete"
+	s.Reliability.EvaluationStatus = "Failed"
+	meas := writeMeasurementFile(t, dir, "meas.json", s)
+
+	result := gate.Evaluate(gate.Request{MeasurementPath: meas, PolicyPath: policy})
+
+	assert.Equal(t, gate.GateNoGrade, result.GateResult)
+	var tCheck gate.Check
+	for _, c := range result.Checks {
+		if c.Category == "threshold" && c.Metric == "m" {
+			tCheck = c
+		}
+	}
+	assert.Equal(t, "no_grade", tCheck.Status, "a value from a failed evaluation must not be graded")
 }
 
 // KSL-T3: a coverage-gap check counts an SLI as "measured" only when its evidence

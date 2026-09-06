@@ -43,10 +43,10 @@ var diagMessages = map[string]diagEntry{
 		summary: "policy.yaml is invalid.",
 		hints: []string{
 			"Check for YAML syntax errors: cat .slint/policy.yaml",
-			"Check that schema_version is present and exactly \"slint.policy.v1\" (missing or any other value is treated as invalid):\n    schema_version: slint.policy.v1",
+			"Check that schema_version is present and is one of \"slint.policy.v2\" (trust-correct, required for protected regression) or \"slint.policy.v1\" (legacy); any other value is treated as invalid:\n    schema_version: slint.policy.v2",
 			"Check for unsupported values in promote_to_fail/fail_on. Supported values: threshold_miss, regression_detected, coverage_gap",
 			"Check that reliability.min_level is partial or complete.",
-			"Check for an unsupported operator (e.g. !=) in an operator field.",
+			"Check for an unsupported operator (e.g. !=), an empty metric/operator, a non-finite threshold value, or a negative regression tolerance.",
 			"Supported operators: <=, >=, <, >, ==",
 		},
 	},

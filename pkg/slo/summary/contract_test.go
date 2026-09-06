@@ -26,6 +26,32 @@ func TestValidateSchemaVersion_ContractFence(t *testing.T) {
 	}
 }
 
+// KSL-T5: a mistyped non-empty reliability status must be rejected, so a
+// malformed trust-correct artifact cannot slip past the collection-failure and
+// reliability checks and produce a protected grade.
+func TestValidate_RejectsUnknownReliabilityStatus(t *testing.T) {
+	s := Summary{
+		SchemaVersion: SchemaVersionTrust,
+		GeneratedAt:   time.Now(),
+		Results:       []SLIResult{{ID: "m", Status: StatusPass}},
+		Reliability:   &Reliability{CollectionStatus: "Fialed"},
+	}
+	if err := Validate(s); err == nil {
+		t.Fatal("a mistyped collectionStatus must be rejected")
+	}
+	for _, st := range []string{"Complete", "partial", "Failed", ""} {
+		s.Reliability.CollectionStatus = st
+		if err := Validate(s); err != nil {
+			t.Fatalf("collectionStatus %q must be accepted: %v", st, err)
+		}
+	}
+	s.Reliability.CollectionStatus = "Complete"
+	s.Reliability.EvaluationStatus = "nope"
+	if err := Validate(s); err == nil {
+		t.Fatal("a mistyped evaluationStatus must be rejected")
+	}
+}
+
 func TestIsTrustCorrectContract(t *testing.T) {
 	if IsTrustCorrectContract(Summary{SchemaVersion: SchemaVersionLegacy}) {
 		t.Fatal("legacy contract must not be trust-correct")

@@ -16,10 +16,11 @@ import (
 type evidenceIndex struct {
 	byID    map[string]summary.SLIResult
 	skipped map[string]bool
-	// collectionFailed is true when the measurement's reliability record reports a
-	// failed collection: the whole run's values are untrustworthy, so NO SLI has
-	// sufficient evidence to grade, regardless of an individual value being present.
-	collectionFailed bool
+	// runUnreliable is true when the measurement's reliability record reports a
+	// failed collection OR a failed evaluation: the whole run's values are
+	// untrustworthy, so NO SLI has sufficient evidence to grade, regardless of an
+	// individual value being present.
+	runUnreliable bool
 }
 
 func newEvidenceIndex(s *summary.Summary) evidenceIndex {
@@ -34,7 +35,8 @@ func newEvidenceIndex(s *summary.Summary) evidenceIndex {
 		for _, id := range s.Reliability.SkippedSLIs {
 			idx.skipped[id] = true
 		}
-		idx.collectionFailed = strings.EqualFold(strings.TrimSpace(s.Reliability.CollectionStatus), "Failed")
+		failed := func(v string) bool { return strings.EqualFold(strings.TrimSpace(v), "Failed") }
+		idx.runUnreliable = failed(s.Reliability.CollectionStatus) || failed(s.Reliability.EvaluationStatus)
 	}
 	return idx
 }
@@ -45,9 +47,10 @@ func newEvidenceIndex(s *summary.Summary) evidenceIndex {
 // The judgment uses only typed facts, so a producer status verdict can neither
 // promote unreliable evidence into a grade nor demote reliable evidence.
 func (e evidenceIndex) valueSufficient(id string) (float64, bool, string) {
-	if e.collectionFailed {
-		// The whole collection failed: every value is untrustworthy, so no check
-		// may grade on it (matches the collection-wide reliability NO_GRADE).
+	if e.runUnreliable {
+		// The whole run is untrustworthy (collection or evaluation failed): every
+		// value is unreliable, so no check may grade on it (matches the run-wide
+		// reliability NO_GRADE).
 		return 0, false, reasonEvidenceInsufficient
 	}
 	r, ok := e.byID[id]

@@ -44,6 +44,12 @@ var supportedMergeModes = map[string]bool{
 type mergeUpdate struct {
 	ID             string
 	OldVal, NewVal float64
+	// Cmp is the CURRENT result's comparability identity. When a baseline value is
+	// replaced by a current value, its comparability must be replaced together with
+	// the value; keeping the old identity would associate the new value with a stale
+	// identity and make a later regression against the same current artifact
+	// spuriously BASELINE_INCOMPARABLE (KSL-T4).
+	Cmp *summary.Comparability
 }
 
 func runBaselineMerge(args []string) error {
@@ -133,6 +139,10 @@ func runBaselineMerge(args []string) error {
 func computeMergePlan(mode string, baseline, cur summary.Summary, directions map[string]string) (appended []summary.SLIResult, updated []mergeUpdate, rejected []string) {
 	baseValues := baseline.ResultValues()
 	curValues := cur.ResultValues()
+	curCmpByID := make(map[string]*summary.Comparability, len(cur.Results))
+	for _, r := range cur.Results {
+		curCmpByID[r.ID] = r.Comparability
+	}
 
 	for _, r := range cur.Results {
 		if r.Value == nil {
@@ -149,7 +159,7 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 			continue
 		}
 		if mergeChangeApplies(mode, directions[id], baseVal, curVal) {
-			updated = append(updated, mergeUpdate{id, baseVal, curVal})
+			updated = append(updated, mergeUpdate{ID: id, OldVal: baseVal, NewVal: curVal, Cmp: curCmpByID[id]})
 		} else {
 			rejected = append(rejected, fmt.Sprintf("%s: current summary has %v, baseline has %v", id, curVal, baseVal))
 		}
@@ -183,14 +193,17 @@ func applyMergePlan(baseline *summary.Summary, appended []summary.SLIResult, upd
 	if len(updated) == 0 {
 		return
 	}
-	newValByID := make(map[string]float64, len(updated))
+	updateByID := make(map[string]mergeUpdate, len(updated))
 	for _, u := range updated {
-		newValByID[u.ID] = u.NewVal
+		updateByID[u.ID] = u
 	}
 	for i := range baseline.Results {
-		if v, ok := newValByID[baseline.Results[i].ID]; ok {
-			vCopy := v
+		if u, ok := updateByID[baseline.Results[i].ID]; ok {
+			vCopy := u.NewVal
 			baseline.Results[i].Value = &vCopy
+			// Replace comparability together with the value so the merged baseline
+			// carries the identity of the value it now holds (KSL-T4).
+			baseline.Results[i].Comparability = u.Cmp
 		}
 	}
 }

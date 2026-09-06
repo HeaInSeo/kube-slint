@@ -127,8 +127,11 @@ func validatePolicy(p Policy) error {
 func validateThresholds(rules []ThresholdRule) error {
 	seenNames := map[string]bool{}
 	for _, rule := range rules {
-		if math.IsNaN(rule.Value) || math.IsInf(rule.Value, 0) {
-			return fmt.Errorf("threshold %q has a non-finite value (%v)", rule.Name, rule.Value)
+		if rule.Value == nil {
+			return fmt.Errorf("threshold %q has no value (a required coordinate)", rule.Name)
+		}
+		if math.IsNaN(*rule.Value) || math.IsInf(*rule.Value, 0) {
+			return fmt.Errorf("threshold %q has a non-finite value (%v)", rule.Name, *rule.Value)
 		}
 		if strings.TrimSpace(rule.Metric) == "" {
 			return fmt.Errorf("threshold %q has an empty metric (a required coordinate)", rule.Name)
