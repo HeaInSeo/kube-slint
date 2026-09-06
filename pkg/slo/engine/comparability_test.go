@@ -264,9 +264,16 @@ func TestSLIContractID_OrderIndependentModesAndRatioSet(t *testing.T) {
 			t.Fatalf("%s is order-independent; reordering inputs must not change SLIContractID", m)
 		}
 	}
-	// Multiplicity is preserved: a repeated input is pooled twice and shifts a percentile.
+	// Percentiles: multiplicity is preserved (a repeated input shifts the distribution).
 	if sliContractID(pool("window_p95", "a")) == sliContractID(pool("window_p95", "a", "a")) {
 		t.Fatal("a repeated input changes the percentile distribution and must change SLIContractID")
+	}
+	// min/max: multiplicity is inert (repeating a key leaves the extremes unchanged).
+	if sliContractID(pool("window_min", "a")) != sliContractID(pool("window_min", "a", "a")) {
+		t.Fatal("a repeated input does not change min; SLIContractID must not change")
+	}
+	if sliContractID(pool("window_max", "a", "b")) != sliContractID(pool("window_max", "a", "b", "a")) {
+		t.Fatal("a repeated input does not change max; SLIContractID must not change")
 	}
 	// window_ratio tail is a unique presence set: a duplicate tail entry, or a tail
 	// entry repeating a required position, does not change value or evidence.

@@ -125,10 +125,12 @@ func sliContractID(s spec.SLISpec) string {
 // measured value produce the same identity, while never merging inputs that can
 // change it (which would risk a false comparison):
 //
-//   - window_min/max/p95/p99 select over the pooled samples (min/max compare;
-//     percentile sorts a copy), so input ORDER cannot change the value → sort the
-//     keys. Multiplicity is kept: a repeated input is pooled twice and shifts a
-//     percentile.
+//   - window_min/max select by comparison, so neither input ORDER nor MULTIPLICITY
+//     changes the value (pooling a key twice repeats identical samples, leaving the
+//     extremes unchanged) → sort AND dedup the keys.
+//   - window_p95/p99 sort a copy before selecting a rank, so input ORDER cannot
+//     change the value → sort the keys; but MULTIPLICITY is kept, because a repeated
+//     input is pooled twice and shifts the percentile distribution.
 //   - window_ratio's value uses only inputs[0] (numerator) and inputs[1]
 //     (denominator); inputs[2:] are an unordered required-PRESENCE set, so the tail's
 //     order and multiplicity — and any tail entry duplicating position 0/1 — cannot
@@ -143,7 +145,10 @@ func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string
 		keys[i] = in.Key
 	}
 	switch mode {
-	case spec.ComputeWindowMin, spec.ComputeWindowMax, spec.ComputeWindowP95, spec.ComputeWindowP99:
+	case spec.ComputeWindowMin, spec.ComputeWindowMax:
+		sort.Strings(keys)
+		return dedupSorted(keys)
+	case spec.ComputeWindowP95, spec.ComputeWindowP99:
 		sort.Strings(keys)
 		return keys
 	case spec.ComputeWindowRatio:
@@ -164,6 +169,21 @@ func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string
 	default:
 		return keys
 	}
+}
+
+// dedupSorted returns the sorted slice with consecutive duplicates removed. The
+// input must already be sorted.
+func dedupSorted(sorted []string) []string {
+	if len(sorted) < 2 {
+		return sorted
+	}
+	out := sorted[:1]
+	for _, k := range sorted[1:] {
+		if k != out[len(out)-1] {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // canonicalMeasurementMode folds compute modes that produce an identical
