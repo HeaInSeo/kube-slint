@@ -35,7 +35,7 @@ func e1Run(t *testing.T, cfg RunConfig, specs ...spec.SLISpec) (*summary.Summary
 }
 
 func e1TrustContract() *TrustContract {
-	return &TrustContract{SubjectID: "release-abc@sha256:deadbeef", SourceConfigID: "prom-default-v1"}
+	return &TrustContract{SubjectID: "release-abc@sha256:deadbeef", SourceConfigID: "prom-default-v1", WindowID: "60m"}
 }
 
 // E1: the protected producer path emits exactly slo.v4 with a complete nonblank
@@ -92,11 +92,42 @@ func TestExecute_LegacyStaysV3NoComparability(t *testing.T) {
 // cannot silently produce a trust-correct artifact.
 func TestExecute_ProtectedMissingCoordinateFailsClosed(t *testing.T) {
 	for _, tc := range []*TrustContract{
-		{SubjectID: "", SourceConfigID: "src"},
-		{SubjectID: "subj", SourceConfigID: ""},
+		{SubjectID: "", SourceConfigID: "src", WindowID: "60m"},
+		{SubjectID: "subj", SourceConfigID: "", WindowID: "60m"},
+		{SubjectID: "subj", SourceConfigID: "src", WindowID: ""},
+		{SubjectID: "subj", SourceConfigID: "src", WindowID: "   "},
 	} {
 		if _, err := e1Run(t, RunConfig{TrustContract: tc}, e1WindowSpec("x", "window_avg")); err == nil {
 			t.Fatalf("protected run with incomplete coordinates %+v must fail closed", tc)
+		}
+	}
+}
+
+// E1: a protected run whose collection FAILS is emitted as legacy slo.v3 (a failed
+// measurement is not protected evidence), never as a v4 artifact that carries no
+// comparability identity for the requested SLIs.
+func TestExecute_ProtectedCollectionFailureStaysV3(t *testing.T) {
+	cfg := RunConfig{TrustContract: e1TrustContract()}
+	cfg.StartedAt = time.Unix(1000, 0)
+	cfg.FinishedAt = time.Unix(1060, 0)
+	eng := New(nil, &mockWriter{}, nil) // no point MetricsFetcher -> point collection fails
+	pointSpec := spec.SLISpec{
+		ID: "err_delta", Unit: "count", Kind: "errors",
+		Inputs:  []spec.MetricRef{{Key: "errors_total"}},
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+	}
+	sum, err := eng.Execute(context.Background(), ExecuteRequest{
+		Config: cfg, Specs: []spec.SLISpec{pointSpec}, Reliability: &summary.Reliability{},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if sum.SchemaVersion != summary.SchemaVersion {
+		t.Fatalf("failed protected collection must stay legacy %q, got %q", summary.SchemaVersion, sum.SchemaVersion)
+	}
+	for _, r := range sum.Results {
+		if r.Comparability != nil {
+			t.Fatalf("a failed-collection result must not carry a v4 comparability identity: %+v", r.Comparability)
 		}
 	}
 }
@@ -136,15 +167,61 @@ func TestSLIContractID_MeasurementSemanticsOnly(t *testing.T) {
 	}
 }
 
-// E1: WindowID is the window/aggregation semantics, not elapsed runtime.
+// E1 (P2 canonicalization): counter-reset policy affects SLIContractID only by its
+// effect on the measured value, only under delta. Warn/Fail/empty are
+// measurement-equivalent (they preserve the value and differ only in a
+// non-authoritative verdict); NoGrade/Skip clear the value and so differ; under a
+// non-delta mode the policy is inert and never changes identity.
+func TestSLIContractID_CounterResetCanonicalization(t *testing.T) {
+	delta := func(p spec.CounterResetPolicy) spec.SLISpec {
+		return spec.SLISpec{
+			ID: "d", Unit: "count", Kind: "errors",
+			Inputs:  []spec.MetricRef{{Key: "errs"}},
+			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: p},
+		}
+	}
+	warn := sliContractID(delta(spec.CounterResetWarn))
+	// Empty default == Warn, and Fail differs only in the advisory verdict.
+	if sliContractID(delta("")) != warn {
+		t.Fatal("empty counter-reset policy (default Warn) must not change SLIContractID")
+	}
+	if sliContractID(delta(spec.CounterResetFail)) != warn {
+		t.Fatal("Fail vs Warn differ only in the non-authoritative verdict; SLIContractID must not change")
+	}
+	// NoGrade/Skip clear the value -> measurement-different.
+	if sliContractID(delta(spec.CounterResetNoGrade)) == warn {
+		t.Fatal("NoGrade clears the value and must change SLIContractID")
+	}
+	if sliContractID(delta(spec.CounterResetSkip)) == sliContractID(delta(spec.CounterResetWarn)) {
+		t.Fatal("Skip clears the value and must change SLIContractID")
+	}
+	// Under a non-delta mode the counter-reset policy is inert.
+	win := func(p spec.CounterResetPolicy) spec.SLISpec {
+		s := e1WindowSpec("w", "window_avg")
+		s.Compute.OnCounterReset = p
+		return s
+	}
+	if sliContractID(win(spec.CounterResetFail)) != sliContractID(win(spec.CounterResetNoGrade)) {
+		t.Fatal("counter-reset policy is inert for non-delta modes and must not change SLIContractID")
+	}
+}
+
+// E1: WindowID is the window/aggregation semantics + the caller's explicit window
+// extent, not elapsed runtime. An aggregation change or an extent change must change
+// it; the same semantics + same extent are deterministic.
 func TestWindowID_SemanticNotRuntime(t *testing.T) {
-	avg := windowID(e1WindowSpec("lat", "window_avg"))
-	p95 := windowID(e1WindowSpec("lat", "window_p95"))
+	avg := windowID(e1WindowSpec("lat", "window_avg"), "60m")
+	p95 := windowID(e1WindowSpec("lat", "window_p95"), "60m")
 	if avg == p95 {
 		t.Fatal("a window/aggregation semantic change must change WindowID")
 	}
-	if avg != windowID(e1WindowSpec("lat", "window_avg")) {
-		t.Fatal("WindowID must be deterministic for the same window semantics")
+	if avg != windowID(e1WindowSpec("lat", "window_avg"), "60m") {
+		t.Fatal("WindowID must be deterministic for the same window semantics and extent")
+	}
+	// The caller's logical window extent is part of identity: a 5m and a 60m window
+	// over the same aggregation must NOT compare as the same window.
+	if windowID(e1WindowSpec("lat", "window_avg"), "5m") == avg {
+		t.Fatal("a different logical window extent must change WindowID")
 	}
 }
 
@@ -166,7 +243,7 @@ func TestComparability_CoordinateIndependenceAndRunScope(t *testing.T) {
 		t.Fatal("run ID alone must not change comparability identity")
 	}
 	// Subject change → only SubjectID changes.
-	subj, err := e1Run(t, RunConfig{TrustContract: &TrustContract{SubjectID: "other", SourceConfigID: "prom-default-v1"}}, s)
+	subj, err := e1Run(t, RunConfig{TrustContract: &TrustContract{SubjectID: "other", SourceConfigID: "prom-default-v1", WindowID: "60m"}}, s)
 	if err != nil {
 		t.Fatalf("subj: %v", err)
 	}
@@ -179,7 +256,7 @@ func TestComparability_CoordinateIndependenceAndRunScope(t *testing.T) {
 		t.Fatal("a subject change must not change the other coordinates")
 	}
 	// Source-config change → only SourceConfigID changes.
-	src, err := e1Run(t, RunConfig{TrustContract: &TrustContract{SubjectID: "release-abc@sha256:deadbeef", SourceConfigID: "other-src"}}, s)
+	src, err := e1Run(t, RunConfig{TrustContract: &TrustContract{SubjectID: "release-abc@sha256:deadbeef", SourceConfigID: "other-src", WindowID: "60m"}}, s)
 	if err != nil {
 		t.Fatalf("src: %v", err)
 	}
@@ -189,6 +266,18 @@ func TestComparability_CoordinateIndependenceAndRunScope(t *testing.T) {
 	}
 	if got.SLIContractID != base.SLIContractID || got.WindowID != base.WindowID || got.SubjectID != base.SubjectID {
 		t.Fatal("a source-config change must not change the other coordinates")
+	}
+	// Window-extent change → only WindowID changes.
+	win, err := e1Run(t, RunConfig{TrustContract: &TrustContract{SubjectID: "release-abc@sha256:deadbeef", SourceConfigID: "prom-default-v1", WindowID: "5m"}}, s)
+	if err != nil {
+		t.Fatalf("win: %v", err)
+	}
+	got = win.Results[0].Comparability
+	if got.WindowID == base.WindowID {
+		t.Fatal("a window-extent change must change WindowID")
+	}
+	if got.SLIContractID != base.SLIContractID || got.SubjectID != base.SubjectID || got.SourceConfigID != base.SourceConfigID {
+		t.Fatal("a window-extent change must not change the other coordinates")
 	}
 }
 

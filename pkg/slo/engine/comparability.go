@@ -11,14 +11,20 @@ import (
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
 )
 
-// protectedSchemaVersion returns the measurement contract version to stamp for a
-// run: the trust-correct slo.v4 when a TrustContract is present, otherwise legacy
-// slo.v3. Historical/unprotected output is never silently reinterpreted as v4.
-func protectedSchemaVersion(cfg RunConfig) string {
-	if cfg.TrustContract != nil {
-		return summary.SchemaVersionTrust
+// contractVersion returns the measurement contract version to stamp for a run: the
+// trust-correct slo.v4 only when a TrustContract is present AND collection did not
+// fail, otherwise legacy slo.v3. A failed collection is not protected evidence, so
+// it is emitted as legacy v3 rather than as a v4 artifact that carries no
+// comparability identity for the requested SLIs (KSL-E1). Historical/unprotected
+// output is never silently reinterpreted as v4.
+func contractVersion(cfg RunConfig, rel *summary.Reliability) string {
+	if cfg.TrustContract == nil {
+		return summary.SchemaVersion
 	}
-	return summary.SchemaVersion
+	if rel != nil && strings.EqualFold(strings.TrimSpace(rel.CollectionStatus), "Failed") {
+		return summary.SchemaVersion
+	}
+	return summary.SchemaVersionTrust
 }
 
 // validateTrustContract fails closed on a protected request whose caller-supplied
@@ -33,6 +39,9 @@ func validateTrustContract(tc *TrustContract) error {
 	}
 	if strings.TrimSpace(tc.SourceConfigID) == "" {
 		return fmt.Errorf("trust-correct measurement requires a non-empty SourceConfigID")
+	}
+	if strings.TrimSpace(tc.WindowID) == "" {
+		return fmt.Errorf("trust-correct measurement requires a non-empty WindowID (the logical measurement window is caller-authoritative and must not be derived from run timestamps)")
 	}
 	return nil
 }
@@ -66,7 +75,7 @@ func applyTrustContract(sum *summary.Summary, specs []spec.SLISpec, tc *TrustCon
 		cmp := &summary.Comparability{
 			SLIContractID:  sliContractID(s),
 			SubjectID:      tc.SubjectID,
-			WindowID:       windowID(s),
+			WindowID:       windowID(s, tc.WindowID),
 			SourceConfigID: tc.SourceConfigID,
 		}
 		if !cmp.Complete() {
@@ -79,9 +88,15 @@ func applyTrustContract(sum *summary.Summary, specs []spec.SLISpec, tc *TrustCon
 
 // sliContractID derives a deterministic identity for an SLI's MEASUREMENT contract
 // semantics — what is measured and how: SLI id, unit, kind, its input source keys,
-// and its compute mode/aggregation/window and counter-reset policy. It deliberately
-// excludes Judge/threshold/policy (which judge the value, not how it is measured),
-// the input Alias (a cosmetic display name), and any run-scoped data.
+// its compute mode/aggregation, and (for delta only) the counter-reset policy's
+// EFFECT ON THE MEASURED VALUE. It deliberately excludes Judge/threshold/policy
+// (which judge the value, not how it is measured), the input Alias (a cosmetic
+// display name), the advisory-only difference between counter-reset policies that
+// keep the same value, and any run-scoped data.
+//
+// Input order is preserved: the only multi-input mode (window_ratio) is
+// order-sensitive (numerator vs denominator), and every other mode consumes a
+// single input, so order never over-distinguishes order-independent measurements.
 func sliContractID(s spec.SLISpec) string {
 	h := sha256.New()
 	writeField(h, "kube-slint.sli.contract.v1")
@@ -89,7 +104,12 @@ func sliContractID(s spec.SLISpec) string {
 	writeField(h, s.Unit)
 	writeField(h, s.Kind)
 	writeField(h, string(s.Compute.Mode))
-	writeField(h, string(s.Compute.OnCounterReset))
+	// Counter-reset policy only affects the measured value under delta, and there
+	// only via whether the value is preserved or cleared — the warn/fail choice is
+	// a non-authoritative producer verdict, so it must not change identity.
+	if s.Compute.Mode == spec.ComputeDelta {
+		writeField(h, "reset="+counterResetMeasurementEffect(s.Compute.OnCounterReset))
+	}
 	writeField(h, fmt.Sprintf("inputs=%d", len(s.Inputs)))
 	for _, in := range s.Inputs {
 		writeField(h, in.Key)
@@ -97,14 +117,32 @@ func sliContractID(s spec.SLISpec) string {
 	return "slic-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
 }
 
-// windowID derives a deterministic identity for the window/aggregation/query
-// semantics of an SLI from its compute mode (which encodes point-vs-window and the
-// aggregation, e.g. window_p95). It is never derived from StartedAt/FinishedAt
-// elapsed runtime (KSL-E1 property 5).
-func windowID(s spec.SLISpec) string {
+// counterResetMeasurementEffect canonicalizes a counter-reset policy to its effect
+// on the MEASURED value, dropping the advisory producer verdict: Warn (the empty
+// default) and Fail both preserve the value and differ only in a non-authoritative
+// status, so they are measurement-equivalent; NoGrade and Skip both clear the value
+// (measurement unreliable).
+func counterResetMeasurementEffect(p spec.CounterResetPolicy) string {
+	switch p {
+	case spec.CounterResetNoGrade, spec.CounterResetSkip:
+		return "clear"
+	default: // CounterResetWarn, CounterResetFail, "" (default Warn)
+		return "preserve"
+	}
+}
+
+// windowID derives a deterministic identity for the window/aggregation semantics of
+// an SLI: its compute mode (point-vs-window and the aggregation, e.g. window_p95)
+// together with the caller's explicit logical window extent. The window extent is
+// caller-authoritative (KSL-E1 property 5) and is NEVER derived from
+// StartedAt/FinishedAt elapsed runtime, so two runs over different window extents
+// (e.g. 5m vs 60m) receive different WindowIDs and are never compared as if
+// measured over the same window.
+func windowID(s spec.SLISpec, logicalWindow string) string {
 	h := sha256.New()
 	writeField(h, "kube-slint.sli.window.v1")
 	writeField(h, string(s.Compute.Mode))
+	writeField(h, logicalWindow)
 	return "win-v1-" + hex.EncodeToString(h.Sum(nil))[:32]
 }
 
