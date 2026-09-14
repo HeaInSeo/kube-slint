@@ -45,6 +45,11 @@ var supportedMergeModes = map[string]bool{
 type mergeUpdate struct {
 	ID             string
 	OldVal, NewVal float64
+	// OldSkipped is true when the existing baseline record for this ID had no numeric
+	// value (nil/skipped) and is being replaced in place by a current numeric record
+	// (force-replace only). It drives honest reporting ("(skipped) → v") and marks
+	// that there is no meaningful OldVal to compare.
+	OldSkipped bool
 	// Cur is the full CURRENT result whose record replaces the baseline result.
 	// Replacing only the value would leave stale comparability (KSL-T4) and stale
 	// per-SLI evidence facts — InputsMissing, and via the top-level skipped set,
@@ -119,6 +124,17 @@ func runBaselineMerge(args []string) error {
 			baseline.SchemaVersion, cur.SchemaVersion)
 	}
 
+	// Issue #18: fail closed on an already-corrupt duplicate-ID input rather than merge
+	// onto it (which could obscure or partially "repair" the corruption). A correct
+	// baseline/summary holds each SLI ID once; a pre-existing duplicate is not silently
+	// reconciled here.
+	if dup := firstDuplicateID(baseline); dup != "" {
+		return fmt.Errorf("baseline is corrupt: SLI %q appears more than once; refusing to merge onto a duplicate-ID baseline", dup)
+	}
+	if dup := firstDuplicateID(cur); dup != "" {
+		return fmt.Errorf("current summary is corrupt: SLI %q appears more than once; refusing to merge from a duplicate-ID summary", dup)
+	}
+
 	baseValues := baseline.ResultValues()
 
 	var directions map[string]string
@@ -161,7 +177,11 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 		if r.Value == nil {
 			continue
 		}
-		if _, ok := baseValues[r.ID]; !ok {
+		// Issue #18: membership is decided over ALL baseline records (baseByID), not
+		// baseValues — which omits nil/skipped baseline records. An existing SLI the
+		// baseline holds as nil/skipped is NOT new; appending its current numeric here
+		// would produce a duplicate-ID baseline. Truly new IDs still append.
+		if _, ok := baseByID[r.ID]; !ok {
 			appended = append(appended, r)
 		}
 	}
@@ -189,6 +209,35 @@ func computeMergePlan(mode string, baseline, cur summary.Summary, directions map
 		}
 	}
 
+	// Issue #18: existing baseline SLIs the baseline holds as nil/skipped (present in
+	// baseByID but omitted from baseValues) are invisible to the numeric loop above.
+	// They are NOT new (so never appended), and are handled here per mode when the
+	// current summary supplies an eligible numeric value:
+	//   - force-replace: replace the one existing record in place (no duplicate; the
+	//     stale skip/comparability marker is reconciled away by applyMergePlan).
+	//   - review-existing: a nil old value cannot prove a numeric improvement — reject
+	//     rather than guess a comparison.
+	//   - append-new-only: leave the existing skipped record untouched (never silently
+	//     filled).
+	// A current nil/absent value never fills or replaces the baseline record.
+	for _, br := range baseline.Results {
+		id := br.ID
+		if _, numeric := baseValues[id]; numeric {
+			continue // numeric baseline record: already handled by the loop above
+		}
+		curRec, ok := curByID[id]
+		if !ok || curRec.Value == nil {
+			continue // no current eligible numeric: leave the skipped baseline record as-is
+		}
+		switch mode {
+		case "force-replace":
+			updated = append(updated, mergeUpdate{ID: id, OldSkipped: true, NewVal: *curRec.Value, Cur: curRec})
+		case "review-existing":
+			rejected = append(rejected, fmt.Sprintf("%s: current summary has %v, baseline is skipped/nil (cannot confirm improvement)", id, *curRec.Value))
+		default: // append-new-only: existing skipped record is not new and is not filled
+		}
+	}
+
 	sort.Slice(appended, func(i, j int) bool { return appended[i].ID < appended[j].ID })
 	sort.Slice(updated, func(i, j int) bool { return updated[i].ID < updated[j].ID })
 	sort.Strings(rejected)
@@ -208,6 +257,20 @@ func mergeChangeApplies(mode, direction string, oldVal, newVal float64) bool {
 	default: // append-new-only
 		return false
 	}
+}
+
+// firstDuplicateID returns the first SLI ID that appears more than once in the
+// summary's Results (in Results order), or "" if every ID is unique. It is used to
+// fail closed on an already-corrupt duplicate-ID artifact before merging.
+func firstDuplicateID(s summary.Summary) string {
+	seen := make(map[string]bool, len(s.Results))
+	for _, r := range s.Results {
+		if seen[r.ID] {
+			return r.ID
+		}
+		seen[r.ID] = true
+	}
+	return ""
 }
 
 // skippedSet returns the set of SLI IDs a summary marks skipped.
@@ -344,7 +407,11 @@ func printMergeReview(mode string, appended []summary.SLIResult, updated []merge
 			fmt.Println("  (none)")
 		}
 		for _, u := range updated {
-			fmt.Printf("  %s: %v → %v\n", u.ID, u.OldVal, u.NewVal)
+			if u.OldSkipped {
+				fmt.Printf("  %s: (skipped) → %v\n", u.ID, u.NewVal)
+			} else {
+				fmt.Printf("  %s: %v → %v\n", u.ID, u.OldVal, u.NewVal)
+			}
 		}
 	}
 
