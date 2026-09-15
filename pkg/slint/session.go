@@ -36,6 +36,25 @@ type SessionConfig struct {
 	Method engine.MeasurementMethod
 	Now    func() time.Time
 
+	// TrustContract, when non-nil, opts this session's run into the trust-correct
+	// slo.v4 measurement contract: the engine stamps a complete per-SLI
+	// comparability identity built from each SLI's measurement semantics plus the
+	// caller-authoritative coordinates carried here (SubjectID, SourceConfigID,
+	// WindowID). It is threaded verbatim into engine.RunConfig.TrustContract by
+	// End() — the session never derives, infers, or defaults these coordinates
+	// from Namespace, MetricsServiceName, Tags, RunID, or the run's
+	// StartedAt/FinishedAt timestamps.
+	//
+	// When nil (the default), the session emits the legacy slo.v3 contract with no
+	// comparability identity, exactly as before — historical/unprotected output is
+	// never silently reinterpreted as protected v4.
+	//
+	// A non-nil but incomplete TrustContract (any of SubjectID, SourceConfigID, or
+	// WindowID blank) fails closed inside the engine: End() returns an error and no
+	// slo.v4 artifact is produced. Completeness is the engine's contract; the
+	// session only forwards the value.
+	TrustContract *engine.TrustContract
+
 	// Optional overrides
 	Specs   []spec.SLISpec
 	Fetcher fetch.MetricsFetcher
@@ -519,6 +538,10 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 			FinishedAt: finished,
 			Format:     "v4.4",
 			Tags:       s.impl.Tags,
+			// Caller-authoritative: forwarded verbatim. nil keeps the legacy
+			// slo.v3 contract; a complete contract yields slo.v4; an incomplete
+			// one fails closed inside the engine. The session never derives it.
+			TrustContract: s.impl.Config.TrustContract,
 		},
 		Specs:         s.impl.specs,
 		OutPath:       uniquePath,
