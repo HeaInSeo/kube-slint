@@ -463,6 +463,32 @@ func (impl *sessionImpl) podRunTimeout() time.Duration {
 	return impl.WaitPodDoneTimeout + impl.LogsTimeout + 30*time.Second
 }
 
+// invalidateStaleStaticAlias removes the static summary alias when the current run
+// could not publish its own summary there, so a previous successful run's summary
+// (or a partially written one) is not left at the default gate input path where it
+// would be read as if it were this run's current evidence. This is what makes a
+// fail-closed protected run (incomplete TrustContract, duplicate protected SLI ID)
+// safe when the ArtifactsDir is reused: the stale slo.v4 alias is invalidated
+// rather than silently promoted as current. The per-run unique audit file is
+// untouched. runErr is the error that failed the run; it is returned as-is when the
+// alias is absent or removed, and wrapped if a present alias cannot be removed, so
+// stale current evidence is never left silently.
+//
+// Like the static-alias write, this targets the shared alias path and is
+// last-writer-wins: it is unsafe under a shared ArtifactsDir, where parallel runs
+// must point --summary at their unique per-run path instead.
+func invalidateStaleStaticAlias(staticPath string, runErr error) error {
+	if staticPath == "" {
+		return runErr
+	}
+	if rmErr := os.Remove(staticPath); rmErr != nil && !os.IsNotExist(rmErr) {
+		return fmt.Errorf(
+			"slint: run failed (%w); additionally, the stale summary alias %q could not be invalidated and may be read as current evidence: %v",
+			runErr, staticPath, rmErr)
+	}
+	return runErr
+}
+
 // End concludes the measurement session.
 func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	if s == nil || s.impl == nil {
@@ -551,14 +577,20 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 
 	if err != nil {
 		s.impl.hasFailed = true
-		return sum, err
+		return sum, invalidateStaleStaticAlias(staticPath, err)
 	}
 
 	// static alias: kept aligned with slint-gate's default input path.
 	// For parallel/multi-test runs, point --summary at uniquePath explicitly.
 	if staticPath != "" && sum != nil {
 		if writeErr := s.impl.writer.Write(staticPath, *sum); writeErr != nil {
-			fmt.Fprintf(os.Stderr, "kube-slint [session]: warning - static alias write failed: %v\n", writeErr)
+			// The current run's summary could not be published to the default gate
+			// input path. Do not leave a prior-run (or partially written) alias
+			// there to be read as current evidence: invalidate it and fail. The
+			// per-run unique audit file was already written and is untouched.
+			s.impl.hasFailed = true
+			return sum, invalidateStaleStaticAlias(staticPath,
+				fmt.Errorf("slint: static summary alias write failed: %w", writeErr))
 		}
 	}
 

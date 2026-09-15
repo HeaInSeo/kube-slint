@@ -146,6 +146,128 @@ func TestSession_End_IncompleteTrustContract_WritesNoArtifact(t *testing.T) {
 	}
 }
 
+// Regression (Codex P1): a fail-closed protected run must invalidate a previous
+// successful run's static alias when the ArtifactsDir is reused, so the stale
+// slo.v4 sli-summary.json is never read as this run's current evidence. Without
+// the fix, ExecuteStandard errors before the alias is rewritten and the old v4
+// file survives at the default slint-gate input path.
+func TestSession_End_ProtectedFailure_InvalidatesStaleStaticAlias(t *testing.T) {
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	alias := filepath.Join(dir, "sli-summary.json")
+
+	// Run 1: a successful protected run leaves a real slo.v4 static alias.
+	ok := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      "ok",
+		RunID:         "run-ok",
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "srccfg-01", WindowID: "60m"},
+	})
+	ok.Start()
+	okSum, err := ok.End(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, okSum)
+	require.Equal(t, summary.SchemaVersionTrust, okSum.SchemaVersion)
+
+	priorBytes, readErr := os.ReadFile(alias)
+	require.NoError(t, readErr, "successful protected run must have written the static alias")
+	require.Contains(t, string(priorBytes), summary.SchemaVersionTrust,
+		"precondition: the reused dir holds a prior successful slo.v4 alias")
+
+	// Run 2: reuse the SAME dir with an incomplete protected contract. The engine
+	// fails closed before the alias is rewritten; the prior v4 alias must not
+	// survive as current evidence.
+	bad := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      "bad",
+		RunID:         "run-bad",
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "", WindowID: "60m"},
+	})
+	bad.Start()
+	_, err = bad.End(context.Background())
+	require.Error(t, err, "incomplete protected contract must fail closed")
+
+	_, statErr := os.Stat(alias)
+	assert.True(t, os.IsNotExist(statErr),
+		"a fail-closed protected run must invalidate the prior successful static alias; found it still present at %s", alias)
+}
+
+// aliasFailingWriter delegates every write to inner EXCEPT the static alias
+// ("sli-summary.json"), which it fails — simulating a successful run whose current
+// summary cannot be published to the default gate input path.
+type aliasFailingWriter struct{ inner summary.Writer }
+
+func (w aliasFailingWriter) Write(path string, s summary.Summary) error {
+	if filepath.Base(path) == "sli-summary.json" {
+		return errStaticAliasWrite
+	}
+	return w.inner.Write(path, s)
+}
+
+var errStaticAliasWrite = errWrite("simulated static alias write failure")
+
+type errWrite string
+
+func (e errWrite) Error() string { return string(e) }
+
+// Regression (Codex P1, success-path twin): even when the run itself SUCCEEDS, if
+// the current summary cannot be published to the static alias, End() must not leave
+// a prior successful run's alias there as current evidence and must not report
+// success. It invalidates the stale alias and returns an error.
+func TestSession_End_StaticAliasWriteFailure_InvalidatesStaleAliasAndErrors(t *testing.T) {
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	alias := filepath.Join(dir, "sli-summary.json")
+
+	// Run 1: a successful protected run leaves a real slo.v4 static alias.
+	ok := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      "ok",
+		RunID:         "run-ok",
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "srccfg-01", WindowID: "60m"},
+	})
+	ok.Start()
+	_, err := ok.End(context.Background())
+	require.NoError(t, err)
+	priorBytes, readErr := os.ReadFile(alias)
+	require.NoError(t, readErr)
+	require.Contains(t, string(priorBytes), summary.SchemaVersionTrust,
+		"precondition: the reused dir holds a prior successful slo.v4 alias")
+
+	// Run 2: reuse the dir; ExecuteStandard succeeds but the static-alias write
+	// fails. The stale prior alias must be invalidated and End must error.
+	bad := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      "bad",
+		RunID:         "run-bad",
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		Writer:        aliasFailingWriter{inner: summary.NewJSONFileWriter()},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "srccfg-01", WindowID: "60m"},
+	})
+	bad.Start()
+	_, err = bad.End(context.Background())
+	require.Error(t, err, "a failed static-alias write must surface as an End() error")
+
+	_, statErr := os.Stat(alias)
+	assert.True(t, os.IsNotExist(statErr),
+		"a failed static-alias write must invalidate the prior successful alias; found it still present at %s", alias)
+}
+
 // D. No producer reinterpretation: the caller's authoritative coordinates reach the
 // engine verbatim. SubjectID/SourceConfigID are deliberately distinct from the
 // session's Namespace/RunID/Tags so the test would fail if the producer inferred or
