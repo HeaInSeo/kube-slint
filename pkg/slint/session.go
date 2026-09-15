@@ -538,6 +538,14 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 	uniquePath := ""
 	staticPath := ""
 	if s.ShouldWriteArtifacts() {
+		// Determine the static alias path up front, before allocating the unique
+		// per-run path. If NextSummaryPath fails (e.g. an os.Stat error such as
+		// ENAMETOOLONG from an over-long sanitized filename), this run cannot
+		// publish its own summary; a prior successful run's alias must not remain
+		// at the default gate input path to be read as current evidence — the same
+		// contract as the ExecuteStandard-error and static-alias-write-failure
+		// paths below.
+		staticPath = filepath.Join(s.impl.Config.ArtifactsDir, "sli-summary.json")
 		uniqueFilename := fmt.Sprintf(
 			"sli-summary.%s.%s.json",
 			SanitizeFilename(s.impl.RunID),
@@ -545,10 +553,10 @@ func (s *Session) End(ctx context.Context) (*summary.Summary, error) {
 		)
 		p, err := s.NextSummaryPath(uniqueFilename)
 		if err != nil {
-			return nil, err
+			s.impl.hasFailed = true
+			return nil, invalidateStaleStaticAlias(staticPath, err)
 		}
 		uniquePath = p
-		staticPath = filepath.Join(s.impl.Config.ArtifactsDir, "sli-summary.json")
 	}
 
 	rel := &summary.Reliability{

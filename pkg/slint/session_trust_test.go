@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -266,6 +267,63 @@ func TestSession_End_StaticAliasWriteFailure_InvalidatesStaleAliasAndErrors(t *t
 	_, statErr := os.Stat(alias)
 	assert.True(t, os.IsNotExist(statErr),
 		"a failed static-alias write must invalidate the prior successful alias; found it still present at %s", alias)
+}
+
+// Regression (Codex P1 4014126101): a run that fails to allocate its per-run
+// unique path (NextSummaryPath) must still invalidate a prior successful run's
+// static alias, so the stale slo.v4 sli-summary.json is not read as this run's
+// current evidence. The failure is triggered through the production path: an
+// accepted-but-long RunID+TestCase sanitizes to a ~258-byte unique filename that
+// exceeds the 255-byte component limit, so os.Stat inside NextSummaryPath returns
+// ENAMETOOLONG (a non-IsNotExist error) before ExecuteStandard runs.
+func TestSession_End_NextSummaryPathFailure_InvalidatesStaleStaticAlias(t *testing.T) {
+	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	alias := filepath.Join(dir, "sli-summary.json")
+
+	// Run 1: a successful protected run (short names) leaves a real slo.v4 alias.
+	ok := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      "ok",
+		RunID:         "run-ok",
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "srccfg-01", WindowID: "60m"},
+	})
+	ok.Start()
+	_, err := ok.End(context.Background())
+	require.NoError(t, err)
+	priorBytes, readErr := os.ReadFile(alias)
+	require.NoError(t, readErr)
+	require.Contains(t, string(priorBytes), summary.SchemaVersionTrust,
+		"precondition: the reused dir holds a prior successful slo.v4 alias")
+
+	// Run 2: reuse the dir with an accepted-but-long RunID + TestCase. Each
+	// sanitizes to 120 bytes, so the unique filename
+	// "sli-summary.<120>.<120>.json" is 258 bytes > NAME_MAX and NextSummaryPath's
+	// os.Stat fails with ENAMETOOLONG before any summary is produced. The static
+	// alias ("sli-summary.json", short) must be invalidated and End must error.
+	longRunID := strings.Repeat("r", 130)
+	longTestCase := strings.Repeat("t", 130)
+	bad := NewSession(SessionConfig{
+		Namespace:     "measured-ns",
+		TestCase:      longTestCase,
+		RunID:         longRunID,
+		ArtifactsDir:  dir,
+		Now:           func() time.Time { return now },
+		Specs:         trustSpecs(),
+		WindowFetcher: &mockWindowFetcher{},
+		TrustContract: &engine.TrustContract{SubjectID: "subj-01", SourceConfigID: "srccfg-01", WindowID: "60m"},
+	})
+	bad.Start()
+	_, err = bad.End(context.Background())
+	require.Error(t, err, "a NextSummaryPath allocation failure must surface as an End() error")
+
+	_, statErr := os.Stat(alias)
+	assert.True(t, os.IsNotExist(statErr),
+		"a NextSummaryPath-failure run must invalidate the prior successful static alias; found it still present at %s", alias)
 }
 
 // D. No producer reinterpretation: the caller's authoritative coordinates reach the
