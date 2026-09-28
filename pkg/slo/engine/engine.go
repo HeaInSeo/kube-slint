@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -360,15 +361,8 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	for _, in := range s.Inputs {
 		used = append(used, in.Key)
 		if in.Selector != nil {
-			var a, b float64
-			var errA, errB error
-			if needStart {
-				a, errA = resolveSelector(in.Selector, start, "start")
-			}
-			if needEnd {
-				b, errB = resolveSelector(in.Selector, end, "end")
-			}
-			if err := errors.Join(errA, errB); err != nil {
+			a, b, err := resolveSelectorInput(in.Selector, s.Compute.Mode, start, end, needStart, needEnd)
+			if err != nil {
 				missing = append(missing, in.Key)
 				selectorErrs = append(selectorErrs, fmt.Sprintf("%s: %v", in.Key, strings.ReplaceAll(err.Error(), "\n", "; ")))
 				continue
@@ -442,13 +436,40 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	return res
 }
 
-// resolveSelector resolves a selector input against one point snapshot.
-func resolveSelector(sel *spec.Selector, values map[string]float64, which string) (float64, error) {
-	v, _, err := sel.Resolve(values)
-	if err != nil {
-		return 0, fmt.Errorf("%s: %w", which, err)
+// resolveSelectorInput resolves a selector input at the endpoints the compute
+// mode reads.
+func resolveSelectorInput(sel *spec.Selector, mode spec.ComputeMode, start, end map[string]float64,
+	needStart, needEnd bool) (float64, float64, error) {
+	var a, b float64
+	var keysA, keysB []string
+	var errA, errB error
+	if needStart {
+		a, keysA, errA = resolveSelector(sel, start, "start")
 	}
-	return v, nil
+	if needEnd {
+		b, keysB, errB = resolveSelector(sel, end, "end")
+	}
+	if err := errors.Join(errA, errB); err != nil {
+		return 0, 0, err
+	}
+	// Without a declared aggregation a delta must subtract one and the same
+	// series; a different unique match at each endpoint is a new series, not
+	// a continuation of the old one.
+	if mode == spec.ComputeDelta && sel.Aggregate == spec.AggregateNone && !slices.Equal(keysA, keysB) {
+		return 0, 0, fmt.Errorf("%w (start %s, end %s)", spec.ErrSelectorSeriesChanged,
+			strings.Join(keysA, ","), strings.Join(keysB, ","))
+	}
+	return a, b, nil
+}
+
+// resolveSelector resolves a selector input against one point snapshot and
+// returns the value together with the sorted matched keys.
+func resolveSelector(sel *spec.Selector, values map[string]float64, which string) (float64, []string, error) {
+	v, keys, err := sel.Resolve(values)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s: %w", which, err)
+	}
+	return v, keys, nil
 }
 
 func evalWindowSLI(s spec.SLISpec, samples []fetch.Sample) summary.SLIResult {

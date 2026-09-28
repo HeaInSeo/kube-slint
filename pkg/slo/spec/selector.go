@@ -104,6 +104,10 @@ var (
 	// ErrSelectorAmbiguous is returned when several series match a selector
 	// that does not declare an aggregation.
 	ErrSelectorAmbiguous = errors.New("selector matched multiple series without declared aggregation")
+	// ErrSelectorSeriesChanged is returned when a delta over a selector that
+	// does not declare an aggregation matches different series at its start
+	// and end endpoints.
+	ErrSelectorSeriesChanged = errors.New("selector matched different series at start and end")
 )
 
 // SelectMetric returns a MetricRef whose value is resolved by a Selector. The

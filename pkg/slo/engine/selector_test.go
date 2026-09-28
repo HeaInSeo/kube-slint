@@ -471,6 +471,64 @@ func TestSelector_DeltaRequiresBothEndpoints(t *testing.T) {
 	}
 }
 
+// Without a declared aggregation a delta subtracts one series only: the same
+// unique match at both endpoints grades (and a decrease is a counter reset),
+// while a different unique match at each endpoint skips with no value.
+func TestSelector_DeltaAggregateNoneRequiresSameSeries(t *testing.T) {
+	sel := func() spec.SLISpec {
+		return spec.SLISpec{
+			ID: "pod-restarts", Unit: "count", Kind: "delta_counter",
+			Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetFail},
+			Inputs:  []spec.MetricRef{spec.SelectMetric("m", spec.AggregateNone, spec.LabelEq("app", "x"))},
+		}
+	}
+	for name, c := range map[string]struct {
+		start, end string
+		status     summary.Status
+		value      *float64
+		reason     string
+	}{
+		"same series":       {`m{app="x",pod="old"} 3`, `m{app="x",pod="old"} 7`, summary.StatusPass, ptrFloat(4), ""},
+		"same series reset": {`m{app="x",pod="old"} 7`, `m{app="x",pod="old"} 2`, summary.StatusFail, ptrFloat(-5), "counter reset"},
+		"different series":  {`m{app="x",pod="old"} 3`, `m{app="x",pod="new"} 9`, summary.StatusSkip, nil, "different series at start and end"},
+		"different reset":   {`m{app="x",pod="old"} 9`, `m{app="x",pod="new"} 3`, summary.StatusSkip, nil, "different series at start and end"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sum, err := runE2P(t, nil, parseE2P(t, c.start), parseE2P(t, c.end), sel())
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			r := sum.Results[0]
+			if r.Status != c.status || !strings.Contains(r.Reason, c.reason) {
+				t.Fatalf("status=%s reason=%q, want %s containing %q", r.Status, r.Reason, c.status, c.reason)
+			}
+			switch {
+			case c.value == nil && r.Value != nil:
+				t.Fatalf("value = %v, want none", *r.Value)
+			case c.value != nil && (r.Value == nil || *r.Value != *c.value):
+				t.Fatalf("value = %v, want %v", r.Value, *c.value)
+			}
+			if c.value == nil && (len(r.InputsMissing) != 1 || !strings.Contains(r.Reason, `pod="old"`) || !strings.Contains(r.Reason, `pod="new"`)) {
+				t.Fatalf("changed series must be reported as missing with both keys: missing=%v reason=%q", r.InputsMissing, r.Reason)
+			}
+		})
+	}
+
+	// A declared sum aggregates over whatever matches at each endpoint, so a
+	// changed series set is still graded.
+	sumSpec := sel()
+	sumSpec.Inputs = []spec.MetricRef{spec.SelectMetric("m", spec.AggregateSum, spec.LabelEq("app", "x"))}
+	sum, err := runE2P(t, nil, parseE2P(t, `m{app="x",pod="old"} 3`), parseE2P(t, `m{app="x",pod="new"} 9`), sumSpec)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if r := sum.Results[0]; r.Status != summary.StatusPass || r.Value == nil || *r.Value != 6 {
+		t.Fatalf("sum over changed series: status=%s value=%v reason=%q, want pass 6", r.Status, r.Value, r.Reason)
+	}
+}
+
+func ptrFloat(v float64) *float64 { return &v }
+
 // Legacy exact-key identities are pinned to the values computed at
 // main@a2407ff, before selectors existed, so slo.v4 identities of existing
 // callers cannot drift.
