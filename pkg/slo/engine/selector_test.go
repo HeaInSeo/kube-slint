@@ -251,6 +251,142 @@ func TestSelector_ContractIDDistinctFromExactKey(t *testing.T) {
 	}
 }
 
+func restErrorsZeroSpec() spec.SLISpec {
+	return spec.SLISpec{
+		ID: "rest-errors-delta", Unit: "count", Kind: "delta_counter",
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+		Inputs: []spec.MetricRef{spec.SelectMetric("rest_client_requests_total", spec.AggregateSum,
+			spec.LabelRegexp("code", "^5[0-9][0-9]$")).WithEmptyMatch(spec.EmptyMatchZeroIfFamilyPresent)},
+	}
+}
+
+const (
+	restHealthyText = `
+rest_client_requests_total{code="200",host="10.96.0.1:443",method="GET"} 1000
+`
+	restOne500Text = `
+rest_client_requests_total{code="200",host="10.96.0.1:443",method="GET"} 1500
+rest_client_requests_total{code="500",host="10.96.0.1:443",method="GET"} 1
+`
+	noRestText = `
+workqueue_depth{controller="boridataplane",name="boridataplane",priority=""} 3
+`
+)
+
+func TestSelector_EmptyMatchZeroGradesPerEndpoint(t *testing.T) {
+	cases := []struct {
+		name       string
+		start, end string
+		want       float64
+	}{
+		{"healthy at both endpoints", restHealthyText, restHealthyText, 0},
+		{"first 5xx appears mid-run", restHealthyText, restOne500Text, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			sum, err := runE2P(t, e1TrustContract(), parseE2P(t, c.start), parseE2P(t, c.end), restErrorsZeroSpec())
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			if err := summary.Validate(*sum); err != nil {
+				t.Fatalf("slo.v4 summary must validate: %v", err)
+			}
+			r := sum.Results[0]
+			if r.Status != summary.StatusPass || r.Value == nil || *r.Value != c.want {
+				t.Fatalf("status=%s value=%v reason=%q, want pass %v", r.Status, r.Value, r.Reason, c.want)
+			}
+			if len(r.InputsMissing) != 0 || r.Comparability == nil || !r.Comparability.Complete() {
+				t.Fatalf("graded result must have no missing input and a complete identity: %+v", r)
+			}
+		})
+	}
+}
+
+func TestSelector_EmptyMatchZeroFamilyAbsentSkips(t *testing.T) {
+	cases := []struct{ name, start, end string }{
+		{"absent at start", noRestText, restOne500Text},
+		{"absent at end", restHealthyText, noRestText},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			sum, err := runE2P(t, nil, parseE2P(t, c.start), parseE2P(t, c.end), restErrorsZeroSpec())
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			r := sum.Results[0]
+			if r.Status != summary.StatusSkip || r.Value != nil || len(r.InputsMissing) != 1 {
+				t.Fatalf("family absent must skip without value: %s %v %v", r.Status, r.Value, r.InputsMissing)
+			}
+			if !strings.Contains(r.Reason, "metric family absent") {
+				t.Fatalf("reason=%q", r.Reason)
+			}
+		})
+	}
+}
+
+func TestSelector_EmptyMatchUndeclaredStillSkips(t *testing.T) {
+	s := restErrorsZeroSpec()
+	s.Inputs = []spec.MetricRef{spec.SelectMetric("rest_client_requests_total", spec.AggregateSum,
+		spec.LabelRegexp("code", "^5[0-9][0-9]$"))}
+	sum, err := runE2P(t, nil, parseE2P(t, restHealthyText), parseE2P(t, restOne500Text), s)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	r := sum.Results[0]
+	if r.Status != summary.StatusSkip || r.Value != nil || !strings.Contains(r.Reason, "matched no series") {
+		t.Fatalf("undeclared policy must keep the existing skip: %s %v %q", r.Status, r.Value, r.Reason)
+	}
+}
+
+func TestSelector_EmptyMatchIncompatibleRejectedBeforeFetch(t *testing.T) {
+	zeroOne := spec.SelectMetric("m", spec.AggregateNone, spec.LabelEq("a", "x")).WithEmptyMatch(spec.EmptyMatchZeroIfFamilyPresent)
+	zeroSum := spec.SelectMetric("m", spec.AggregateSum, spec.LabelEq("a", "x")).WithEmptyMatch(spec.EmptyMatchZeroIfFamilyPresent)
+	unknown := spec.SelectMetric("m", spec.AggregateSum, spec.LabelEq("a", "x")).WithEmptyMatch(spec.EmptyMatchPolicy("zero"))
+	bad := []spec.SLISpec{
+		{ID: "zero-without-sum", Compute: spec.ComputeSpec{Mode: spec.ComputeDelta}, Inputs: []spec.MetricRef{zeroOne}},
+		{ID: "zero-in-end-mode", Compute: spec.ComputeSpec{Mode: spec.ComputeEnd}, Inputs: []spec.MetricRef{zeroSum}},
+		{ID: "unknown-policy", Compute: spec.ComputeSpec{Mode: spec.ComputeDelta}, Inputs: []spec.MetricRef{unknown}},
+	}
+	for _, s := range bad {
+		t.Run(s.ID, func(t *testing.T) {
+			w := &mockWriter{}
+			eng := New(&mockStaticFetcher{values: map[string]float64{}}, w, nil)
+			_, err := eng.Execute(context.Background(), ExecuteRequest{
+				Config: RunConfig{StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)},
+				Specs:  []spec.SLISpec{s},
+			})
+			if err == nil {
+				t.Fatal("incompatible empty-match policy must fail Execute")
+			}
+			if w.lastWritten != nil {
+				t.Fatal("no summary may be written")
+			}
+		})
+	}
+}
+
+func TestSelector_ContractIDDisjointAcrossExactSelectorAndZeroPolicy(t *testing.T) {
+	zero := restErrorsZeroSpec()
+	skip := zero
+	skip.Inputs = []spec.MetricRef{spec.SelectMetric("rest_client_requests_total", spec.AggregateSum,
+		spec.LabelRegexp("code", "^5[0-9][0-9]$"))}
+	exactOfSkip := skip
+	exactOfSkip.Inputs = []spec.MetricRef{spec.InputKey(skip.Inputs[0].Key)}
+	exactOfZero := zero
+	exactOfZero.Inputs = []spec.MetricRef{spec.InputKey(zero.Inputs[0].Key)}
+
+	ids := map[string]string{}
+	for name, s := range map[string]spec.SLISpec{
+		"selector": skip, "selector+zero": zero, "exact(selector key)": exactOfSkip, "exact(zero key)": exactOfZero,
+	} {
+		id := sliContractID(s)
+		if prev, dup := ids[id]; dup {
+			t.Fatalf("%s and %s share SLIContractID %s", prev, name, id)
+		}
+		ids[id] = name
+	}
+}
+
 // Legacy exact-key identities are pinned to the values computed at
 // main@a2407ff, before selectors existed, so slo.v4 identities of existing
 // callers cannot drift.

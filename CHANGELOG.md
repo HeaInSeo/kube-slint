@@ -13,9 +13,18 @@
   spec declares `AggregateSum`. Matching and summation are deterministic.
   - A selector that matches zero series, or several series without a declared
     aggregation, fails closed: the SLI is skipped with a reason.
-  - A malformed selector fails `Execute` before any fetch.
-  - Selector inputs have their own canonical identity key. Exact-key inputs keep
-    their existing behavior and slo.v4 `SLIContractID` values unchanged.
+  - `MetricRef.WithEmptyMatch(spec.EmptyMatchZeroIfFamilyPresent)` declares that
+    an empty match is 0 when the metric family is present in that snapshot. It is
+    decided per endpoint, so a series that first appears mid-run gives a positive
+    delta. If the family is absent the SLI is still skipped. The policy requires
+    `AggregateSum` and `ComputeDelta`; without it, an empty match still skips.
+  - A malformed selector, or an incompatible or unknown empty-match policy, fails
+    `Execute` before any fetch.
+  - Selector inputs have their own canonical identity key, which includes the
+    aggregation and the empty-match policy. Exact and selector identities are
+    disjoint: an exact key starting with the reserved `kube-slint.` prefix is
+    hashed under `kube-slint.exact/v1`. Other exact-key inputs keep their existing
+    behavior and slo.v4 `SLIContractID` values unchanged.
 
 ## [1.7.0] - 2026-07-16
 

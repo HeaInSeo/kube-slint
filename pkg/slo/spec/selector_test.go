@@ -149,3 +149,98 @@ func TestSLISpec_ValidateSelectorsRejectsWindowModes(t *testing.T) {
 		t.Fatalf("delta mode must accept a valid selector: %v", err)
 	}
 }
+
+func TestSelector_EmptyMatchZeroIfFamilyPresent(t *testing.T) {
+	ref := SelectMetric("rest_client_requests_total", AggregateSum, LabelRegexp("code", "5[0-9][0-9]")).
+		WithEmptyMatch(EmptyMatchZeroIfFamilyPresent)
+	healthy := map[string]float64{`rest_client_requests_total{code="200",host="h",method="GET"}`: 10}
+	got, matched, err := ref.Selector.Resolve(healthy)
+	if err != nil || got != 0 || len(matched) != 0 {
+		t.Fatalf("family present, no match: got %v %v %v; want 0, none, nil", got, matched, err)
+	}
+	// Only the synthesized bare aggregate is present: the family is present.
+	if got, _, err := ref.Selector.Resolve(map[string]float64{`rest_client_requests_total`: 10}); err != nil || got != 0 {
+		t.Fatalf("bare aggregate only: got %v, %v; want 0, nil", got, err)
+	}
+	// Family absent stays missing.
+	_, _, err = ref.Selector.Resolve(map[string]float64{`other_total{code="500"}`: 1})
+	if !errors.Is(err, ErrSelectorFamilyAbsent) {
+		t.Fatalf("err = %v, want ErrSelectorFamilyAbsent", err)
+	}
+	// Matches still sum as before.
+	healthy[`rest_client_requests_total{code="500",host="h",method="GET"}`] = 2
+	if got, _, err := ref.Selector.Resolve(healthy); err != nil || got != 2 {
+		t.Fatalf("got %v, %v; want 2, nil", got, err)
+	}
+}
+
+func TestSelector_EmptyMatchDefaultSkips(t *testing.T) {
+	ref := SelectMetric("m", AggregateSum, LabelEq("a", "x"))
+	if ref.Selector.EmptyMatch != EmptyMatchSkip {
+		t.Fatalf("default policy = %q, want skip", ref.Selector.EmptyMatch)
+	}
+	_, _, err := ref.Selector.Resolve(map[string]float64{`m{a="y"}`: 1})
+	if !errors.Is(err, ErrSelectorNoMatch) {
+		t.Fatalf("err = %v, want ErrSelectorNoMatch", err)
+	}
+}
+
+func TestSelector_EmptyMatchPolicyValidation(t *testing.T) {
+	cases := map[string]MetricRef{
+		"zero without sum": SelectMetric("m", AggregateNone, LabelEq("a", "x")).WithEmptyMatch(EmptyMatchZeroIfFamilyPresent),
+		"unknown policy":   SelectMetric("m", AggregateSum, LabelEq("a", "x")).WithEmptyMatch(EmptyMatchPolicy("zero")),
+		"metric w/ space":  SelectMetric("empty=zero_if_family_present m", AggregateSum, LabelEq("a", "x")),
+		"label w/ dash":    SelectMetric("m", AggregateSum, LabelEq("a-b", "x")),
+	}
+	for name, ref := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := ref.Validate(); err == nil {
+				t.Fatal("Validate must reject")
+			}
+		})
+	}
+
+	s := SLISpec{ID: "z", Compute: ComputeSpec{Mode: ComputeEnd},
+		Inputs: []MetricRef{SelectMetric("m", AggregateSum, LabelEq("a", "x")).WithEmptyMatch(EmptyMatchZeroIfFamilyPresent)}}
+	if err := s.ValidateSelectors(); err == nil {
+		t.Fatal("zero_if_family_present must be rejected outside delta mode")
+	}
+	s.Compute.Mode = ComputeDelta
+	if err := s.ValidateSelectors(); err != nil {
+		t.Fatalf("delta+sum zero policy must validate: %v", err)
+	}
+}
+
+func TestSelector_EmptyMatchPolicyIsInIdentity(t *testing.T) {
+	skip := SelectMetric("m", AggregateSum, LabelEq("a", "x"))
+	zero := skip.WithEmptyMatch(EmptyMatchZeroIfFamilyPresent)
+	if skip.Key == zero.Key || skip.IdentityKey() == zero.IdentityKey() {
+		t.Fatalf("empty-match policy must change the identity: %q", zero.Key)
+	}
+	if skip.Selector.EmptyMatch != EmptyMatchSkip {
+		t.Fatal("WithEmptyMatch must not mutate the receiver")
+	}
+	if err := zero.Validate(); err != nil {
+		t.Fatalf("WithEmptyMatch must keep Key canonical: %v", err)
+	}
+}
+
+func TestMetricRef_ExactAndSelectorIdentitiesDisjoint(t *testing.T) {
+	sel := SelectMetric("m", AggregateSum, LabelEq("a", "x"))
+	zero := sel.WithEmptyMatch(EmptyMatchZeroIfFamilyPresent)
+	for _, s := range []MetricRef{sel, zero} {
+		exact := InputKey(s.Key)
+		if exact.IdentityKey() == s.IdentityKey() {
+			t.Fatalf("exact key %q shares the selector identity", s.Key)
+		}
+		if strings.HasPrefix(exact.IdentityKey(), selectorKeyPrefix) {
+			t.Fatalf("exact identity %q is in the selector namespace", exact.IdentityKey())
+		}
+	}
+	// Escaping stays injective across exact keys.
+	a := InputKey(sel.Key)
+	b := InputKey(exactIdentityPrefix + sel.Key)
+	if a.IdentityKey() == b.IdentityKey() {
+		t.Fatal("distinct exact keys must keep distinct identities")
+	}
+}

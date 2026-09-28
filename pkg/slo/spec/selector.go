@@ -12,9 +12,22 @@ import (
 
 // selectorKeyPrefix marks MetricRef.Key values that encode a Selector rather
 // than a raw input key. The canonical selector key is what appears in
-// InputsUsed/InputsMissing and what the SLI measurement identity hashes, so a
-// selector input never shares an identity with an exact-key input.
+// InputsUsed/InputsMissing and what the SLI measurement identity hashes.
 const selectorKeyPrefix = "kube-slint.select/v1 "
+
+// reservedIdentityPrefix is the identity namespace owned by kube-slint. Selector
+// identities always start with selectorKeyPrefix; an exact key that starts with
+// the reserved prefix is hashed under exactIdentityPrefix instead (see
+// IdentityKey), so exact and selector identities can never collide.
+const (
+	reservedIdentityPrefix = "kube-slint."
+	exactIdentityPrefix    = "kube-slint.exact/v1 "
+)
+
+var (
+	metricNameRE = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+	labelNameRE  = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+)
 
 // MatchOp is a label matcher operator.
 type MatchOp string
@@ -56,18 +69,38 @@ const (
 	AggregateSum Aggregation = "sum"
 )
 
+// EmptyMatchPolicy declares what a selector resolves to when the metric family
+// is present in a snapshot but none of its series match.
+type EmptyMatchPolicy string
+
+const (
+	// EmptyMatchSkip is the default: an empty match leaves the input missing,
+	// so the SLI is skipped.
+	EmptyMatchSkip EmptyMatchPolicy = ""
+	// EmptyMatchZeroIfFamilyPresent resolves an empty match to 0 when at least
+	// one series of the metric family is present in the same snapshot. If the
+	// family is absent the input stays missing. It is decided per snapshot, so a
+	// series that first appears between start and end yields a positive delta.
+	// It requires AggregateSum and ComputeDelta.
+	EmptyMatchZeroIfFamilyPresent EmptyMatchPolicy = "zero_if_family_present"
+)
+
 // Selector identifies input series by metric name plus label matchers instead
 // of an exact key. It is only valid for point compute modes
 // (single/start/end/delta).
 type Selector struct {
-	Metric    string
-	Matchers  []LabelMatcher
-	Aggregate Aggregation
+	Metric     string
+	Matchers   []LabelMatcher
+	Aggregate  Aggregation
+	EmptyMatch EmptyMatchPolicy
 }
 
 var (
 	// ErrSelectorNoMatch is returned when no series matches a selector.
 	ErrSelectorNoMatch = errors.New("selector matched no series")
+	// ErrSelectorFamilyAbsent is returned when a selector declaring
+	// EmptyMatchZeroIfFamilyPresent finds no series of its metric family.
+	ErrSelectorFamilyAbsent = errors.New("selector metric family absent")
 	// ErrSelectorAmbiguous is returned when several series match a selector
 	// that does not declare an aggregation.
 	ErrSelectorAmbiguous = errors.New("selector matched multiple series without declared aggregation")
@@ -78,6 +111,19 @@ var (
 func SelectMetric(name string, agg Aggregation, matchers ...LabelMatcher) MetricRef {
 	sel := &Selector{Metric: name, Matchers: append([]LabelMatcher(nil), matchers...), Aggregate: agg}
 	return MetricRef{Key: sel.CanonicalKey(), Selector: sel}
+}
+
+// WithEmptyMatch returns a copy of a selector ref that declares policy for an
+// empty match, with the Key recomputed. It panics on an exact-key ref, which
+// has no selector to configure.
+func (m MetricRef) WithEmptyMatch(policy EmptyMatchPolicy) MetricRef {
+	if m.Selector == nil {
+		panic("spec: WithEmptyMatch on an exact-key MetricRef")
+	}
+	sel := *m.Selector
+	sel.Matchers = append([]LabelMatcher(nil), m.Selector.Matchers...)
+	sel.EmptyMatch = policy
+	return MetricRef{Key: sel.CanonicalKey(), Alias: m.Alias, Selector: &sel}
 }
 
 // CanonicalKey returns a deterministic key for the selector: matchers are
@@ -102,6 +148,10 @@ func (s *Selector) CanonicalKey() string {
 	} else {
 		b.WriteString(string(s.Aggregate))
 	}
+	if s.EmptyMatch != EmptyMatchSkip {
+		b.WriteString(" empty=")
+		b.WriteString(string(s.EmptyMatch))
+	}
 	b.WriteByte(' ')
 	b.WriteString(s.Metric)
 	b.WriteByte('{')
@@ -122,7 +172,7 @@ func (s *Selector) CanonicalKey() string {
 // Validate reports a malformed selector. It is called before any measurement
 // work so a malformed selector fails the run instead of silently skipping.
 func (s *Selector) Validate() error {
-	if strings.TrimSpace(s.Metric) == "" || strings.ContainsAny(s.Metric, "{}\"") {
+	if !metricNameRE.MatchString(s.Metric) {
 		return fmt.Errorf("selector: invalid metric name %q", s.Metric)
 	}
 	if len(s.Matchers) == 0 {
@@ -133,9 +183,18 @@ func (s *Selector) Validate() error {
 	default:
 		return fmt.Errorf("selector %q: unsupported aggregation %q", s.Metric, s.Aggregate)
 	}
+	switch s.EmptyMatch {
+	case EmptyMatchSkip:
+	case EmptyMatchZeroIfFamilyPresent:
+		if s.Aggregate != AggregateSum {
+			return fmt.Errorf("selector %q: empty-match policy %q requires aggregation %q", s.Metric, s.EmptyMatch, AggregateSum)
+		}
+	default:
+		return fmt.Errorf("selector %q: unsupported empty-match policy %q", s.Metric, s.EmptyMatch)
+	}
 	seen := map[string]bool{}
 	for _, m := range s.Matchers {
-		if strings.TrimSpace(m.Name) == "" || strings.ContainsAny(m.Name, "{}=,\" ") {
+		if !labelNameRE.MatchString(m.Name) {
 			return fmt.Errorf("selector %q: invalid label name %q", s.Metric, m.Name)
 		}
 		if seen[m.Name] {
@@ -171,11 +230,13 @@ func (s *Selector) Resolve(values map[string]float64) (float64, []string, error)
 	}
 
 	var matched []string
+	familyPresent := false
 	for key := range values {
 		name, labels, err := promkey.Parse(key)
 		if err != nil || name != s.Metric {
 			continue
 		}
+		familyPresent = true
 		if s.matches(labels, res) {
 			matched = append(matched, key)
 		}
@@ -183,6 +244,11 @@ func (s *Selector) Resolve(values map[string]float64) (float64, []string, error)
 	sort.Strings(matched)
 
 	switch {
+	case len(matched) == 0 && s.EmptyMatch == EmptyMatchZeroIfFamilyPresent:
+		if !familyPresent {
+			return 0, nil, ErrSelectorFamilyAbsent
+		}
+		return 0, nil, nil
 	case len(matched) == 0:
 		return 0, nil, ErrSelectorNoMatch
 	case len(matched) > 1 && s.Aggregate == AggregateNone:
@@ -228,11 +294,17 @@ func compileAnchored(expr string) (*regexp.Regexp, error) {
 	return re, nil
 }
 
-// IdentityKey returns the key that identifies this input in results and in
-// the SLI measurement identity.
+// IdentityKey returns the key that identifies this input in the SLI
+// measurement identity. Exact and selector identities are disjoint: selector
+// identities start with selectorKeyPrefix, and an exact key that starts with
+// the reserved kube-slint prefix is moved under exactIdentityPrefix. Every
+// other exact key is returned unchanged, so existing identities do not drift.
 func (m MetricRef) IdentityKey() string {
 	if m.Selector != nil {
 		return m.Selector.CanonicalKey()
+	}
+	if strings.HasPrefix(m.Key, reservedIdentityPrefix) {
+		return exactIdentityPrefix + m.Key
 	}
 	return m.Key
 }
@@ -268,6 +340,9 @@ func (s SLISpec) ValidateSelectors() error {
 		}
 		if err := in.Validate(); err != nil {
 			return fmt.Errorf("sli %q: %w", s.ID, err)
+		}
+		if in.Selector.EmptyMatch == EmptyMatchZeroIfFamilyPresent && s.Compute.Mode != ComputeDelta {
+			return fmt.Errorf("sli %q: empty-match policy %q requires compute mode %q", s.ID, in.Selector.EmptyMatch, ComputeDelta)
 		}
 	}
 	return nil
