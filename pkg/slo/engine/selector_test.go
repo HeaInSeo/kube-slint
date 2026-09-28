@@ -527,6 +527,62 @@ func TestSelector_DeltaAggregateNoneRequiresSameSeries(t *testing.T) {
 	}
 }
 
+// A custom fetcher may serialize one canonical series differently at each
+// endpoint. Series continuity is judged on canonical metric+label identity, so
+// label order or spacing is not a change, while a real label change still
+// skips and a malformed key still never matches.
+func TestSelector_DeltaAggregateNoneCanonicalSeriesIdentity(t *testing.T) {
+	sel := spec.SLISpec{
+		ID: "pod-restarts", Unit: "count", Kind: "delta_counter",
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta, OnCounterReset: spec.CounterResetFail},
+		Inputs:  []spec.MetricRef{spec.SelectMetric("m", spec.AggregateNone, spec.LabelEq("app", "x"))},
+	}
+	for name, c := range map[string]struct {
+		start, end map[string]float64
+		status     summary.Status
+		value      *float64
+		reason     string
+	}{
+		"reversed label order": {
+			map[string]float64{`m{pod="old",app="x"}`: 3}, map[string]float64{`m{app="x",pod="old"}`: 7},
+			summary.StatusPass, ptrFloat(4), "",
+		},
+		"reversed order reset": {
+			map[string]float64{`m{app="x",pod="old"}`: 7}, map[string]float64{`m{pod="old",app="x"}`: 2},
+			summary.StatusFail, ptrFloat(-5), "counter reset",
+		},
+		"spacing differs": {
+			map[string]float64{`m{app="x", pod="old"}`: 3}, map[string]float64{`m{app="x",pod="old"}`: 7},
+			summary.StatusPass, ptrFloat(4), "",
+		},
+		"reordered changed label": {
+			map[string]float64{`m{pod="old",app="x"}`: 3}, map[string]float64{`m{app="x",pod="new"}`: 9},
+			summary.StatusSkip, nil, "different series at start and end",
+		},
+		"malformed start key": {
+			map[string]float64{`m{app="x",pod="old"`: 3}, map[string]float64{`m{app="x",pod="old"}`: 7},
+			summary.StatusSkip, nil, "start: " + spec.ErrSelectorNoMatch.Error(),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sum, err := runE2P(t, nil, c.start, c.end, sel)
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			r := sum.Results[0]
+			if r.Status != c.status || !strings.Contains(r.Reason, c.reason) {
+				t.Fatalf("status=%s reason=%q, want %s containing %q", r.Status, r.Reason, c.status, c.reason)
+			}
+			switch {
+			case c.value == nil && (r.Value != nil || len(r.InputsMissing) != 1):
+				t.Fatalf("value=%v missing=%v, want no value and one missing input", r.Value, r.InputsMissing)
+			case c.value != nil && (r.Value == nil || *r.Value != *c.value):
+				t.Fatalf("value = %v, want %v", r.Value, *c.value)
+			}
+		})
+	}
+}
+
 func ptrFloat(v float64) *float64 { return &v }
 
 // Legacy exact-key identities are pinned to the values computed at

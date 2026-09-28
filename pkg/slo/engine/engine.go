@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
@@ -455,11 +456,46 @@ func resolveSelectorInput(sel *spec.Selector, mode spec.ComputeMode, start, end 
 	// Without a declared aggregation a delta must subtract one and the same
 	// series; a different unique match at each endpoint is a new series, not
 	// a continuation of the old one.
-	if mode == spec.ComputeDelta && sel.Aggregate == spec.AggregateNone && !slices.Equal(keysA, keysB) {
-		return 0, 0, fmt.Errorf("%w (start %s, end %s)", spec.ErrSelectorSeriesChanged,
-			strings.Join(keysA, ","), strings.Join(keysB, ","))
+	if mode == spec.ComputeDelta && sel.Aggregate == spec.AggregateNone {
+		same, err := sameSeries(keysA, keysB)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !same {
+			return 0, 0, fmt.Errorf("%w (start %s, end %s)", spec.ErrSelectorSeriesChanged,
+				strings.Join(keysA, ","), strings.Join(keysB, ","))
+		}
 	}
 	return a, b, nil
+}
+
+// sameSeries reports whether two matched key sets name the same series. Keys
+// are compared by canonical metric+label identity, not raw serialization, so a
+// fetcher that orders or spaces labels differently at each endpoint does not
+// look like a series change. The raw keys stay the value-lookup handles.
+func sameSeries(keysA, keysB []string) (bool, error) {
+	a, err := canonicalKeys(keysA)
+	if err != nil {
+		return false, err
+	}
+	b, err := canonicalKeys(keysB)
+	if err != nil {
+		return false, err
+	}
+	return slices.Equal(a, b), nil
+}
+
+func canonicalKeys(keys []string) ([]string, error) {
+	out := make([]string, len(keys))
+	for i, k := range keys {
+		c, err := promkey.Canonicalize(k)
+		if err != nil {
+			return nil, fmt.Errorf("canonicalize matched series %q: %w", k, err)
+		}
+		out[i] = c
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 // resolveSelector resolves a selector input against one point snapshot and
