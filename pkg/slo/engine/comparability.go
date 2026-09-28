@@ -165,7 +165,7 @@ func sliContractID(s spec.SLISpec) string {
 func canonicalInputKeys(mode spec.ComputeMode, inputs []spec.MetricRef) []string {
 	keys := make([]string, len(inputs))
 	for i, in := range inputs {
-		keys[i] = in.Key
+		keys[i] = in.IdentityKey()
 	}
 	switch mode {
 	case spec.ComputeWindowMin, spec.ComputeWindowMax:

@@ -14,6 +14,10 @@ import (
 type MetricRef struct {
 	Key   string
 	Alias string // 선택 사항
+	// Selector, when set, resolves the input by metric name and label matchers
+	// instead of an exact Key lookup. Build it with SelectMetric. Nil keeps the
+	// legacy exact-key behavior.
+	Selector *Selector
 }
 
 // InputKey creates a MetricRef from a source-neutral input key. Use this for

@@ -2,12 +2,16 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
+	"github.com/HeaInSeo/kube-slint/pkg/slo/common/promkey"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/fetch"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/spec"
 	"github.com/HeaInSeo/kube-slint/pkg/slo/summary"
@@ -51,6 +55,13 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	}
 	if cfg.TrustContract != nil {
 		if err := validateProtectedSpecIDs(req.Specs); err != nil {
+			return nil, err
+		}
+	}
+	// A malformed selector is a spec error, not a measurement failure: reject it
+	// before any fetch rather than reporting a skipped SLI.
+	for _, s := range req.Specs {
+		if err := s.ValidateSelectors(); err != nil {
 			return nil, err
 		}
 	}
@@ -342,8 +353,25 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 
 	// v3: 단일 입력 SLI를 권장함. 여러 입력이 존재하면 이를 합산함.
 	var valStart, valEnd float64
+	var selectorErrs []string
+	// Selector inputs resolve only the endpoints the compute mode reads, so a
+	// miss or ambiguity in an unused snapshot cannot skip a point-mode SLI.
+	// Unknown modes resolve both and fall through to the mode check below.
+	needStart := s.Compute.Mode != spec.ComputeEnd
+	needEnd := s.Compute.Mode != spec.ComputeSingle && s.Compute.Mode != spec.ComputeStart
 	for _, in := range s.Inputs {
 		used = append(used, in.Key)
+		if in.Selector != nil {
+			a, b, err := resolveSelectorInput(in.Selector, s.Compute.Mode, start, end, needStart, needEnd)
+			if err != nil {
+				missing = append(missing, in.Key)
+				selectorErrs = append(selectorErrs, fmt.Sprintf("%s: %v", in.Key, strings.ReplaceAll(err.Error(), "\n", "; ")))
+				continue
+			}
+			valStart += a
+			valEnd += b
+			continue
+		}
 		a, okA := start[in.Key]
 		b, okB := end[in.Key]
 		if !okA || !okB {
@@ -359,6 +387,9 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	if len(missing) > 0 {
 		res.Status = summary.StatusSkip
 		res.Reason = "missing input metrics"
+		if len(selectorErrs) > 0 {
+			res.Reason = "unresolved selector input: " + strings.Join(selectorErrs, "; ")
+		}
 		return res
 	}
 
@@ -404,6 +435,77 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	}
 
 	return res
+}
+
+// resolveSelectorInput resolves a selector input at the endpoints the compute
+// mode reads.
+func resolveSelectorInput(sel *spec.Selector, mode spec.ComputeMode, start, end map[string]float64,
+	needStart, needEnd bool) (float64, float64, error) {
+	var a, b float64
+	var keysA, keysB []string
+	var errA, errB error
+	if needStart {
+		a, keysA, errA = resolveSelector(sel, start, "start")
+	}
+	if needEnd {
+		b, keysB, errB = resolveSelector(sel, end, "end")
+	}
+	if err := errors.Join(errA, errB); err != nil {
+		return 0, 0, err
+	}
+	// Without a declared aggregation a delta must subtract one and the same
+	// series; a different unique match at each endpoint is a new series, not
+	// a continuation of the old one.
+	if mode == spec.ComputeDelta && sel.Aggregate == spec.AggregateNone {
+		same, err := sameSeries(keysA, keysB)
+		if err != nil {
+			return 0, 0, err
+		}
+		if !same {
+			return 0, 0, fmt.Errorf("%w (start %s, end %s)", spec.ErrSelectorSeriesChanged,
+				strings.Join(keysA, ","), strings.Join(keysB, ","))
+		}
+	}
+	return a, b, nil
+}
+
+// sameSeries reports whether two matched key sets name the same series. Keys
+// are compared by canonical metric+label identity, not raw serialization, so a
+// fetcher that orders or spaces labels differently at each endpoint does not
+// look like a series change. The raw keys stay the value-lookup handles.
+func sameSeries(keysA, keysB []string) (bool, error) {
+	a, err := canonicalKeys(keysA)
+	if err != nil {
+		return false, err
+	}
+	b, err := canonicalKeys(keysB)
+	if err != nil {
+		return false, err
+	}
+	return slices.Equal(a, b), nil
+}
+
+func canonicalKeys(keys []string) ([]string, error) {
+	out := make([]string, len(keys))
+	for i, k := range keys {
+		c, err := promkey.Canonicalize(k)
+		if err != nil {
+			return nil, fmt.Errorf("canonicalize matched series %q: %w", k, err)
+		}
+		out[i] = c
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// resolveSelector resolves a selector input against one point snapshot and
+// returns the value together with the sorted matched keys.
+func resolveSelector(sel *spec.Selector, values map[string]float64, which string) (float64, []string, error) {
+	v, keys, err := sel.Resolve(values)
+	if err != nil {
+		return 0, nil, fmt.Errorf("%s: %w", which, err)
+	}
+	return v, keys, nil
 }
 
 func evalWindowSLI(s spec.SLISpec, samples []fetch.Sample) summary.SLIResult {
