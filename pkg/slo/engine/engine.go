@@ -352,11 +352,22 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	// v3: 단일 입력 SLI를 권장함. 여러 입력이 존재하면 이를 합산함.
 	var valStart, valEnd float64
 	var selectorErrs []string
+	// Selector inputs resolve only the endpoints the compute mode reads, so a
+	// miss or ambiguity in an unused snapshot cannot skip a point-mode SLI.
+	// Unknown modes resolve both and fall through to the mode check below.
+	needStart := s.Compute.Mode != spec.ComputeEnd
+	needEnd := s.Compute.Mode != spec.ComputeSingle && s.Compute.Mode != spec.ComputeStart
 	for _, in := range s.Inputs {
 		used = append(used, in.Key)
 		if in.Selector != nil {
-			a, errA := resolveSelector(in.Selector, start, "start")
-			b, errB := resolveSelector(in.Selector, end, "end")
+			var a, b float64
+			var errA, errB error
+			if needStart {
+				a, errA = resolveSelector(in.Selector, start, "start")
+			}
+			if needEnd {
+				b, errB = resolveSelector(in.Selector, end, "end")
+			}
 			if err := errors.Join(errA, errB); err != nil {
 				missing = append(missing, in.Key)
 				selectorErrs = append(selectorErrs, fmt.Sprintf("%s: %v", in.Key, strings.ReplaceAll(err.Error(), "\n", "; ")))

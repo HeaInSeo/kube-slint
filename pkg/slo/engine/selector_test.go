@@ -387,6 +387,90 @@ func TestSelector_ContractIDDisjointAcrossExactSelectorAndZeroPolicy(t *testing.
 	}
 }
 
+const (
+	depthGoodText   = `workqueue_depth{controller="boridataplane",name="boridataplane",priority=""} 5`
+	depthAbsentText = `rest_client_requests_total{code="200",host="h",method="GET"} 1`
+	depthNoMatch    = `workqueue_depth{controller="boriother",name="boriother",priority=""} 40`
+	depthMultiText  = `
+workqueue_depth{controller="boridataplane",name="a",priority=""} 1
+workqueue_depth{controller="boridataplane",name="b",priority=""} 2
+`
+)
+
+func depthSpec(mode spec.ComputeMode) spec.SLISpec {
+	return spec.SLISpec{
+		ID: "workqueue-depth", Unit: "count", Kind: "gauge", Compute: spec.ComputeSpec{Mode: mode},
+		Inputs: []spec.MetricRef{spec.SelectMetric("workqueue_depth", spec.AggregateNone,
+			spec.LabelEq("controller", "boridataplane"))},
+	}
+}
+
+// A point mode resolves only the endpoint it reads: an absent family, no
+// match or undeclared multi-match in the unused snapshot must not skip it,
+// while the same defect in the used snapshot still fails closed.
+func TestSelector_PointModesResolveOnlyUsedEndpoint(t *testing.T) {
+	bad := map[string]struct{ text, reason string }{
+		"family absent": {depthAbsentText, "matched no series"},
+		"no match":      {depthNoMatch, "matched no series"},
+		"multi match":   {depthMultiText, "without declared aggregation"},
+	}
+	for _, mode := range []spec.ComputeMode{spec.ComputeSingle, spec.ComputeStart, spec.ComputeEnd} {
+		for name, b := range bad {
+			usedStart := mode != spec.ComputeEnd
+			good, other := parseE2P(t, depthGoodText), parseE2P(t, b.text)
+			t.Run(string(mode)+"/unused "+name, func(t *testing.T) {
+				start, end := good, other
+				if !usedStart {
+					start, end = other, good
+				}
+				sum, err := runE2P(t, e1TrustContract(), start, end, depthSpec(mode))
+				if err != nil {
+					t.Fatalf("Execute: %v", err)
+				}
+				r := sum.Results[0]
+				if r.Status != summary.StatusPass || r.Value == nil || *r.Value != 5 || len(r.InputsMissing) != 0 {
+					t.Fatalf("status=%s value=%v reason=%q missing=%v, want pass 5", r.Status, r.Value, r.Reason, r.InputsMissing)
+				}
+			})
+			t.Run(string(mode)+"/used "+name, func(t *testing.T) {
+				start, end := other, good
+				if !usedStart {
+					start, end = good, other
+				}
+				sum, err := runE2P(t, nil, start, end, depthSpec(mode))
+				if err != nil {
+					t.Fatalf("Execute: %v", err)
+				}
+				r := sum.Results[0]
+				if r.Status != summary.StatusSkip || r.Value != nil || len(r.InputsMissing) != 1 || !strings.Contains(r.Reason, b.reason) {
+					t.Fatalf("used endpoint must fail closed: %s %v %q", r.Status, r.Value, r.Reason)
+				}
+			})
+		}
+	}
+}
+
+// Delta reads both endpoints, so a defect at either one still skips.
+func TestSelector_DeltaRequiresBothEndpoints(t *testing.T) {
+	good := depthGoodText
+	for name, b := range map[string]string{"family absent": depthAbsentText, "no match": depthNoMatch, "multi match": depthMultiText} {
+		for _, c := range []struct{ side, start, end string }{
+			{"start", b, good}, {"end", good, b},
+		} {
+			t.Run(c.side+" "+name, func(t *testing.T) {
+				sum, err := runE2P(t, nil, parseE2P(t, c.start), parseE2P(t, c.end), depthSpec(spec.ComputeDelta))
+				if err != nil {
+					t.Fatalf("Execute: %v", err)
+				}
+				r := sum.Results[0]
+				if r.Status != summary.StatusSkip || r.Value != nil || len(r.InputsMissing) != 1 || !strings.Contains(r.Reason, c.side+":") {
+					t.Fatalf("delta must skip on a %s defect: %s %v %q", c.side, r.Status, r.Value, r.Reason)
+				}
+			})
+		}
+	}
+}
+
 // Legacy exact-key identities are pinned to the values computed at
 // main@a2407ff, before selectors existed, so slo.v4 identities of existing
 // callers cannot drift.
