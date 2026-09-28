@@ -2,9 +2,11 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/HeaInSeo/kube-slint/pkg/slo"
@@ -51,6 +53,13 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*summary.Summ
 	}
 	if cfg.TrustContract != nil {
 		if err := validateProtectedSpecIDs(req.Specs); err != nil {
+			return nil, err
+		}
+	}
+	// A malformed selector is a spec error, not a measurement failure: reject it
+	// before any fetch rather than reporting a skipped SLI.
+	for _, s := range req.Specs {
+		if err := s.ValidateSelectors(); err != nil {
 			return nil, err
 		}
 	}
@@ -342,8 +351,21 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 
 	// v3: 단일 입력 SLI를 권장함. 여러 입력이 존재하면 이를 합산함.
 	var valStart, valEnd float64
+	var selectorErrs []string
 	for _, in := range s.Inputs {
 		used = append(used, in.Key)
+		if in.Selector != nil {
+			a, errA := resolveSelector(in.Selector, start, "start")
+			b, errB := resolveSelector(in.Selector, end, "end")
+			if err := errors.Join(errA, errB); err != nil {
+				missing = append(missing, in.Key)
+				selectorErrs = append(selectorErrs, fmt.Sprintf("%s: %v", in.Key, strings.ReplaceAll(err.Error(), "\n", "; ")))
+				continue
+			}
+			valStart += a
+			valEnd += b
+			continue
+		}
 		a, okA := start[in.Key]
 		b, okB := end[in.Key]
 		if !okA || !okB {
@@ -359,6 +381,9 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	if len(missing) > 0 {
 		res.Status = summary.StatusSkip
 		res.Reason = "missing input metrics"
+		if len(selectorErrs) > 0 {
+			res.Reason = "unresolved selector input: " + strings.Join(selectorErrs, "; ")
+		}
 		return res
 	}
 
@@ -404,6 +429,15 @@ func evalSLI(s spec.SLISpec, start, end map[string]float64) summary.SLIResult {
 	}
 
 	return res
+}
+
+// resolveSelector resolves a selector input against one point snapshot.
+func resolveSelector(sel *spec.Selector, values map[string]float64, which string) (float64, error) {
+	v, _, err := sel.Resolve(values)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", which, err)
+	}
+	return v, nil
 }
 
 func evalWindowSLI(s spec.SLISpec, samples []fetch.Sample) summary.SLIResult {

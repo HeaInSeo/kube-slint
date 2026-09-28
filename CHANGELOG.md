@@ -5,6 +5,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- `spec.SelectMetric` adds an explicit selector to `MetricRef` for point compute
+  modes. It selects series by metric name and label matchers (`LabelEq`, and
+  `LabelRegexp`, which is anchored RE2). Sum aggregation happens only when the
+  spec declares `AggregateSum`. Matching and summation are deterministic.
+  - A selector that matches zero series, or several series without a declared
+    aggregation, fails closed: the SLI is skipped with a reason.
+  - A malformed selector fails `Execute` before any fetch.
+  - Selector inputs have their own canonical identity key. Exact-key inputs keep
+    their existing behavior and slo.v4 `SLIContractID` values unchanged.
+
 ## [1.7.0] - 2026-07-16
 
 ### Added
