@@ -585,6 +585,37 @@ func TestSelector_DeltaAggregateNoneCanonicalSeriesIdentity(t *testing.T) {
 
 func ptrFloat(v float64) *float64 { return &v }
 
+// Codex P2 4126142138: AggregateSum adds matched series in canonical identity
+// order, so an endpoint whose fetcher serializes labels differently cannot
+// produce a false delta through floating-point cancellation.
+func TestSelector_DeltaAggregateSumCanonicalOrder(t *testing.T) {
+	sel := spec.SLISpec{
+		ID: "rest-errors-delta", Unit: "count", Kind: "delta_counter",
+		Compute: spec.ComputeSpec{Mode: spec.ComputeDelta},
+		Inputs:  []spec.MetricRef{spec.SelectMetric("m", spec.AggregateSum, spec.LabelEq("app", "x"))},
+	}
+	canonical := map[string]float64{`m{app="x",s="a"}`: 1e16, `m{app="x",s="b"}`: -1e16, `m{app="x",s="c"}`: 1}
+	// Same logical series and values; only b's labels are serialized in
+	// reverse, so its raw key sorts after c's.
+	permuted := map[string]float64{`m{app="x",s="a"}`: 1e16, `m{s="b",app="x"}`: -1e16, `m{app="x",s="c"}`: 1}
+	for name, c := range map[string]struct{ start, end map[string]float64 }{
+		"canonical to permuted": {canonical, permuted},
+		"permuted to canonical": {permuted, canonical},
+		"permuted both":         {permuted, permuted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			sum, err := runE2P(t, nil, c.start, c.end, sel)
+			if err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+			r := sum.Results[0]
+			if r.Status != summary.StatusPass || r.Value == nil || *r.Value != 0 {
+				t.Fatalf("status=%s value=%v reason=%q, want pass with delta 0", r.Status, r.Value, r.Reason)
+			}
+		})
+	}
+}
+
 // Legacy exact-key identities are pinned to the values computed at
 // main@a2407ff, before selectors existed, so slo.v4 identities of existing
 // callers cannot drift.

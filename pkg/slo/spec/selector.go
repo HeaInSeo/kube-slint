@@ -219,9 +219,12 @@ func (s *Selector) Validate() error {
 }
 
 // Resolve selects the matching series from values and returns their combined
-// value together with the sorted matched keys. Keys that are not parseable
-// Prometheus keys never match. Matched values are summed in sorted key order,
-// so the result does not depend on map iteration order.
+// value together with the matched keys. Keys that are not parseable
+// Prometheus keys never match. Matched series are ordered, and their values
+// summed, by canonical metric+label identity (raw key as tie-break), so the
+// result depends neither on map iteration order nor on how the fetcher
+// serializes labels. The returned keys are the raw keys, in that order, and
+// stay the value-lookup handles.
 func (s *Selector) Resolve(values map[string]float64) (float64, []string, error) {
 	if err := s.Validate(); err != nil {
 		return 0, nil, err
@@ -233,7 +236,8 @@ func (s *Selector) Resolve(values map[string]float64) (float64, []string, error)
 		}
 	}
 
-	var matched []string
+	type series struct{ raw, canonical string }
+	var found []series
 	familyPresent := false
 	for key := range values {
 		name, labels, err := promkey.Parse(key)
@@ -242,10 +246,19 @@ func (s *Selector) Resolve(values map[string]float64) (float64, []string, error)
 		}
 		familyPresent = true
 		if s.matches(labels, res) {
-			matched = append(matched, key)
+			found = append(found, series{raw: key, canonical: promkey.Format(name, labels)})
 		}
 	}
-	sort.Strings(matched)
+	sort.Slice(found, func(i, j int) bool {
+		if found[i].canonical != found[j].canonical {
+			return found[i].canonical < found[j].canonical
+		}
+		return found[i].raw < found[j].raw
+	})
+	var matched []string
+	for _, f := range found {
+		matched = append(matched, f.raw)
+	}
 
 	switch {
 	case len(matched) == 0 && s.EmptyMatch == EmptyMatchZeroIfFamilyPresent:

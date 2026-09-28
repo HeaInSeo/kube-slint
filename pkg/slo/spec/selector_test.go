@@ -244,3 +244,32 @@ func TestMetricRef_ExactAndSelectorIdentitiesDisjoint(t *testing.T) {
 		t.Fatal("distinct exact keys must keep distinct identities")
 	}
 }
+
+// Codex P2 4126142138: the sum must not depend on how a fetcher serializes
+// labels. With 1e16, -1e16 and 1 the float result depends on addition order:
+// canonical order a,b,c gives 1, while raw-key order a,c,b would give 0.
+func TestSelector_SumOrderIsCanonicalNotRaw(t *testing.T) {
+	a, b, c := `m{app="x",s="a"}`, `m{app="x",s="b"}`, `m{app="x",s="c"}`
+	ref := SelectMetric("m", AggregateSum, LabelEq("app", "x"))
+	for name, keys := range map[string][3]string{
+		"canonical":            {a, b, c},
+		"all reversed":         {`m{s="a",app="x"}`, `m{s="b",app="x"}`, `m{s="c",app="x"}`},
+		"b reversed":           {a, `m{s="b",app="x"}`, c},
+		"a reversed, b spaced": {`m{s="a",app="x"}`, `m{app="x", s="b"}`, c},
+	} {
+		t.Run(name, func(t *testing.T) {
+			values := map[string]float64{keys[0]: 1e16, keys[1]: -1e16, keys[2]: 1}
+			got, matched, err := ref.Selector.Resolve(values)
+			if err != nil {
+				t.Fatalf("Resolve: %v", err)
+			}
+			if got != 1 {
+				t.Fatalf("sum = %v, want 1 (canonical a,b,c order)", got)
+			}
+			// Raw keys are returned, ordered by canonical identity.
+			if strings.Join(matched, "|") != strings.Join(keys[:], "|") {
+				t.Fatalf("matched = %v, want raw keys in canonical order %v", matched, keys)
+			}
+		})
+	}
+}
